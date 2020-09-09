@@ -1,0 +1,28 @@
+language: python
+dist: xenial
+
+# Cache package wheels
+cache: pip
+
+python:
+  - "3.6"
+
+# command to install dependencies
+install:
+  - pip install -r requirements.txt
+  - python -m nltk.downloader stopwords
+
+script:
+  - pip install -e /home/travis/build/HazyResearch/bootleg
+  - mkdir /home/travis/build/HazyResearch/bootleg/runs
+  - pytest test
+
+# blocklist
+#branches:
+#  except:
+#  - api
+
+notifications:
+  email:
+  - mleszczy@stanford.edu
+  - lorr1@cs.stanford.edu

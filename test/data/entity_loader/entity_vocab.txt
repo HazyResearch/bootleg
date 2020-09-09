@@ -1,0 +1,5 @@
+alias1 1 0 0 0 0 
+alias2 0 1 0 0 0 
+alias3 0 0 1 0 0
+alias4 0 0 0 1 0 
+multi 0 0 0 0 1

@@ -1,0 +1,58 @@
+{
+    "run_config": {
+        "save_dir": "runs",
+        "run_folder": "test",
+        "distributed": false,
+        "cpu": true,
+        "dataloader_threads": 1,
+        "dataset_threads": 1,
+        "perc_eval": 1.0,
+        "min_eval_size": 1,
+        "topk": 2,
+        "eval_slices": ["base", "slice1", "slice2"]
+    },
+    "train_config": {
+        "batch_size": 1,
+        "train_heads": ["base", "slice1", "slice2"],
+        "slice_method": "SBL"
+    },
+    "model_config": {
+        "attn_load_class": "conee_base.CoNEEBase",
+        "hidden_size": 10,
+        "num_heads": 1,
+        "num_model_stages": 2
+    },
+    "data_config": {
+        "train_in_candidates": true,
+        "max_word_token_len": 5,
+        "max_aliases": 4,
+        "data_dir": "test/data/data_loader",
+        "overwrite_preprocessed_data": true,
+        "emb_dir": "test/data",
+        "train_dataset":
+        {
+            "train_file_prefix": "train_small.txt",
+            "load_class": "WikiDataset",
+            "slice_class": "WikiSlices"
+        },
+        "dev_datasets":
+        [{
+            "dev_file_prefix": "en_dev",
+            "load_class": "WikiDataset",
+            "slice_class": "WikiSlices"
+        }],
+        "word_embedding":
+        {
+            "load_class": "standard_word_emb.StandardWordEmb",
+            "sent_class": "standard_sent_emb.StandardSentEmb",
+            "word_symbols": "CustomWordSymbols",
+            "custom_vocab_embedding_file": "data_loader/data_vocab.txt",
+            "layers": 1,
+            "freeze_word_emb": false,
+            "cache_dir": "embs"
+        },
+        "ent_embeddings": [
+            {"key": "learned","load_class": "entity_embs.LearnedEntityEmb"}
+        ]
+    }
+}

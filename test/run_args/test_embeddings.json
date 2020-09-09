@@ -1,0 +1,52 @@
+{
+    "run_config": {
+        "save_dir": "runs/test",
+        "cpu": true
+      },
+    "model_config": {
+        "attn_load_class": "conee_base.CoNEEBase",
+        "hidden_size": 10,
+        "num_heads": 1
+    },
+    "train_config": {
+        "batch_size": 1
+    },
+    "data_config": {
+        "train_in_candidates": true,
+        "max_aliases": 5,
+        "data_dir": "test/data/data_loader",
+        "emb_dir": "test/data",
+        "train_dataset": {
+            "file": "train_small_dis.txt",
+            "load_class": "wiki_dataset.WikiDataset",
+            "slice_class": "wiki_slices.WikiSlices"
+        },
+        "dev_dataset": {
+            "file": "en_dev.txt",
+            "load_class": "wiki_dataset.WikiDataset",
+            "slice_class": "wiki_slices.WikiSlices"
+        },
+        "word_embedding": {
+            "load_class": "standard_word_emb.StandardWordEmb",
+            "sent_class": "standard_sent_emb.StandardSentEmb",
+            "word_symbols": "CustomWordSymbols",
+            "custom_vocab_embedding_file": "custom_embedding.txt",
+            "layers": 3,
+            "freeze_word_emb": true
+        },
+        "ent_embeddings": [
+            {
+                "key": "learned",
+                "load_class": "entity_embs.LearnedEntityEmb",
+                "args": {
+                    "learned_embedding_size": 10}
+            },
+            {
+                "load_class": "title_embs.AvgTitleEmb",
+                "key": "avg_title",
+                "args": {
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,3 @@
+{"aliases":["alias1","multi word alias2"],"parent_qid":"-1","parent_title":"-1","anchor":[true,true], "qids":["Q1","Q4"],"sent_idx":"1","sent_idx_unq":"1","sentence":"alias1 or multi word alias2","spans":["0:1","2:5"],"slices": {"base_slice": [0,1]}}
+{"aliases":["alias3","alias4"],"parent_qid":"-1","parent_title":"-1","anchor":[true,true], "qids":["Q1","Q3"],"sent_idx":"2","sent_idx_unq":"2","sentence":"alias3 cat alias4","spans":["0:1","2:3"],"slices": {"base_slice": [0,1]}}
+{"aliases":["multi word alias2"],"parent_qid":"-1","parent_title":"-1","anchor":[true], "qids":["Q4"],"sent_idx":"3","sent_idx_unq":"3","sentence":"cat multi word alias2","spans":["1:4"],"slices": {"base_slice": [0]}}
