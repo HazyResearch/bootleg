@@ -1,0 +1,134 @@
+---
+layout: default
+---
+
+<h1>About</h1>
+<p>
+  Bootleg is a guidable, self-supervised named entity disambiguation (NED) system that links mentions in text to entities in a knowledge base. Bootleg is built to improve disambiguation of tail entities using a simple transformer-based architecture.
+  <!-- Bootleg leverages guidability mechanisms--augmentation, weak labeling, and slice-based learning---to quickly patch errors. -->
+  Bootleg is still in active development, but is already in use at industry and research labs.
+</p>
+
+
+  </p>
+  <h1>Code</h1>
+  <p>If you would like to collaborate, please fill out the brief
+  <a target="blank" href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3NlOXjzaEubyBV1XAxR81guFtOmkUBJssPyAIwC6UVUNzJaRDFSN0M3MUgyWVNRNU5LS09YQk04Ri4u&embed=true">questionnaire</a> so that we can get in touch.</p>
+
+<h1>Results</h1>
+Bootleg achieves state-of-the-art on NED benchmarks and improves over a standard BERT NED baseline by over 50 F1 points on the tail. Bootleg can even correctly disambiguate entities which were never seen during train!
+<h3>NED Benchmarks</h3>
+We compare Bootleg against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
+<p>
+  <table class="ui structured red table small-font">
+    <thead>
+        <tr>
+          <th>Benchmark</th>
+          <th>System</th>
+            <th>Precision</th>
+            <th>Recall</th>
+            <th>F1</th>
+        </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td rowspan="2">KORE50<sup><a href="#note1">1</a></sup></td>
+        <td>Hu et al., 2019<sup><a href="#note1">4</a></sup></td>
+          <td>80.0</td>
+          <td>79.8</td>
+          <td>79.9</td>
+      </tr>
+    </tr>
+    <td>Bootleg</td>
+        <td><b>87.5</b></td>
+        <td><b>83.2</b></td>
+        <td><b>85.3</b></td>
+      <tr>
+        <td rowspan="2">RSS500<sup><a href="#note1">2</a></sup></td>
+          <td>Phan et al., 2019<sup><a href="#note1">5</a></sup></td>
+          <td>82.3 </td>
+          <td><b>82.3</b></td>
+          <td>82.3</td>
+      </tr>
+      <td>Bootleg</td>
+      <td><b>89.2</b> </td>
+      <td>80.3</td>
+      <td><b>84.5</b></td>
+    </tr>
+      <tr>
+        <td rowspan="2">AIDA CoNLL YAGO<sup><a href="#note1">3</a></sup></td>
+          <td>Fevry et al., 2020<sup><a href="#note1">6</a></sup></td>
+          <td>-</td>
+          <td>96.7</td>
+          <td>-</td>
+      </tr>
+    </tr>
+    <td>Bootleg</td>
+    <td>97.0</td>
+    <td>96.7</td>
+    <td>96.8</td>
+  </tr>
+</tr>
+    </tbody>
+</table>
+</p>
+<h3>Tail Performance</h3>
+We also evaluate the performance of Bootleg on the tail compared to a standard BERT NED baseline.
+We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores.
+<p>
+  <table class="ui structured red table small-font">
+    <thead>
+        <tr>
+          <th>Evaluation Set</th>
+          <th>BERT NED Baseline</th>
+            <th>Bootleg</th>
+        </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>All Entities</td>
+          <td>92.8</td>
+          <td><b>96.2</b></td>
+      </tr>
+    </tr>
+    <td>Torso Entities</td>
+        <td>62.1</td>
+        <td><b>80.2</b></td>
+    </tr>
+      <td>Tail Entities</td>
+          <td>19.2</td>
+          <td><b>71.3</b></td>
+      </tr>
+      <tr>
+          <td>Unseen Entities</td>
+          <td>11.4</td>
+          <td><b>65.8</b></td>
+      </tr>
+    </tbody>
+</table>
+
+
+<h2>References</h2>
+<p>
+<p style="font-size:14px" id="note1"><sup>1</sup>Johannes Hoffart, Stephan Seufert, Dat Ba Nguyen, Martin Theobald, and Gerhard Weikum. <a href=https://www.hoffart.ai/wp-content/papercite-data/pdf/hoffart-2012vx.pdf>"Kore: keyphrase overlap relatedness for entity disambiguation."</a>  In <i>CIKM</i>, 2012.
+<p style="font-size:14px" id="note1"><sup>2</sup> Daniel Gerber, Sebastian Hellmann, Lorenz Bühmann, Tommaso Soru, Ricardo Usbeck, and Axel-Cyrille Ngonga Ngomo.<a href=https://link.springer.com/chapter/10.1007/978-3-642-41335-3_9>"Real-time rdf extraction from un- structured data streams."</a> In <i>ISWC</i>, 2013.
+<p style="font-size:14px" id="note1"><sup>3</sup>Johannes Hoffart, Mohamed Amir Yosef,Ilaria Bordino,Hagen Fürstenau, Manfred Pinkal, Marc Spaniol, Bilyana Taneva, Stefan Thater, and Gerhard Weikum. <a href=https://www.aclweb.org/anthology/D11-1072.pdf>"Robust disambiguation of named entities in text."</a> In <i>EMNLP</i>, 2011.
+<p style="font-size:14px" id="note1"><sup>4</sup>Shengze Hu, Zhen Tan, Weixin Zeng, Bin Ge, and Weidong Xiao. <a href=https://www.mdpi.com/2073-8994/11/4/453>"Entity linking via symmetrical attention-based neural network and entity structural features."</a> <i>Symmetry</i>, 2019.
+<p style="font-size:14px" id="note1"><sup>5</sup> Minh C. Phan, Aixin Sun, Yi Tay, Jialong Han, and Chenliang Li. <a href=https://arxiv.org/pdf/1802.01074.pdf>"Pair-linking for
+  collective entity disambiguation: Two could be better than all".</a> In <i>TKDE</i>, 2019.
+<p style="font-size:14px" id="note1"><sup>6</sup> Thibault Févry, Nicholas FitzGerald, Livio Baldini Soares, and Tom Kwiatkowski. <a href=https://arxiv.org/pdf/2005.14253.pdf>"Empirical evaluation of pretraining strategies for supervised entity linking."</a> In <i>AKBC</i>, 2020.
+</p>
+<!--
+<div class="posts">
+  {% for post in site.posts %}
+    <article class="post">
+
+      <h1><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></h1>
+
+      <div class="entry">
+        {{ post.excerpt }}
+      </div>
+
+    </article>
+  {% endfor %}
+</div> -->
