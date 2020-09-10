@@ -30,7 +30,7 @@ class TypeSymbols:
             total = 0.
             count = 0.
             qid2typeid_raw = json.load(f)
-            for qid in tqdm(qid2typeid_raw):
+            for qid in tqdm(qid2typeid_raw, desc=f"Reading {type_file}"):
                 typeids = qid2typeid_raw[qid][:max_types]
                 total += len(typeids)
                 # Use identity map if type is not in vocab

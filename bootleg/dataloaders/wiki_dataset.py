@@ -1,6 +1,6 @@
 import os
 import time
-import ujson
+import ujson as json
 import torch
 import sys
 import pickle

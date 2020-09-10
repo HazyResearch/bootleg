@@ -15,14 +15,14 @@ def get_log_name(args, mode):
 
 def create_logger(args, mode):
     if args.run_config.distributed:
-        logger = multiprocessing.get_logger("bootleg")
+        logger = multiprocessing.get_logger()
     else:
         logger = logging.getLogger("bootleg")
 
     # set logging level
     numeric_level = getattr(logging, args.run_config.loglevel.upper(), None)
     if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s' % loglevel)
+        raise ValueError('Invalid log level: %s' % args.run_config.loglevel.upper())
     logger.setLevel(numeric_level)
     # do not propagate messages to the root logger
     logger.propagate = False
@@ -45,6 +45,6 @@ def create_logger(args, mode):
 
 def get_logger(args):
     if args.run_config.distributed:
-        return multiprocessing.get_logger("bootleg")
+        return multiprocessing.get_logger()
     else:
         return logging.getLogger("bootleg")
