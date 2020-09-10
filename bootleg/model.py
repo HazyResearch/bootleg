@@ -90,7 +90,7 @@ class BaselineModel(Model):
         mask = entity_indices == -1
         entity_indices = torch.where(entity_indices >= 0, entity_indices,
                                            (torch.ones_like(entity_indices, dtype=torch.long)*(self.num_entities_with_pad_and_nocand-1)))
-        entity_package = EmbeddingPackage(tensor=entity_indices, pos_in_sent=alias_idx_pair_sent, alias_indices=alias_indices, mask=mask, normalize=False, key=None, dim=None)
+        entity_package = DottedDict(tensor=entity_indices, pos_in_sent=alias_idx_pair_sent, alias_indices=alias_indices, mask=mask, normalize=False, key=None, dim=None)
         sent_emb, entity_embs = self.emb_layer(word_indices, entity_package, batch_prepped_data, batch_on_the_fly_data)
         res = self.attn_network(alias_idx_pair_sent, sent_emb, entity_embs, batch_prepped_data)
         return res, entity_package, None
