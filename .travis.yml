@@ -13,8 +13,8 @@ install:
   - python -m nltk.downloader stopwords
 
 script:
-  - pip install -e /home/travis/build/HazyResearch/bootleg
-  - mkdir /home/travis/build/HazyResearch/bootleg/runs
+  - pip install -e /home/travis/build/HazyResearch/bootleg-internal
+  - mkdir /home/travis/build/HazyResearch/bootleg-internal/runs
   - pytest test
 
 # blocklist
