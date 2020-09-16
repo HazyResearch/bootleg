@@ -128,6 +128,7 @@ def generate_data_subsent_helper(input_args):
             assert 'qids' in line
             assert 'spans' in line
             assert 'sentence' in line
+            assert ANCHOR_KEY in line
             sent_idx = line['sent_idx_unq']
             # aliases are assumed to be lower-cased in candidate map
             aliases = [alias.lower() for alias in line['aliases']]
@@ -151,7 +152,6 @@ def generate_data_subsent_helper(input_args):
                 assert len(span) == 2,  f"Span is too large {span}"
                 # assert int(span.split(":")[0]) <= len(phrase.split(" "))-1, f"Span is too large {span}"
             if not use_weak_label:
-                assert ANCHOR_KEY in line, 'Cannot toggle off data weak labelling without anchor info'
                 aliases = [aliases[i] for i in range(len(anchor)) if anchor[i] is True]
                 qids = [qids[i] for i in range(len(anchor)) if anchor[i] is True]
                 spans = [spans[i] for i in range(len(anchor)) if anchor[i] is True]
