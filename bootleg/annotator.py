@@ -122,8 +122,7 @@ class Annotator():
 
                 # alias_idx_pair
                 span_idx = spans_arr[sub_idx][mention_idx]
-                span_start_idx = int(span_idx.split(":")[0])
-                span_end_idx = int(span_idx.split(":")[1])
+                span_start_idx, span_end_idx = span_idx
                 example_aliases_locs_start[mention_idx] = span_start_idx
                 example_aliases_locs_end[mention_idx] = span_end_idx
 

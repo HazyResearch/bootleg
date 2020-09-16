@@ -151,7 +151,6 @@ def split_sentence(max_aliases, phrase, spans, aliases, aliases_seen_by_model, s
     is_bert = word_symbols.is_bert
     sentence, aliases2see, maxlen = phrase, aliases_seen_by_model, seq_len
     sentence = word_symbols.tokenize(sentence)
-    spans = [tuple(map(int, x.split(':'))) for x in spans]
 
     if is_bert:
         # Example: "Kit ##tens love purple ##ish puppet ##eers" ~=~=~=> [0, 0, 1, 2, 2, 3, 3]
@@ -189,8 +188,7 @@ def split_sentence(max_aliases, phrase, spans, aliases, aliases_seen_by_model, s
 
             span_offset += int(is_bert)  # add one for BERT to account for [CLS]
             span_endpos += int(is_bert)
-            # span_endpos = min(span_endpos, split_endpos)  # Keep the span as an indication it's not fully in window
-            window_spans[-1].append(':'.join([str(span_offset - split_offset), str(span_endpos - split_offset)]))
+            window_spans[-1].append([span_offset - split_offset, span_endpos - split_offset])
             current_alias_idx += 1
 
     return window_span_idxs, window_aliases2see, window_spans, window_sentences

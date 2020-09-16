@@ -42,9 +42,14 @@ conda install pytorch==1.5.0 torchvision==0.6.0 cudatoolkit=10.1 -c pytorch
 
 ## Tutorials
 
-We provide three tutorials to help users get familiar with Bootleg:
+We provide five tutorials to help users get familiar with Bootleg:
+### Training
+- [basic training](tutorials/basic_training_tutorial.md): learn how to train a Bootleg model on new data, including formatting data, preprocessing data, and training with a sample dataset.
+- [advanced training](tutorials/advanced_training_tutorial.md): learn how to use distributed training to train a Bootleg model on the full English Wikipedia dump (over 50 million sentences!).
+### Inference
 - [benchmark](tutorials/benchmark_tutorial.ipynb): learn how to use a Bootleg model pretrained on Wikipedia to run inference on the standard RSS500 NED benchmark, where Bootleg must disambiguate pre-detected mentions in sentences.
-- [end_to_end](tutorials/end2end_ned_tutorial.ipynb): learn how to use Bootleg for end-to-end inference, starting from text data to detecting and labeling mentions. We also show how to use Bootleg for "on-the-fly" inference of individual sentences.
+- [end-to-end](tutorials/end2end_ned_tutorial.ipynb): learn how to use Bootleg for end-to-end inference, starting from text data to detecting and labeling mentions. We also show how to use Bootleg for "on-the-fly" inference of individual sentences.
+### Embeddings for Downstream Tasks
 - [entity embeddings](tutorials/entity_embedding_tutorial.ipynb): learn how to use pretrained Bootleg models to generate contextual and static entity embeddings for use in downstream tasks.
 
 # Disambiguating at the Tail
@@ -60,7 +65,7 @@ is associated with each mention.
 ![Dataflow](docs/images/bootleg_dataflow.png "Bootleg Dataflow")
 
 ## Entity Payload
-We use three embeddings to for the entity payloads. Each entity gets the following embeddings:
+We use three embeddings for the entity payloads. Each entity gets the following embeddings:
 * Entity: learned embedding
 * Type: learned embedding for each of its types
 * Relation: learned embedding for each relation it participates in on Wikidata
@@ -82,7 +87,7 @@ These embeddings are concatenated and projected to form an entity payload.
     <img src="docs/images/bootleg_architecture.png " width="500" class="center"/>
 </p>
 
-In the figure above, *M* represents the maximum number of mentions (or aliases) in the sentence, *K* represents the maximum number of candidates considered per mention, and *N* represents the maximum number of sub-words in the sentence. Typically, we use *M*=10, *K*=30, and *N*=100. Additionally, *H* is the hidden dimension used throughout the backbone, *E* is the dimension of the learned entity embedding, *R* the dimension of the learned relation embedding, and *T* the dimension of the learned type embedding. We further select an entity's 3 most popular types and 50 most unique Wikidata relations. These are all tunable parameters in Bootleg. 
+In the figure above, *M* represents the maximum number of mentions (or aliases) in the sentence, *K* represents the maximum number of candidates considered per mention, and *N* represents the maximum number of sub-words in the sentence. Typically, we use *M*=10, *K*=30, and *N*=100. Additionally, *H* is the hidden dimension used throughout the backbone, *E* is the dimension of the learned entity embedding, *R* the dimension of the learned relation embedding, and *T* the dimension of the learned type embedding. We further select an entity's 3 most popular types and 50 most unique Wikidata relations. These are all tunable parameters in Bootleg.
 
 
 ## Inference
@@ -91,4 +96,4 @@ Given a pretrained model, we support three types of inference: `--mode eval`, `-
  <!-- type or KG embeddings) if desired. -->
 
 ## Training
-Coming soon!
+We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](basic_training_tutorial.md) and [Advanced Training](advanced_training_tutorial.md) tutorials for more information and sample data!

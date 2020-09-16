@@ -152,7 +152,8 @@ class WikiDataset(Dataset):
         if not dataset_is_eval:
             # Whether to use a random NIL training regime
             self.random_nil = args.train_config.random_nil
-            self.logger.info('Using random nils')
+            if self.random_nil:
+                self.logger.info('Using random nils')
 
     def __len__(self):
         return self.data_len

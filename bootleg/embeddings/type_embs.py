@@ -120,7 +120,7 @@ class TypeEmb(EntityEmb):
         # make sure adding type labels doesn't add new types
         assert (max_type_id_all+1) <= labeled_num_types
         eid2typeids[eid2typeids == -1] = labeled_num_types
-        print(f"{type_hit/entity_symbols.num_entities} have not pad or null types")
+        print(f"{round(type_hit/entity_symbols.num_entities, 2)*100}% of entities are assigned types")
         # As max_type_id is +1, it accounts for 0 indexing
         type2row = [0]*(max_type_id_all)
         for type_id in type2row_dict:

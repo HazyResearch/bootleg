@@ -12,7 +12,7 @@
     "data_config": {
         "train_in_candidates": true,
         "max_aliases": 5,
-        "entity_dir": "test/data/entity_loader/entity_db",
+        "entity_dir": "test/data/entity_loader/entity_data",
         "data_dir": "test/data/entity_loader",
         "emb_dir": "test/data",
         "train_dataset": {

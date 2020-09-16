@@ -11,8 +11,6 @@ import jsonlines
 import pickle
 from collections import defaultdict
 
-logging.basicConfig(level = logging.INFO, format = '%(asctime)s %(message)s')
-
 from bootleg.symbols.alias_entity_table import AliasEntityTable
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.symbols.constants import *
@@ -123,7 +121,8 @@ def generate_data_subsent_helper(input_args):
             assert 'spans' in line
             assert 'sentence' in line
             sent_idx = line['sent_idx_unq']
-            aliases = line['aliases']
+            # aliases are assumed to be lower-cased in candidate map
+            aliases = [alias.lower() for alias in line['aliases']]
             qids = line['qids']
             spans = line['spans']
             phrase = line['sentence']
@@ -132,8 +131,8 @@ def generate_data_subsent_helper(input_args):
             # For datasets, we see all aliases, unless use_weak_label is turned off
             aliases_seen_by_model = [i for i in range(len(aliases))]
             anchor = [True for i in range(len(aliases))]
-            if 'anchor' in line:
-                anchor = line['anchor']
+            if ANCHOR_KEY in line:
+                anchor = line[ANCHOR_KEY]
                 assert len(aliases) == len(anchor)
                 assert all(isinstance(a, bool) for a in anchor)
                 all_false_anchors = all([a is False for a in anchor])
@@ -141,9 +140,10 @@ def generate_data_subsent_helper(input_args):
             for alias in aliases:
                 assert (alias in entity_symbols.get_all_aliases()), f"alias {alias} is not in entity_symbols"
             for span in spans:
-                assert int(span.split(":")[0]) <= len(phrase.split(" "))-1, f"Span is too large {span}"
+                assert len(span) == 2,  f"Span is too large {span}"
+                # assert int(span.split(":")[0]) <= len(phrase.split(" "))-1, f"Span is too large {span}"
             if not use_weak_label:
-                assert 'anchor' in line, 'Cannot toggle off data weak labelling without anchor info'
+                assert ANCHOR_KEY in line, 'Cannot toggle off data weak labelling without anchor info'
                 aliases = [aliases[i] for i in range(len(anchor)) if anchor[i] is True]
                 qids = [qids[i] for i in range(len(anchor)) if anchor[i] is True]
                 spans = [spans[i] for i in range(len(anchor)) if anchor[i] is True]
@@ -243,8 +243,7 @@ def process_data_subsent_helper(input_args):
             example_true_entities_for_train = np.ones(data_args.max_aliases) * PAD_ID
             # used to keep track of original alias index in the list
             for idx, (alias, span_idx, qid, alias_pos) in enumerate(zip(aliases, spans, qids, alias_list_pos)):
-                span_start_idx = int(span_idx.split(":")[0])
-                span_end_idx = int(span_idx.split(":")[1])
+                span_start_idx,  span_end_idx = span_idx
                 # generate indexes into alias table.
                 alias_trie_idx = entity_symbols.get_alias_idx(alias)
                 alias_qids = np.array(entity_symbols.get_qid_cands(alias))
@@ -321,8 +320,8 @@ def generate_slice_data_helper(input_args):
             # dict from slice_names -> aliases_to_predict
             # only used for slicing models
             anchor = [True for i in range(len(aliases))]
-            if 'anchor' in line:
-                anchor = line['anchor']
+            if ANCHOR_KEY in line:
+                anchor = line[ANCHOR_KEY]
                 assert len(aliases) == len(anchor)
                 assert all(isinstance(a, bool) for a in anchor)
                 if dataset_is_eval:
@@ -350,7 +349,7 @@ def generate_slice_data_helper(input_args):
             #     If dataset_is_eval is False, let
             #     a2p = [0,2,4,5]     (a2p can be anything)
             if not use_weak_label:
-                assert 'anchor' in line, 'Cannot toggle off data weak labelling without anchor info'
+                assert ANCHOR_KEY in line, 'Cannot toggle off data weak labelling without anchor info'
                 # The number of aliases will be reduced to the number of true anchors
                 num_a2p = sum(anchor)
                 # We must correct all mappings with alias indexes in them (filterings, importances, ...)
@@ -460,7 +459,9 @@ def process_emb_helper(input_args):
     # alias entity table and embeddings have already been prepped by now so
     # we can pass None for entity_symbols to avoid huge memory cost of
     # duplicating entity_symbols across processes
-    alias2entity_table, _ = AliasEntityTable.prep(args=args, entity_symbols=None, num_aliases_with_pad=num_aliases_with_pad, num_cands_K=num_cands_K)
+    alias2entity_table, _ = AliasEntityTable.prep(args=args, entity_symbols=None,
+        num_aliases_with_pad=num_aliases_with_pad, num_cands_K=num_cands_K,
+        log_func=logging.debug)
     logging.debug(f'alias table size {len(pickle.dumps(alias2entity_table, -1))}')
     batch_prepped = {}
     for emb in args.data_config.ent_embeddings:
@@ -876,11 +877,12 @@ def main():
     args = get_full_config(args.config_script, unknown)
     train_utils.setup_train_heads_and_eval_slices(args)
     formatter = logging.Formatter('%(asctime)s %(message)s')
-    logging.basicConfig(level=logging.DEBUG, format='%(message)s', datefmt='%FT%T', )
-    logging.debug("Logging")
+    numeric_level = getattr(logging, args.run_config.loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % loglevel)
+    logging.basicConfig(level=numeric_level, format='%(asctime)s %(message)s')
     log = logging.getLogger()
 
-    # TODO: make logging make more sense (right now it will be overwritten for dataset variants)
     prep_dir = get_data_prep_dir(args)
     utils.ensure_dir(prep_dir)
     log_name = os.path.join(prep_dir, "log")
@@ -899,7 +901,7 @@ def main():
         logging.info('Prepping embs...')
         start = time.time()
         prep_all_embs(args)
-        logging.info(f'Done prepping entity embeddings in {round(time.time() - start, 2)}s!')
+        logging.info(f'Done prepping embs in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_train:
         logging.info('Prepping train...')
@@ -915,8 +917,8 @@ def main():
             batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
             prep_dir=prep_dir,
             dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping {args.data_config.train_dataset.file} in {round(time.time() - start, 2)}s!')
-        logging.info('Done with train prep')
+        logging.debug(f'Prepped {args.data_config.train_dataset.file}.')
+        logging.info(f'Done with train prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_dev:
         logging.info('Prepping dev...')
@@ -933,8 +935,8 @@ def main():
               batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
               prep_dir=prep_dir,
               dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping {args.data_config.dev_dataset.file} in {round(time.time() - start, 2)}s!')
-        logging.info('Done with dev prep')
+        logging.debug(f'Prepped {args.data_config.dev_dataset.file}')
+        logging.info(f'Done with dev prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_test:
         logging.info('Prepping test...')
@@ -951,44 +953,43 @@ def main():
               batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
               prep_dir=prep_dir,
               dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping {args.data_config.test_dataset.file} in {round(time.time() - start, 2)}s!')
-        logging.info('Done with test prep')
+        logging.debug(f'Prepped {args.data_config.test_dataset.file}')
+        logging.info(f'Done with test prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_train_slices:
         logging.info('Prepping train slices...')
         start = time.time()
-        dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.train_datasets[0].use_weak_label,
-            split_name="slice_" + os.path.splitext(args.data_config.train_datasets[0].file)[0],
+        dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.train_dataset.use_weak_label,
+            split_name="slice_" + os.path.splitext(args.data_config.train_dataset.file)[0],
             dataset_is_eval=False)
         full_dataset_name = os.path.join(prep_dir, dataset_name)
-        config_dataset_name = data_utils.get_slice_storage_file(dataset_name)
-        sent_idx_to_idx_file = data_utils.get_sent_idx_file(dataset_name)
-        prep_slice(args, args.data_config.train_datasets[0].file, args.data_config.train_datasets[0].use_weak_label,
+        config_dataset_name = os.path.join(prep_dir, data_utils.get_slice_storage_file(dataset_name))
+        sent_idx_to_idx_file = os.path.join(prep_dir, data_utils.get_sent_idx_file(dataset_name))
+        prep_slice(args, args.data_config.train_dataset.file, args.data_config.train_dataset.use_weak_label,
             dataset_is_eval=False, dataset_name=full_dataset_name,
             sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping slices from {args.data_config.train_datasets[0].file} in {round(time.time() - start, 2)}s to {full_dataset_name}!')
-        logging.info('Done with train slice prep')
+        logging.debug(f'Prepped slices from {args.data_config.train_dataset.file} to {full_dataset_name}.')
+        logging.info(f'Done with train slice prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_dev_eval_slices:
-        logging.info('Prepping dev slices')
+        logging.info('Prepping dev slices...')
         start = time.time()
         dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.dev_dataset.use_weak_label,
             split_name="slice_" + os.path.splitext(args.data_config.dev_dataset.file)[0],
              dataset_is_eval=True)
         full_dataset_name = os.path.join(prep_dir, dataset_name)
-
         config_dataset_name = os.path.join(prep_dir, data_utils.get_slice_storage_file(dataset_name))
         sent_idx_to_idx_file = os.path.join(prep_dir, data_utils.get_sent_idx_file(dataset_name))
         prep_slice(args, args.data_config.dev_dataset.file, args.data_config.dev_dataset.use_weak_label,
             dataset_is_eval=True, dataset_name=full_dataset_name,
             sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping slices from {args.data_config.dev_dataset} in {round(time.time() - start, 2)}s to {full_dataset_name}!')
-        logging.info('Done with dev slice prep')
+        logging.debug(f'Prepped slices from {args.data_config.dev_dataset} to {full_dataset_name}.')
+        logging.info(f'Done with dev slice prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_test_eval_slices:
-        logging.info('Prepping test slices')
+        logging.info('Prepping test slices...')
         start = time.time()
         dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.test_dataset.use_weak_label,
             split_name="slice_" + os.path.splitext(args.data_config.test_dataset.file)[0],
@@ -1000,8 +1001,8 @@ def main():
             dataset_is_eval=True, dataset_name=full_dataset_name,
             sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Done prepping slices from {args.data_config.test_dataset} in {round(time.time() - start, 2)}s to {full_dataset_name}!')
-        logging.info('Done with test slice prep')
+        logging.debug(f'Prepped slices from {args.data_config.test_dataset} to {full_dataset_name}.')
+        logging.info(f'Done with test slice prep in {round(time.time() - start, 2)}s!')
 
 if __name__ == '__main__':
     main()

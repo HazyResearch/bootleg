@@ -63,7 +63,7 @@ config_args = {
         "train_in_candidates": (True, "Train in candidates (if False, this means we include NIL entity)"),
         "data_dir": ("data","where training, testing, and dev data is stored"),
         "data_prep_dir": ("prep", "directory where data prep files are saved inside data_dir"),
-        "entity_dir": ("entity_db", "where entity profile information and prepped embedding data is stored"),
+        "entity_dir": ("entity_data", "where entity profile information and prepped embedding data is stored"),
         "entity_prep_dir": ("prep", "directory where prepped embedding data is saved inside entity_dir"),
         "entity_map_dir": ("entity_mappings", "directory where entity json mappings are saved inside entity_dir"),
         "alias_cand_map": ("alias2qids.json", "name of alias candidate map, should be saved in entity_dir/entity_map_dir"),
@@ -90,15 +90,15 @@ config_args = {
             "use_weak_label": (True, "Use weakly labeled mentions")
         },
         "word_embedding": {
-            "load_class": ("bert.BERTWordEmbedding", ""),
+            "load_class": ("bert_word_emb.BERTWordEmbedding", ""),
             "word_symbols": ("BERTWordSymbols", ""),
-            "sent_class": ("base_sent_emb.BaseSentEmbedding", ""),
+            "sent_class": ("bert_sent_emb.BERTSentEmbedding", ""),
             "custom_vocab_embedding_file": ("", ""),
             "layers": (3, ""),
             "freeze_word_emb": (False, ""),
             "freeze_sent_emb": (False, ""),
             "use_lower_case": (False, ""),
-            "cache_dir": ("embs", ""),
+            "cache_dir": ("pretrained_bert_models", "Directory where word embeddings are cached"),
             "custom_proj_size": (-1, "If set to positive number, will project the word embeddings before sending them to the sentence embedding."),
         },
         "ent_embeddings": ([

@@ -16,12 +16,12 @@ class BERTWordEmbedding(BaseWordEmbedding):
         # import torch
         # import os
         # from transformers import BertModel
-        # cache_dir = os.path.join("embs", "pretrained_bert_models")
+        # cache_dir = "pretrained_bert_models"
         # model = BertModel.from_pretrained('bert-base-cased', cache_dir=cache_dir)
         # torch.save(model.embeddings, os.path.join(cache_dir, "bert_base_cased_embedding.pt"))
         # model = BertModel.from_pretrained('bert-base-uncased', cache_dir=cache_dir)
         # torch.save(model.embeddings, os.path.join(cache_dir, "bert_base_uncased_embedding.pt"))
-        cache_dir = os.path.join(emb_args.cache_dir, "pretrained_bert_models")
+        cache_dir = emb_args.cache_dir
         if emb_args.use_lower_case:
             self.embeddings = torch.load(os.path.join(cache_dir, "bert_base_uncased_embedding.pt"))
         else:

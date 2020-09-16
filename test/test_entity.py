@@ -10,7 +10,7 @@ from bootleg.utils.classes.dotted_dict import DottedDict
 
 class EntitySymbolTest(unittest.TestCase):
     def setUp(self):
-        entity_dump_dir = "test/data/entity_loader/entity_db/entity_mappings"
+        entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols(load_dir=entity_dump_dir,
             alias_cand_map_file="alias2qids.json")
 
@@ -55,12 +55,12 @@ class EntitySymbolTest(unittest.TestCase):
 
 class AliasTableTest(unittest.TestCase):
     def setUp(self):
-        entity_dump_dir = "test/data/entity_loader/entity_db/entity_mappings"
+        entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols(entity_dump_dir, alias_cand_map_file="alias2qids.json")
         self.config = {
             'data_config':
                 {'train_in_candidates': False,
-                 'entity_dir': 'test/data/entity_loader/entity_db',
+                 'entity_dir': 'test/data/entity_loader/entity_data',
                  'entity_prep_dir': 'prep',
                  'alias_cand_map': 'alias2qids.json',
                  'max_aliases': 3,

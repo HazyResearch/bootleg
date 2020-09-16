@@ -1,4 +1,4 @@
-"""Word symobls class"""
+"""Word symbols class"""
 
 import os
 import torch
@@ -56,12 +56,12 @@ class BERTWordSymbols(WordSymbols):
         self.is_bert = True
         self.unk_id = None
         self.pad_id = 0
-        cache_dir = os.path.join(args.word_embedding.cache_dir, "pretrained_bert_models")
+        cache_dir = args.word_embedding.cache_dir
         utils.ensure_dir(cache_dir)
         # import torch
         # import os
         # from transformers import BertTokenizer
-        # cache_dir = os.path.join("embs", "pretrained_bert_models")
+        # cache_dir = "pretrained_bert_models"
         # tokenizer = BertTokenizer.from_pretrained('bert-base-cased', cache_dir=cache_dir, do_lower_case=False)
         # torch.save(tokenizer, os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))
         self.tokenizer = torch.load(os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))

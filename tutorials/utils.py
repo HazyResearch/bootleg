@@ -124,10 +124,9 @@ def compute_precision_and_recall(orig_label_file, new_label_file, threshold=None
             pred_mentions += sum([pred_qid != 'NC' for pred_qid in pred_qids])
 
             for gold_alias, gold_qid, gold_span in zip(gold_aliases, gold_qids, gold_spans):
-                gold_span_start = int(gold_span.split(':')[0])
-                gold_span_end = int(gold_span.split(':')[1])
-                fuzzy_gold_left = f'{gold_span_start-1}:{gold_span_end}'
-                fuzzy_gold_right = f'{gold_span_start+1}:{gold_span_end}'
+                gold_span_start, gold_span_end = gold_span
+                fuzzy_gold_left = [gold_span_start-1,gold_span_end]
+                fuzzy_gold_right = [gold_span_start+1,gold_span_end]
                 if gold_span in pred_spans or fuzzy_gold_left in pred_spans or fuzzy_gold_right in pred_spans:
                     if gold_span in pred_spans:
                         pred_idx = pred_spans.index(gold_span)
@@ -156,10 +155,9 @@ def compute_precision_and_recall(orig_label_file, new_label_file, threshold=None
                 if pred_qid == 'NC':
                     errors['NC'].append(create_error(line, gold_aliases, gold_qids, gold_spans, pred_aliases, pred_spans,
                                                               pred_qids, pred_probs, error=''))
-                gold_span_start = int(pred_span.split(':')[0])
-                gold_span_end = int(pred_span.split(':')[1])
-                fuzzy_gold_left = f'{gold_span_start-1}:{gold_span_end}'
-                fuzzy_gold_right = f'{gold_span_start+1}:{gold_span_end}'
+                pred_span_start, pred_span_end = pred_span
+                fuzzy_gold_left = [pred_span_start-1,pred_span_end]
+                fuzzy_gold_right = [pred_span_start+1,pred_span_end]
                 if pred_span not in gold_spans and fuzzy_gold_left not in gold_spans and fuzzy_gold_right not in gold_spans and pred_qid != 'NC':
                     errors['extra_mention'].append(create_error(line, gold_aliases, gold_qids, gold_spans, pred_aliases, pred_spans,
                                                               pred_qids, pred_probs, error=pred_alias))
@@ -195,7 +193,7 @@ def tagme_annotate(in_file, out_file, threshold=0.1, wpid2qid=None):
                 except:
                     span_end = len(text_spans)
                 aliases.append(mention)
-                spans.append(f'{span_start}:{span_end}')
+                spans.append([span_start, span_end])
                 qids.append(qid)
                 probs.append(ann.score)
 
@@ -203,4 +201,5 @@ def tagme_annotate(in_file, out_file, threshold=0.1, wpid2qid=None):
             line['qids'] = qids
             line['spans'] = spans
             line['probs'] = probs
+            line[ANCHOR_KEY] = [True for _ in aliases]
             f_out.write(line)

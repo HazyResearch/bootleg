@@ -15,7 +15,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5'
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
-        spans = ["0:2", "12:13", "20:21"]
+        spans = [[0,2], [12,13], [20,21]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -26,7 +26,7 @@ class SentenceUtils(unittest.TestCase):
         # Truth data
         true_phrase_arr = [
             "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")]
-        true_spans_arr = [["0:2", "12:13", "20:21"]]
+        true_spans_arr = [[[0,2], [12,13], [20,21]]]
         true_alias_to_predict_arr = [[0, 1, 2]]
         true_aliases_arr = [["The big", "alias3", "alias5"]]
 
@@ -51,7 +51,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5'
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
-        spans = ["0:2", "12:13", "20:21"]
+        spans = [[0,2], [12,13], [20,21]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -61,7 +61,7 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = ["The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")] * 2
-        true_spans_arr = [["0:2", "12:13"], ["20:21"]]
+        true_spans_arr = [[[0,2], [12,13]], [[20,21]]]
         true_alias_to_predict_arr = [[0, 1], [0]]
         true_aliases_arr = [["The big", "alias3"], ["alias5"]]
 
@@ -85,7 +85,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5'
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1]
-        spans = ["0:2", "12:13", "20:21"]
+        spans = [[0,2], [12,13], [20,21]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -96,7 +96,7 @@ class SentenceUtils(unittest.TestCase):
         # Truth data
         true_phrase_arr = [
             "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")]
-        true_spans_arr = [["0:2", "12:13", "20:21"]]
+        true_spans_arr = [[[0,2], [12,13], [20,21]]]
         true_alias_to_predict_arr = [[0, 1]]
         true_aliases_arr = [["The big", "alias3", "alias5"]]
 
@@ -122,7 +122,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5'
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
-        spans = ["0:2", "12:13", "20:21"]
+        spans = [[0,2], [12,13], [20,21]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -133,7 +133,7 @@ class SentenceUtils(unittest.TestCase):
         # True data
         true_phrase_arr = ["The big alias1 ran away from dogs and multi word alias2 and".split(),
                            "word alias2 and alias3 because we want our cat and our alias5".split()]
-        true_spans_arr = [["0:2"], ["3:4", "11:12"]]
+        true_spans_arr = [[[0,2]], [[3,4], [11,12]]]
         true_alias_to_predict_arr = [[0], [0, 1]]
         true_aliases_arr = [["The big"], ["alias3", "alias5"]]
 
@@ -160,7 +160,7 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = ["word alias2 and alias3 because we want our cat and our alias5".split()]
-        true_spans_arr = [["3:4", "11:12"]]
+        true_spans_arr = [[[3,4], [11,12]]]
         true_alias_to_predict_arr = [[0, 1]]
         true_aliases_arr = [["alias3", "alias5"]]
 
@@ -188,7 +188,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5'
         aliases = ["The big alias1", "multi word alias2 and alias3"]
         aliases_to_predict = [0, 1]
-        spans = ["0:3", "8:13"]
+        spans = [[0,3], [8,13]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -198,7 +198,7 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = ["The big alias1".split(), "multi word alias2".split()]
-        true_spans_arr = [["0:3"], ["0:5"]]
+        true_spans_arr = [[[0,3]], [[0,5]]]
         true_alias_to_predict_arr = [[0], [0]]
         true_aliases_arr = [["The big alias1"], ["multi word alias2 and alias3"]]
 
@@ -226,7 +226,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = 'The animal is called paca in most of its range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or guartinaja in Colombia'
         aliases = ["mexico", "panama", "ecuador", "peru", "bolivia", "colombia"]
         aliases_to_predict = [0, 1, 2, 3, 4, 5]
-        spans = ["19:20", "36:37", "39:40", "44:45", "48:49", "70:71"]
+        spans = [[19,20], [36,37], [39,40], [44,45], [48,49], [70,71]]
 
 
         # Run function
@@ -240,7 +240,7 @@ class SentenceUtils(unittest.TestCase):
             'range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media'.split(),
             'Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or guartinaja in Colombia'.split()
         ]
-        true_spans_arr = [["10:11", "27:28", "30:31", "35:36", "39:40"], ["15:16", "18:19", "23:24", "27:28", "49:50"]]
+        true_spans_arr = [[[10,11], [27,28], [30,31], [35,36], [39,40]], [[15,16], [18,19], [23,24], [27,28], [49,50]]]
         true_alias_to_predict_arr = [[0, 1, 2, 3, 4], [4]]
         true_aliases_arr = [["mexico", "panama", "ecuador", "peru", "bolivia"],
                             ["panama", "ecuador", "peru", "bolivia", "colombia"]]
@@ -267,7 +267,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall"
         aliases = ["coolock", "swords", "darndale", "santry", "donnycarney", "baldoyle", "sutton", "donaghmede", "artane", "whitehall", "kilbarrack", "raheny", "clontarf", "fairview", "malahide", "howth", "marino", "ballybough", "north strand", "sheriff street", "east wall"]
         aliases_to_predict = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,171,8,19,20]
-        spans = ["12:13","14:15","15:16","17:18","18:19","19:20","20:21","21:22","22:23","23:24","24:25","25:26","26:27","27:28","28:29","29:30","30:31","38:39","39:41","41:43","43:45"]
+        spans = [[12,13],[14,15],[15,16],[17,18],[18,19],[19,20],[20,21],[21,22],[22,23],[23,24],[24,25],[25,26],[26,27],[27,28],[28,29],[29,30],[30,31],[38,39],[39,41],[41,43],[43,45]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -281,7 +281,7 @@ class SentenceUtils(unittest.TestCase):
             "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
             "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall <pad> <pad> <pad> <pad> <pad>".split()
         ]
-        true_spans_arr = [['12:13', '14:15', '15:16', '17:18', '18:19', '19:20', '20:21', '21:22'], ['20:21', '21:22', '22:23', '23:24', '24:25', '25:26', '26:27', '27:28', '28:29'], ['27:28', '28:29', '29:30', '30:31', '38:39', '39:41', '41:43', '43:45']]
+        true_spans_arr = [[[12,13], [14,15], [15,16], [17,18], [18,19], [19,20], [20,21], [21,22]], [[20,21], [21,22], [22,23], [23,24], [24,25], [25,26], [26,27], [27,28], [28,29]], [[27,28], [28,29], [29,30], [30,31], [38,39], [39,41], [41,43], [43,45]]]
         true_alias_to_predict_arr = [[0, 1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 6, 7]]
         true_aliases_arr = [["coolock", "swords", "darndale", "santry", "donnycarney", "baldoyle", "sutton", "donaghmede"],
                             ["sutton", "donaghmede", "artane", "whitehall", "kilbarrack", "raheny", "clontarf", "fairview", "malahide"],
@@ -307,7 +307,7 @@ class SentenceUtils(unittest.TestCase):
         sentence = "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s schools"
         aliases = ["kentucky", "green"]
         aliases_to_predict = [0,1]
-        spans = ["8:9","9:10"]
+        spans = [[8,9],[9,10]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
@@ -319,7 +319,7 @@ class SentenceUtils(unittest.TestCase):
         true_phrase_arr = [
             "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s schools <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad>".split()
         ]
-        true_spans_arr = [["8:9","9:10"]]
+        true_spans_arr = [[[8,9],[9,10]]]
         true_alias_to_predict_arr = [[0, 1]]
         true_aliases_arr = [["kentucky", "green"]]
 
@@ -344,13 +344,13 @@ class SentenceUtils(unittest.TestCase):
         # Manual data
         sentence = 'Kittens love purpleish pupppeteers because alias2 and spanning the brreaches alias5'
         aliases = ["Kittens love", "alias2", "alias5"]
-        spans = ["0:2", "5:6", "10:11"]
+        spans = [[0,2], [5,6], [10,11]]
         aliases_to_predict = [0, 1, 2]
 
         # Truth
         bert_tokenized = ['Kit', '##tens', 'love', 'purple', '##ish', 'pu', '##pp', '##pet', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', 'br', '##rea', '##ches', 'alias', '##5']
         true_phrase_arr = [['[CLS]'] + bert_tokenized + ['[SEP]']]
-        true_spans_arr = [["1:4", "11:13", "19:21"]]
+        true_spans_arr = [[[1,4], [11,13], [19,21]]]
         true_alias_to_predict_arr = [[0, 1, 2]]
         true_aliases_arr = [["Kittens love", "alias2", "alias5"]]
 
@@ -380,7 +380,7 @@ class SentenceUtils(unittest.TestCase):
         # Manual data
         sentence = 'Kittens love purpleish pupppeteers because alias2 and spanning the brreaches alias5'
         aliases = ["Kittens love", "alias2", "alias5"]
-        spans = ["0:2", "5:6", "10:11"]
+        spans = [[0,2], [5,6], [10,11]]
         aliases_to_predict = [0, 1, 2]
 
         # Run function
@@ -391,7 +391,7 @@ class SentenceUtils(unittest.TestCase):
 
         # Truth
         true_phrase_arr = [['[CLS]', 'Kit', '##tens', 'love', 'purple', '##ish', 'pu', '##pp', '[SEP]'], ['[CLS]', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', '[SEP]'], ['[CLS]', 'spanning', 'the', 'br', '##rea', '##ches', 'alias', '##5', '[SEP]']]
-        true_spans_arr = [["1:4"], ["3:5"], ["6:8"]]
+        true_spans_arr = [[[1,4]], [[3,5]], [[6,8]]]
         true_alias_to_predict_arr = [[0], [0], [0]]
         true_aliases_arr = [["Kittens love"], ["alias2"], ["alias5"]]
 
@@ -418,7 +418,7 @@ class SentenceUtils(unittest.TestCase):
         # Manual data
         sentence = 'Kittens Kittens Kittens Kittens love purpleish pupppeteers because alias2 and spanning the brreaches alias5'
         aliases = ["Kittens love", "alias2", "alias5"]
-        spans = ["3:5", "8:9", "13:14"]
+        spans = [[3,5], [8,9], [13,14]]
         aliases_to_predict = [0, 1, 2]
 
         # Run function
@@ -429,7 +429,7 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = [['[CLS]', '##tens', 'Kit', '##tens', 'Kit', '##tens', 'love', 'purple', '##ish', 'pu', '##pp', '##pet', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', '[SEP]'], ['[CLS]', 'love', 'purple', '##ish', 'pu', '##pp', '##pet', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', 'br', '##rea', '##ches', 'alias', '##5', '[SEP]']]
-        true_spans_arr = [["4:7", "14:16"], ["9:11", "17:19"]]
+        true_spans_arr = [[[4,7], [14,16]], [[9,11], [17,19]]]
         true_alias_to_predict_arr = [[0,1], [1]]
         true_aliases_arr = [["Kittens love", "alias2"], ["alias2", "alias5"]]
 
@@ -454,12 +454,12 @@ class SentenceUtils(unittest.TestCase):
         # Manual data
         sentence = "The guest roster for O'Brien 's final show on January 22\u2014 Tom Hanks , Steve Carell and original first guest Will Ferrell \u2014was regarded by O'Brien as a `` dream lineup '' ; in addition , Neil Young performed his song `` Long May You Run `` and , as the show closed , was joined by Beck , Ferrell ( dressed as Ronnie Van Zant ) , Billy Gibbons , Ben Harper , O'Brien , Viveca Paulin , and The Tonight Show Band to perform the Lynyrd Skynyrd song `` Free Bird `` ."
         aliases = ["tom hanks","steve carell","will ferrell","neil young","long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"]
-        spans = ["11:13","14:16","20:22","36:38","42:46","57:58","63:66","68:70","71:73","76:78","87:89","91:93"]
+        spans = [[11,13],[14,16],[20,22],[36,38],[42,46],[57,58],[63,66],[68,70],[71,73],[76,78],[87,89],[91,93]]
         aliases_to_predict = [0,1,2,3,4,5,6,7,8,9,10,11]
 
         # Truth
         true_phrase_arr = [['[CLS]', 'The', 'guest', 'roster', 'for', 'O', "'", 'Brien', "'", 's', 'final', 'show', 'on', 'January', '22', '—', 'Tom', 'Hank', '##s', ',', 'Steve', 'Care', '##ll', 'and', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', '[SEP]'], ['[CLS]', 'The', 'guest', 'roster', 'for', 'O', "'", 'Brien', "'", 's', 'final', 'show', 'on', 'January', '22', '—', 'Tom', 'Hank', '##s', ',', 'Steve', 'Care', '##ll', 'and', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', '[SEP]'], ['[CLS]', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', 'and', 'The', 'Tonight', 'Show', 'Band', 'to', 'perform', 'the', 'L', '##yn', '##yr', '##d', 'Sky', '##ny', '##rd', 'song', '`', '`', 'Free', 'Bird', '`', '`', '.', '[SEP]']]
-        true_spans_arr = [['12:14', '15:17', '23:25', '40:42', '46:50', '61:62', '67:70', '72:74'], ['46:50', '61:62', '67:70', '72:74', '76:78', '81:84', '93:95', '100:102'], ['17:19', '23:27', '38:39', '44:47', '49:51', '53:55', '58:61', '70:72', '77:79']]
+        true_spans_arr = [[[12,14], [15,17], [23,25], [40,42], [46,50], [61,62], [67,70], [72,74]], [[46,50], [61,62], [67,70], [72,74], [76,78], [81,84], [93,95], [100,102]], [[17,19], [23,27], [38,39], [44,47], [49,51], [53,55], [58,61], [70,72], [77,79]]]
         true_alias_to_predict_arr = [[0, 1, 2, 3, 4, 5], [2, 3, 4, 5], [7, 8]]
         true_aliases_arr = [["tom hanks","steve carell","will ferrell","neil young","long may you run","beck","ronnie van zant","billy gibbons"], ["long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"], ["neil young","long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"]]
         # Run function
