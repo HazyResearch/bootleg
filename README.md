@@ -96,4 +96,4 @@ Given a pretrained model, we support three types of inference: `--mode eval`, `-
  <!-- type or KG embeddings) if desired. -->
 
 ## Training
-We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](basic_training_tutorial.md) and [Advanced Training](advanced_training_tutorial.md) tutorials for more information and sample data!
+We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](tutorials/basic_training_tutorial.md) and [Advanced Training](tutorials/advanced_training_tutorial.md) tutorials for more information and sample data!
