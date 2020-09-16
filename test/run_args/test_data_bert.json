@@ -26,7 +26,7 @@
             "custom_vocab_embedding_file": "",
             "layers": 1,
             "freeze_word_emb": false,
-            "cache_dir": "test/data"
+            "cache_dir": "test/data/pretrained_bert_models"
         },
         "ent_embeddings": [
             {"key": "learned","load_class": "entity_embs.LearnedEntityEmb"}

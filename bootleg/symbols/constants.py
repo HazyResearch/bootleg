@@ -19,3 +19,6 @@ DISAMBIG = "disambig"
 INDICATOR = "indicator"
 FINAL_LOSS = "final_loss"
 BASE_SLICE = "base"
+
+# dataset keys
+ANCHOR_KEY = "gold"

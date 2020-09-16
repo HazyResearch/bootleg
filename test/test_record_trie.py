@@ -11,7 +11,7 @@ from bootleg.utils.sentence_utils import split_sentence
 class TestRecordTrieCollection(unittest.TestCase):
 
     def test_construction_single(self):
-        entity_dump_dir = "test/data/preprocessing/base/entity_db/entity_mappings"
+        entity_dump_dir = "test/data/preprocessing/base/entity_data/entity_mappings"
         entity_symbols = EntitySymbols(load_dir=entity_dump_dir,
             alias_cand_map_file="alias2qids.json")
         fmt_types = {"trie1": "qid_cand_with_score"}
@@ -56,7 +56,7 @@ class TestRecordTrieCollection(unittest.TestCase):
                         'Q3': set(["Q2"]),
                         'Q4': set(["Q1", "Q2", "Q3"])
                         }
-        entity_dump_dir = "test/data/preprocessing/base/entity_db/entity_mappings"
+        entity_dump_dir = "test/data/preprocessing/base/entity_data/entity_mappings"
         entity_symbols = EntitySymbols(load_dir=entity_dump_dir,
             alias_cand_map_file="alias2qids.json")
         fmt_types = {"trie1": "qid_cand_with_score", "trie2": "type_ids", "trie3": "kg_relations"}
@@ -75,7 +75,7 @@ class TestRecordTrieCollection(unittest.TestCase):
             self.assertEqual(truerelations[qid], record_trie.get_value("trie3", qid))
 
     def test_load_and_save(self):
-        entity_dump_dir = "test/data/preprocessing/base/entity_db/entity_mappings"
+        entity_dump_dir = "test/data/preprocessing/base/entity_data/entity_mappings"
         entity_symbols = EntitySymbols(load_dir=entity_dump_dir,
             alias_cand_map_file="alias2qids.json")
         fmt_types = {"trie1": "qid_cand_with_score"}

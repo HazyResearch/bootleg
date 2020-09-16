@@ -833,7 +833,7 @@ def get_data_train_anchors_eval_yesaug_long():
     }
 
     # Sentence 3:
-    # {"aliases":["multi word alias2", "alias4", "alias4", "alias4"],"anchor":[false,true,false,true],"qids":["Q4","Q4","Q4","Q4"],"sent_idx_unq":"2",
+    # {"aliases":["multi word alias2", "alias4", "alias4", "alias4"],"gold":[false,true,false,true],"qids":["Q4","Q4","Q4","Q4"],"sent_idx_unq":"2",
     # "sentence":"cat multi word alias2 alias4 alias4 cat cat cat alias4","slices":{"base": [0,1,2,3], "slice1": []}}
     # First two aliases in this subsentence
     aliases = ['multi word alias2', 'alias4']
@@ -910,19 +910,19 @@ def get_slice_data_test_anchors_yesaug():
 
     # Slices enforce the size of alias_to_predict to be at least 2 so that we can always assume matrix for memmap
 
-    # {"aliases":["alias1","multi word alias2"],"anchor":[true,true],"qids":["Q1","Q4"],"sent_idx":"0","sent_idx_unq":"0",
+    # {"aliases":["alias1","multi word alias2"],"gold":[true,true],"qids":["Q1","Q4"],"sent_idx":"0","sent_idx_unq":"0",
     #       "sentence":"alias1 or multi word alias2","spans":["0:1","2:5"],
     #       "importance": {"base": {"0":0.2, "1":1.0}, "slice1": {"0": 0.8}},
     #       "slices": {"slice1": {"0":1.0, "1":0.9}, "slice2": {"0": 0.0, "1":0.0}}}
-    # {"aliases":["alias3","alias4","alias3"],"anchor":[true,false,true],"qids":["Q1","Q4","Q1"],"sent_idx":"1","sent_idx_unq":"1",
+    # {"aliases":["alias3","alias4","alias3"],"gold":[true,false,true],"qids":["Q1","Q4","Q1"],"sent_idx":"1","sent_idx_unq":"1",
     #       "sentence":"alias3 cat alias4 alias3","spans":["0:1","2:3","3:4"],
     #       "importance": {"base": {"0":1.0, "1":0.1, "2":1.0}, "slice2": {"1": 0.9}},
     #       "slices": {"slice1": {"0":0.0, "1":0.0, "2":0.0}, "slice2": {"0": 0.0, "1":1.0, "2":1.0}}}
-    # {"aliases":["multi word alias2"],"anchor":[false],"qids":["Q4"],"sent_idx":"2","sent_idx_unq":"2",
+    # {"aliases":["multi word alias2"],"gold":[false],"qids":["Q4"],"sent_idx":"2","sent_idx_unq":"2",
     #       "sentence":"cat multi word alias2","spans":["1:4"],
     #       "importance": {"base": {"0":1.0}},
     #       "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}}
-    # {"aliases":["alias4"],"anchor":[true],"qids":["Q3"],"sent_idx":"3","sent_idx_unq":"3",
+    # {"aliases":["alias4"],"gold":[true],"qids":["Q3"],"sent_idx":"3","sent_idx_unq":"3",
     #       "sentence":"alias3 cat alias4","spans":["2:3"],
     #       "importance": {"base": {"0":0.0}, "slice1": {"0": 1.0}},
     #       "slices": {"slice1": {"0": 1.0}, "slice2": {"0": 0.0}}}
@@ -952,19 +952,19 @@ def get_slice_data_test_anchors_noaug():
 
     # Slices enforce the size of alias_to_predict to be at least 2 so that we can always assume matrix for memmap
 
-    # {"aliases":["alias1","multi word alias2"],"anchor":[true,true],"qids":["Q1","Q4"],"sent_idx":"0","sent_idx_unq":"0",
+    # {"aliases":["alias1","multi word alias2"],"gold":[true,true],"qids":["Q1","Q4"],"sent_idx":"0","sent_idx_unq":"0",
     #       "sentence":"alias1 or multi word alias2","spans":["0:1","2:5"],
     #       "importance": {"base": {"0":0.2, "1":1.0}, "slice1": {"0": 0.8}},
     #       "slices": {"slice1": {"0":1.0, "1":0.9}, "slice2": {"0": 0.0, "1":0.0}}}
-    # {"aliases":["alias3","alias4","alias3"],"anchor":[true,false,true],"qids":["Q1","Q4","Q1"],"sent_idx":"1","sent_idx_unq":"1",
+    # {"aliases":["alias3","alias4","alias3"],"gold":[true,false,true],"qids":["Q1","Q4","Q1"],"sent_idx":"1","sent_idx_unq":"1",
     #       "sentence":"alias3 cat alias4 alias3","spans":["0:1","2:3","3:4"],
     #       "importance": {"base": {"0":1.0, "1":0.1, "2":1.0}, "slice2": {"1": 0.9}},
     #       "slices": {"slice1": {"0":0.0, "1":0.0, "2":0.0}, "slice2": {"0": 0.0, "1":1.0, "2":1.0}}}
-    # {"aliases":["multi word alias2"],"anchor":[false],"qids":["Q4"],"sent_idx":"2","sent_idx_unq":"2",
+    # {"aliases":["multi word alias2"],"gold":[false],"qids":["Q4"],"sent_idx":"2","sent_idx_unq":"2",
     #       "sentence":"cat multi word alias2","spans":["1:4"],
     #       "importance": {"base": {"0":1.0}},
     #       "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}}
-    # {"aliases":["alias4"],"anchor":[true],"qids":["Q3"],"sent_idx":"3","sent_idx_unq":"3",
+    # {"aliases":["alias4"],"gold":[true],"qids":["Q3"],"sent_idx":"3","sent_idx_unq":"3",
     #       "sentence":"alias3 cat alias4","spans":["2:3"],
     #       "importance": {"base": {"0":0.0}, "slice1": {"0": 1.0}},
     #       "slices": {"slice1": {"0": 1.0}, "slice2": {"0": 0.0}}}

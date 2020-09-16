@@ -17,6 +17,7 @@ import unicodedata
 import numpy as np
 import nltk
 
+from bootleg.symbols.constants import ANCHOR_KEY
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -35,7 +36,7 @@ def create_out_line(sent_obj, final_aliases, final_spans):
     # sent_obj["qids"] = ["Q-1"]*len(final_aliases)
     global alias2qids
     sent_obj["qids"] = [alias2qids[alias][0] for alias in final_aliases]
-    sent_obj["anchor"] = [True]*len(final_aliases)
+    sent_obj[ANCHOR_KEY] = [True]*len(final_aliases)
     return sent_obj
 
 def get_lnrm(s):
@@ -107,7 +108,7 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len = 5):
     # sort based on span order
     aliases_for_sorting = sorted(used_aliases, key=lambda elem: [elem[1], elem[2]])
     used_aliases = [a[0] for a in aliases_for_sorting]
-    spans = ["{}:{}".format(a[1], a[2]) for a in aliases_for_sorting]
+    spans = [[a[1], a[2]] for a in aliases_for_sorting]
     return used_aliases, spans
 
 def get_num_lines(input_src):

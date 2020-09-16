@@ -19,7 +19,7 @@ class BERTSentEmbedding(BaseSentEmbedding):
         # import torch
         # import os
         # from transformers import BertModel
-        # cache_dir = os.path.join("embs", "pretrained_bert_models")
+        # cache_dir = "pretrained_bert_models"
         # model = BertModel.from_pretrained('bert-base-cased', cache_dir=cache_dir)
         # torch.save(model.encoder, os.path.join(cache_dir, "bert_base_cased_encoder.pt"))
         # model = BertModel.from_pretrained('bert-base-uncased', cache_dir=cache_dir)
@@ -29,7 +29,7 @@ class BERTSentEmbedding(BaseSentEmbedding):
         # If both are frozen, we can use torch.no_grad in the forward pass to save memory
         self.requires_grad = not emb_args.freeze_sent_emb or not emb_args.freeze_word_emb
         self.num_layers = emb_args.layers
-        cache_dir = os.path.join(emb_args.cache_dir, "pretrained_bert_models")
+        cache_dir = emb_args.cache_dir
         if emb_args.use_lower_case:
             self.encoder = torch.load(os.path.join(cache_dir, "bert_base_uncased_encoder.pt"))
         else:

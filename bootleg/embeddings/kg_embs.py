@@ -429,7 +429,7 @@ class KGRelEmbBase(EntityEmb):
 
 class KGRelEmb(KGRelEmbBase):
     """
-    KG relation embedidng class.
+    KG relation embedding class.
     """
     def __init__(self, main_args, emb_args, model_device, entity_symbols,
         word_symbols=None, word_emb=None, key=""):
@@ -510,7 +510,7 @@ class KGRelEmb(KGRelEmbBase):
     # This methods takes a single relation per pair of related QIDs
     @classmethod
     def build_kg_triples(cls, kg_adj_file, entity_symbols, relations, log_func):
-        """Reads in file KG related entity pairs and a single relation between them. The adjaceny matrix stores the relation index."""
+        """Reads in file KG related entity pairs and a _single_ relation between them (a simplifying assumption). The adjaceny matrix stores the _single_ relation index."""
         G = nx.Graph()
         qids = set(entity_symbols.get_all_qids())
         # Only store one relation
@@ -549,7 +549,7 @@ class KGRelEmb(KGRelEmbBase):
         # rel_ids is (MxK) x (MxK) where the value is the relation id
         rel_ids = super(KGRelEmb, self).batch_prep(alias_indices, entity_indices)
         assert list(rel_ids.shape) == [(M*K), (M*K)]
-        return rel_ids.flatten()
+        return rel_ids.astype(np.int16).flatten()
 
     def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
         # return M x K x hidden size embedding (to be appended)

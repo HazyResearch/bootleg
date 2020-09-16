@@ -19,7 +19,7 @@
         "num_heads": 1
     },
     "data_config": {
-        "entity_dir": "test/data/data_loader/entity_db",
+        "entity_dir": "test/data/data_loader/entity_data",
         "train_in_candidates": true,
         "max_word_token_len": 5,
         "max_aliases": 4,

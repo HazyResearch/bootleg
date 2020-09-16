@@ -21,7 +21,7 @@
         "max_word_token_len": 6,
         "max_aliases": 2,
         "data_dir": "test/data/model_training",
-        "entity_dir": "test/data/model_training/entity_db",
+        "entity_dir": "test/data/model_training/entity_data",
         "overwrite_preprocessed_data": true,
         "emb_dir": "test/data/model_training",
         "train_dataset" :
