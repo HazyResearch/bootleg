@@ -302,6 +302,7 @@ def get_sent_start_map(data_file):
     with jsonlines.open(data_file) as f:
         for line in f:
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of aliases)
+            assert line['sent_idx_unq'] not in sent_start_map, f'Sentence indices must be unique. {line["sent_idx_unq"]} already seen.'
             sent_start_map[line['sent_idx_unq']] = total_num_mentions
             # include false aliases for debugging (and alias_pos includes them)
             total_num_mentions += len(line['aliases'])

@@ -81,8 +81,16 @@ def chunk_text_data(args, input_src, chunk_prep_dir):
     # keep track of what files are written
     chunk_list = [out_files[chunk_id]]
     out_file = open(out_files[chunk_id], 'w')
+
+    # since we have to read through all lines to chunk files,
+    # we check for unique sentence indices here
+    seen_sent_indices = set()
     with open(input_src, 'r', encoding='utf-8') as in_file:
         for i, line in enumerate(in_file):
+            assert 'sent_idx_unq' in line
+            line_json = json.loads(line)
+            assert line_json['sent_idx_unq'] not in seen_sent_indices, f'Sentence indices must be unique. {line_json["sent_idx_unq"]} already seen.'
+            seen_sent_indices.add(line_json['sent_idx_unq'])
             out_file.write(line)
             num_lines_in_chunk += 1
             # move on to new chunk when it hits chunk size
@@ -750,7 +758,6 @@ def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_
 def get_idx_mapping(data_prep_dir, dataset_name):
     logging.debug('Getting sentence to data idx mapping')
     start = time.time()
-    # TODO: add a directory with metadata?
     data_metadata = json.load(open(os.path.join(data_prep_dir, 'metadata.json'), 'r'))
     storage_type = [tuple(type) for type in data_metadata['storage_type']]
     data = np.memmap(dataset_name, dtype=storage_type, mode='r')
