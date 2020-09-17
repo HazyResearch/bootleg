@@ -152,6 +152,10 @@ def generate_data_subsent_helper(input_args):
                 assert len(span) == 2,  f"Span is too large {span}"
                 # assert int(span.split(":")[0]) <= len(phrase.split(" "))-1, f"Span is too large {span}"
             if not use_weak_label:
+<<<<<<< HEAD
+=======
+                assert ANCHOR_KEY in line, 'Cannot toggle off data weak labelling without anchor info'
+>>>>>>> 7ba88719bd9af43f3961bbd102764579bd7bbcb3
                 aliases = [aliases[i] for i in range(len(anchor)) if anchor[i] is True]
                 qids = [qids[i] for i in range(len(anchor)) if anchor[i] is True]
                 spans = [spans[i] for i in range(len(anchor)) if anchor[i] is True]

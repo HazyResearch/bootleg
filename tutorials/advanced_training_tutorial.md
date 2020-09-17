@@ -15,7 +15,7 @@ We provide scripts to download:
 2. Pretrained BERT model (used for word embedding backbone)
 3. Wikipedia entity data and embedding data
 
-To download the Wikipedia data, run the command below with the directory to download the data to. Note that the prepped Wikipedia data will require ~205GB of disk space and will take some time to download and decompress the prepped Wikipedia data (25GB compressed, 180GB uncompressed).
+To download the Wikipedia data, run the command below with the directory to download the data to. Note that the prepped Wikipedia data will require ~200GB of disk space and will take some time to download and decompress the prepped Wikipedia data (16GB compressed, ~150GB uncompressed).
 ```
 bash download_wiki.sh <DOWNLOAD_DIRECTORY>
 ```
