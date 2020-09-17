@@ -97,3 +97,6 @@ Given a pretrained model, we support three types of inference: `--mode eval`, `-
 
 ## Training
 We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](basic_training_tutorial.md) and [Advanced Training](advanced_training_tutorial.md) tutorials for more information and sample data!
+
+## Downstream Tasks
+Bootleg produces contextual entity embeddings (as well as learned static embeddings) that can be used in downstream tasks, such as relation extraction and question answering. Check out the [Entity Embedding tutorial](tutorials/entity_embedding_tutorial.ipynb) on how to generate these embeddings with Bootleg. *Code examples with Bootleg embeddings in downstream models are coming soon!*
