@@ -89,11 +89,11 @@ These embeddings are concatenated and projected to form an entity payload.
 
 In the figure above, *M* represents the maximum number of mentions (or aliases) in the sentence, *K* represents the maximum number of candidates considered per mention, and *N* represents the maximum number of sub-words in the sentence. Typically, we use *M*=10, *K*=30, and *N*=100. Additionally, *H* is the hidden dimension used throughout the backbone, *E* is the dimension of the learned entity embedding, *R* the dimension of the learned relation embedding, and *T* the dimension of the learned type embedding. We further select an entity's 3 most popular types and 50 most unique Wikidata relations. These are all tunable parameters in Bootleg.
 
-
 ## Inference
 Given a pretrained model, we support three types of inference: `--mode eval`, `--mode dump_preds`, and `--mode dump_embs`. `Eval` mode is the fastest option and will run the test files through the model and output aggregated quality metrics to the log. `Dump_preds` mode will write the individual predictions and corresponding probabilities to a jsonlines file. This is useful for error analysis. `Dump_embs` mode is the same as `dump_preds`, but will additionally  output contextual entity embeddings. These can then be read and processed in a downstream system.
- <!-- This dump will also include information for querying the other structural embeddings (e.g., -->
- <!-- type or KG embeddings) if desired. -->
 
 ## Training
 We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](tutorials/basic_training_tutorial.md) and [Advanced Training](tutorials/advanced_training_tutorial.md) tutorials for more information and sample data!
+
+## Downstream Tasks
+Bootleg produces contextual entity embeddings (as well as learned static embeddings) that can be used in downstream tasks, such as relation extraction and question answering. Check out the [Entity Embedding tutorial](tutorials/entity_embedding_tutorial.ipynb) on how to generate Bootleg embeddings. *Code examples with Bootleg embeddings in downstream models are coming soon!*

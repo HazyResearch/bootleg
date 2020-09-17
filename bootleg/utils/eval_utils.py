@@ -193,6 +193,8 @@ def run_batched_eval(args, is_test, global_step, logger, trainer, dataloader, st
         status_reporter.dump_results(all_dev_results, pretty_dict_for_printing, file, is_test)
     return all_dev_results
 
+def select_embs(embs, pred_cands, batch_size, M):
+    return embs[torch.arange(batch_size).unsqueeze(-1), torch.arange(M).unsqueeze(0), pred_cands]
 
 def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_symbols, dump_embs=False):
     # we only care about the entity embeddings for the final slice head
@@ -245,7 +247,8 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
 
         # final_entity_embs is batch x M x K x hidden_size, pred_cands in batch x M
         if dump_embs:
-            chosen_entity_embs = final_entity_embs[torch.arange(curr_batch_size).unsqueeze(-1), torch.arange(M).unsqueeze(0), pred_cands]
+            chosen_entity_embs = select_embs(embs=final_entity_embs, pred_cands=pred_cands,
+                batch_size=curr_batch_size, M=M)
 
             # write chosen entity embs to file for contextualized entity embeddings
             mmap_file[start_idx:end_idx]['entity_emb'] = chosen_entity_embs.reshape(curr_batch_size,-1).cpu().numpy()
@@ -299,6 +302,7 @@ def get_sent_start_map(data_file):
     with jsonlines.open(data_file) as f:
         for line in f:
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of aliases)
+            assert line['sent_idx_unq'] not in sent_start_map, f'Sentence indices must be unique. {line["sent_idx_unq"]} already seen.'
             sent_start_map[line['sent_idx_unq']] = total_num_mentions
             # include false aliases for debugging (and alias_pos includes them)
             total_num_mentions += len(line['aliases'])
