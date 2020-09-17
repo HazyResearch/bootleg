@@ -87,8 +87,8 @@ def chunk_text_data(args, input_src, chunk_prep_dir):
     seen_sent_indices = set()
     with open(input_src, 'r', encoding='utf-8') as in_file:
         for i, line in enumerate(in_file):
-            assert 'sent_idx_unq' in line
             line_json = json.loads(line)
+            assert 'sent_idx_unq' in line
             assert line_json['sent_idx_unq'] not in seen_sent_indices, f'Sentence indices must be unique. {line_json["sent_idx_unq"]} already seen.'
             seen_sent_indices.add(line_json['sent_idx_unq'])
             out_file.write(line)
