@@ -18,7 +18,7 @@ layout: default
 <h1>Results</h1>
 Bootleg achieves state-of-the-art on NED benchmarks and improves over a standard BERT NED baseline by over 50 F1 points on the tail. Bootleg can even correctly disambiguate entities which were never seen during train!
 <h3>NED Benchmarks</h3>
-We compare Bootleg against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
+We compare the newest version Bootleg as of Sep 2020 against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
 <p>
   <table class="ui structured red table small-font">
     <thead>
@@ -40,9 +40,9 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
       </tr>
     </tr>
     <td>Bootleg</td>
+        <td><b>89.8</b></td>
+        <td><b>85.4</b></td>
         <td><b>87.5</b></td>
-        <td><b>83.2</b></td>
-        <td><b>85.3</b></td>
       <tr>
         <td rowspan="2">RSS500<sup><a href="#note1">2</a></sup></td>
           <td>Phan et al., 2019<sup><a href="#note1">5</a></sup></td>
@@ -51,9 +51,9 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
           <td>82.3</td>
       </tr>
       <td>Bootleg</td>
-      <td><b>89.2</b> </td>
-      <td>80.3</td>
-      <td><b>84.5</b></td>
+      <td><b>88.5</b> </td>
+      <td>79.9</td>
+      <td><b>84.0</b></td>
     </tr>
       <tr>
         <td rowspan="2">AIDA CoNLL YAGO<sup><a href="#note1">3</a></sup></td>
@@ -64,8 +64,8 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
       </tr>
     </tr>
     <td>Bootleg</td>
-    <td>97.0</td>
-    <td>96.7</td>
+    <td>96.9</td>
+    <td>96.6</td>
     <td>96.8</td>
   </tr>
 </tr>
@@ -74,7 +74,7 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
 </p>
 <h3>Tail Performance</h3>
 We also evaluate the performance of Bootleg on the tail compared to a standard BERT NED baseline.
-We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores.
+We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores. The slight increase in performance over unseen entities compared to tail entities is the lower degress of ambiguity among unseen entities, which tend to be more obscure and have more specific aliases, than the tail entities.
 <p>
   <table class="ui structured red table small-font">
     <thead>
@@ -87,22 +87,22 @@ We create evaluation sets from Wikipedia by filtering by the frequency of the tr
     <tbody>
       <tr>
         <td>All Entities</td>
-          <td>92.8</td>
-          <td><b>96.2</b></td>
+          <td>92.1</td>
+          <td><b>96.7</b></td>
       </tr>
     </tr>
     <td>Torso Entities</td>
-        <td>62.1</td>
-        <td><b>80.2</b></td>
+        <td>67.0</td>
+        <td><b>82.1</b></td>
     </tr>
       <td>Tail Entities</td>
-          <td>19.2</td>
-          <td><b>71.3</b></td>
+          <td>17.8</td>
+          <td><b>77.7</b></td>
       </tr>
       <tr>
           <td>Unseen Entities</td>
-          <td>11.4</td>
-          <td><b>65.8</b></td>
+          <td>23.0</td>
+          <td><b>80.1</b></td>
       </tr>
     </tbody>
 </table>
