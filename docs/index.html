@@ -4,7 +4,7 @@ layout: default
 
 <h1>About</h1>
 <p>
-  Bootleg is a guidable, self-supervised named entity disambiguation (NED) system that links mentions in text to entities in a knowledge base. Bootleg is built to improve disambiguation of tail entities using a simple transformer-based architecture.
+  Bootleg is a self-supervised named entity disambiguation (NED) system that links mentions in text to entities in a knowledge base. Bootleg is built to improve disambiguation of tail entities using a simple Transformer-based architecture.
   <!-- Bootleg leverages guidability mechanisms--augmentation, weak labeling, and slice-based learning---to quickly patch errors. -->
   Bootleg is still in active development, but is already in use at industry and research labs.
 </p>
@@ -16,7 +16,7 @@ layout: default
   <a target="blank" href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3NlOXjzaEubyBV1XAxR81guFtOmkUBJssPyAIwC6UVUNzJaRDFSN0M3MUgyWVNRNU5LS09YQk04Ri4u&embed=true">questionnaire</a> so that we can get in touch.</p>
 
 <h1>Results</h1>
-Bootleg achieves state-of-the-art on NED benchmarks and improves over a standard BERT NED baseline by over 50 F1 points on the tail. Bootleg can even correctly disambiguate entities which were never seen during train!
+Bootleg achieves state of the art on NED benchmarks and improves over a standard BERT NED baseline by over 50 F1 points on the tail. Bootleg can even correctly disambiguate entities which were never seen during train!
 <h3>NED Benchmarks</h3>
 We compare the newest version Bootleg as of Sep 2020 against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
 <p>
@@ -74,7 +74,7 @@ We compare the newest version Bootleg as of Sep 2020 against the current reporte
 </p>
 <h3>Tail Performance</h3>
 We also evaluate the performance of Bootleg on the tail compared to a standard BERT NED baseline.
-We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores. The slight increase in performance over unseen entities compared to tail entities is due to the lower degree of ambiguity among unseen entities, which tend to be more obscure and have more specific aliases, than the tail entities.
+We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores. The slight increase in performance over unseen entities compared to tail entities is due to the lower degree of ambiguity among the unseen entities compared to the tail entities.
 <p>
   <table class="ui structured red table small-font">
     <thead>
