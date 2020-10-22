@@ -81,6 +81,7 @@ class EmbeddingLayer(nn.Module):
             # This happens for the kg bias (KGIndices) class for our kg attention network
             if len(emb_package) == 0:
                 continue
+            emb_package.tensor = model_utils.emb_1d_dropout(entity_emb.training, entity_emb.dropout_perc, emb_package.tensor)
             emb_package.tensor = model_utils.emb_2d_dropout(entity_emb.training, entity_emb.mask_perc, emb_package.tensor)
             entity_embs.append(emb_package)
         return sent_emb, entity_embs
@@ -102,6 +103,7 @@ class EmbeddingLayerNoProj(EmbeddingLayer):
             # This happens for the kg bias (KGIndices) class for our kg attention network
             if len(emb_package) == 0:
                 continue
+            emb_package.tensor = model_utils.emb_1d_dropout(entity_emb.training, entity_emb.dropout_perc, emb_package.tensor)
             emb_package.tensor = model_utils.emb_2d_dropout(entity_emb.training, entity_emb.mask_perc, emb_package.tensor)
             entity_embs.append(emb_package)
         return sent_emb, entity_embs

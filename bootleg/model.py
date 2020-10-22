@@ -5,12 +5,13 @@ import torch
 from bootleg.layers.embedding_layers import EmbeddingLayer, EmbeddingLayerNoProj
 from bootleg.layers.slice_heads import SliceHeadsSBL, NoSliceHeads
 from bootleg.layers.emb_combiner import EmbCombinerProj
-
-from bootleg.utils import logging_utils
+from bootleg.layers.layers import TypePred
+from bootleg.utils import logging_utils, train_utils
 from bootleg.utils.classes.dotted_dict import DottedDict
 from bootleg.utils.utils import import_class
 
-from bootleg.symbols.constants import DISAMBIG
+from bootleg.symbols.constants import DISAMBIG, TYPEPRED, FINAL_LOSS
+
 
 class Model(nn.Module):
     def __init__(self, args, model_device, entity_symbols, word_symbols):
@@ -20,6 +21,11 @@ class Model(nn.Module):
         self.logger = logging_utils.get_logger(args)
         # embeddings
         self.emb_layer = EmbeddingLayer(args, self.model_device, entity_symbols, word_symbols)
+        self.type_pred = False
+        if args.data_config.type_prediction.use_type_pred:
+            self.type_pred = True
+            # Add 1 for pad type
+            self.type_prediction = TypePred(args.model_config.hidden_size, args.data_config.type_prediction.dim, args.data_config.type_prediction.num_types+1)
         self.emb_combiner = EmbCombinerProj(args, self.emb_layer.emb_sizes,
             self.emb_layer.sent_emb_size, word_symbols, entity_symbols)
         # attention network
@@ -62,6 +68,8 @@ class Model(nn.Module):
                                            (torch.ones_like(entity_indices, dtype=torch.long)*(self.num_entities_with_pad_and_nocand-1)))
         entity_package = DottedDict(tensor=entity_indices, pos_in_sent=alias_idx_pair_sent, alias_indices=alias_indices, mask=mask)
         sent_emb, entity_embs = self.emb_layer(word_indices, entity_package, batch_prepped_data, batch_on_the_fly_data)
+        if self.type_pred:
+            entity_embs, batch_type_pred = self.type_prediction(sent_emb, entity_package, entity_embs)
         sent_emb, entity_embs = self.emb_combiner(sent_embedding=sent_emb,
             alias_idx_pair_sent=alias_idx_pair_sent, entity_embedding=entity_embs, entity_mask=mask)
         context_matrix_dict, backbone_out = self.attn_network(alias_idx_pair_sent, sent_emb, entity_embs, batch_prepped_data, batch_on_the_fly_data)
@@ -70,6 +78,8 @@ class Model(nn.Module):
             raw_entity_emb=entity_embs)
         # update output dictionary with backbone out
         res[DISAMBIG].update(backbone_out[DISAMBIG])
+        if self.type_pred:
+            res[TYPEPRED] = {train_utils.get_type_head_name(): batch_type_pred}
         return res, entity_package, final_entity_embs
 
 
@@ -92,5 +102,5 @@ class BaselineModel(Model):
                                            (torch.ones_like(entity_indices, dtype=torch.long)*(self.num_entities_with_pad_and_nocand-1)))
         entity_package = DottedDict(tensor=entity_indices, pos_in_sent=alias_idx_pair_sent, alias_indices=alias_indices, mask=mask, normalize=False, key=None, dim=None)
         sent_emb, entity_embs = self.emb_layer(word_indices, entity_package, batch_prepped_data, batch_on_the_fly_data)
-        res = self.attn_network(alias_idx_pair_sent, sent_emb, entity_embs, batch_prepped_data)
+        res = self.attn_network(alias_idx_pair_sent, sent_emb, entity_embs, batch_prepped_data, batch_on_the_fly_data)
         return res, entity_package, None

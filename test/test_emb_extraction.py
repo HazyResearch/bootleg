@@ -47,13 +47,14 @@ class EmbeddingExtractionTest(unittest.TestCase):
         storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int),
             ('alias_list_pos', int, M), ('entity_emb', float, M*hidden_size),
             ('final_loss_true', int, M), ('final_loss_pred', int, M),
-            ('final_loss_prob', float, M)])
+            ('final_loss_prob', float, M), ('final_loss_cand_probs', float, M*K)])
         full_emb = np.memmap('tmp.pt', dtype=storage_type, mode='w+', shape=(num_examples,))
 
         # 2 sentences, 1st sent has 1 subsentence, 2nd sentence has 2 subsentences
         # first sentence
         full_emb['hidden_size'] = hidden_size
         full_emb['M'] = M
+        full_emb['K'] = K
         full_emb[0]['sent_idx'] = 0
         full_emb[0]['subsent_idx'] = 0
         # last alias is padded
@@ -81,7 +82,8 @@ class EmbeddingExtractionTest(unittest.TestCase):
                              ('alias_list_pos', int),
                              ('entity_emb', float, hidden_size),
                              ('final_loss_pred', int),
-                             ('final_loss_prob', float)])
+                             ('final_loss_prob', float),
+                             ('final_loss_cand_probs', float, K)])
         merged_emb = np.zeros(total_num_mentions, dtype=storage_type)
         merged_emb['entity_emb'] = np.array([[0, 1],
                                              [2, 3],

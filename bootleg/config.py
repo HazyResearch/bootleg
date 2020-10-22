@@ -71,6 +71,12 @@ config_args = {
         "max_word_token_len": (100, "max token length sentences"),
         "max_aliases": (10, "max aliases per sentence"),
         "overwrite_preprocessed_data": (False, "overwrite preprocessed data"),
+        "type_prediction": {
+            "use_type_pred": (False, "whether to add type prediction or not"),
+            "file": ("hyena_types_coarse.json", "type file from qid to list of type ids"),
+            "num_types": (5, "number of types for prediction"),
+            "dim": (128, "type dimension")
+        },
         "train_dataset":{
             "file": ("train.jsonl", ""),
             "load_class": ("wiki_dataset.WikiDataset", ""),

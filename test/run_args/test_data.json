@@ -26,6 +26,9 @@
         "data_dir": "test/data/data_loader",
         "overwrite_preprocessed_data": true,
         "emb_dir": "test/data",
+        "type_prediction": {
+            "use_type_pred": false
+        },
         "word_embedding":
         {
             "load_class": "standard_word_emb.StandardWordEmb",

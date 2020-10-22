@@ -149,15 +149,15 @@ def generate_data_subsent_helper(input_args):
             for alias in aliases:
                 assert (alias in entity_symbols.get_all_aliases()), f"alias {alias} is not in entity_symbols"
             for span in spans:
-                assert len(span) == 2,  f"Span is too large {span}"
-                # assert int(span.split(":")[0]) <= len(phrase.split(" "))-1, f"Span is too large {span}"
+                assert len(span) == 2,  f"Span should be len 2. Your span {span} is {len(span)}"
             if not use_weak_label:
                 aliases = [aliases[i] for i in range(len(anchor)) if anchor[i] is True]
                 qids = [qids[i] for i in range(len(anchor)) if anchor[i] is True]
                 spans = [spans[i] for i in range(len(anchor)) if anchor[i] is True]
                 aliases_seen_by_model = [i for i in range(len(aliases))]
                 anchor = [True for i in range(len(aliases))]
-            if (dataset_is_eval and all_false_anchors) or len(aliases) == 0:
+            # Happens if use weak labels is False
+            if len(aliases) == 0:
                 dropped_lines += 1
                 # logging.warning(f'Dropping sentence. There are no aliases to predict for {line}.')
                 continue
@@ -193,12 +193,6 @@ def generate_data_subsent_helper(input_args):
                     aliases_to_predict_arr = [a2p_ex for a2p_ex in aliases_to_predict_per_split[subsent_idx] if anchor_arr[subsent_idx][a2p_ex] is True]
                 else:
                     aliases_to_predict_arr = aliases_to_predict_per_split[subsent_idx]
-                # If no aliases to predict or it's an eval dataset and all aliases to predict are false, then drop
-                # Note that this may occur because of the windowing above. If aliases get split up, you have have True anchors in the sentence
-                # but all aliases to predict anchors will be False.
-                if (len(aliases_to_predict_arr) <= 0): #or (dataset_is_eval and sum([anchor_arr[subsent_idx][i] for i in aliases_to_predict_per_split[subsent_idx]]) == 0):
-                    # logging.warning('Dropping example. There are no aliases to predict for the example.')
-                    continue
                 num_samples += 1
                 writer.write({
                     'sent_idx': sent_idx,
@@ -210,12 +204,13 @@ def generate_data_subsent_helper(input_args):
                     'word_indices': word_indices_arr[subsent_idx],
                     'aliases': aliases_arr[subsent_idx],
                     'qids': qids_arr[subsent_idx]})
-    logging.debug(f"Finished processing data. Dropped {dropped_lines} from dataset. If use_weak_label is false, this is because lines had all false anchors. If use_weak_label"
+    logging.debug(f"Finished processing data. Dropped {dropped_lines} from dataset and swa {num_samples} samples. If use_weak_label is false, this is because lines had all false golds. If use_weak_label"
           f" is true, then this is because this is a dev/test slice where there were no True anchors.")
     return num_samples
 
 def process_data_subsent_helper(input_args):
     args = input_args['args']
+    dataset_is_eval = input_args['dataset_is_eval']
     data_args = args.data_config
     in_file = input_args['in_file']
     mmap_file_name = input_args['out_file']
@@ -256,9 +251,15 @@ def process_data_subsent_helper(input_args):
                 alias_trie_idx = entity_symbols.get_alias_idx(alias)
                 alias_qids = np.array(entity_symbols.get_qid_cands(alias))
                 if not qid in alias_qids:
-                    assert not data_args.train_in_candidates
-                    # set class label to be "not in candidate set"
-                    true_entity_idx = 0
+                    # assert not data_args.train_in_candidates
+                    if not data_args.train_in_candidates:
+                        # set class label to be "not in candidate set"
+                        true_entity_idx = 0
+                    else:
+                        # if we are not using a NC (no candidate) but are in eval mode, we let the gold candidate not be in the candidate set
+                        # we give in a true index of -2, meaning our model will always get this example incorrect
+                        assert dataset_is_eval, f"If you are training, the QID must be in the candidate list for data_args.train_in_candidates to be True"
+                        true_entity_idx = -2
                 else:
                     # Here we are getting the correct class label for training.
                     # Our training is "which of the max_entities entity candidates is the right one (class labels 1 to max_entities) or is it none of these (class label 0)".
@@ -369,15 +370,17 @@ def generate_slice_data_helper(input_args):
             for slice_name in list(slices.keys()):
                 if len(slices[slice_name]) <= 0:
                     del slices[slice_name]
-            if len(slices) <= 1:
-                if len(slices) == 1:
-                    assert list(slices.keys())[0] == FINAL_LOSS, f'Slice includes {list(slices.keys())[0]}'
-                dropped_lines += 1
-                # log_func(f'Dropping sentence. There are no aliases to predict for {line}.')
-                continue
+            # KEep
+            # if len(slices) <= 1:
+            #     if len(slices) == 1:
+            #         assert list(slices.keys())[0] == FINAL_LOSS, f'Slice includes {list(slices.keys())[0]}'
+            #     dropped_lines += 1
+            #     # log_func(f'Dropping sentence. There are no aliases to predict for {line}.')
+            #     continue
             # For nicer code downstream, we make sure FINAL_LOSS is in here
-            assert FINAL_LOSS in slices
-            if train_utils.is_slicing_model(args) and not dataset_is_eval:
+            all_false_anchors = all([anc is False for anc in anchor])
+            assert ((not use_weak_label or dataset_is_eval) and all_false_anchors) or FINAL_LOSS in slices, f"FINAL LOSS isn't in {slices}"
+            if train_utils.is_slicing_model(args) and not ((not use_weak_label or dataset_is_eval) and all_false_anchors):
                 assert len(slices) > 1, f'{slices} only has FINAL_LOSS and this is a train dataset with slicing'
             # We store aliases_to_predict as an index array into the aliases. The max is therefore based on the number of aliases
             max_a2p = max(max_a2p, num_a2p)
@@ -385,7 +388,7 @@ def generate_slice_data_helper(input_args):
             writer.write({'slices': slices, 'max_cands_per_alias': max_cands_per_alias, 'sent_idx': sent_idx})
             num_lines += 1
 
-        logging.debug(f"Finished processing data. Dropped {dropped_lines} lines. If use_weak_label is false, this is because there were only false anchors.")
+        logging.debug(f"Finished processing data. Dropped {dropped_lines} lines. Saw {num_lines} lines total. If use_weak_label is false, this is because there were only false anchors.")
         logging.debug(f"Max aliases2predict for chunk is {max_a2p}")
         return {'max_a2p': max_a2p, 'max_cands': max_cands, 'num_lines': num_lines, 'max_sent_idx': max_sent_idx}
 
@@ -533,7 +536,7 @@ def generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir,
     logging.debug(f'Extracted {idx} sub-sentences in {round(time.time() - start,2)}s')
 
 
-def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name):
+def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval):
     logging.debug('Building data chunks...')
     start = time.time()
     chunk_metadata = utils.load_json_file(os.path.join(predata_prep_dir, 'metadata.json'))
@@ -568,6 +571,7 @@ def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name):
 
     all_process_args = [{'chunk_idx': i,
                         'args': args,
+                        'dataset_is_eval': dataset_is_eval,
                         'in_file': chunk_metadata['chunks'][i]['path'],
                         'len': chunk_metadata['chunks'][i]['len'],
                         'start_idx':  chunk_metadata['chunks'][i]['start_idx'],
@@ -807,7 +811,7 @@ def prep_data(args, use_weak_label, dataset_is_eval, input_src='', chunk_data=Tr
     # Build data arrays
     if build_data or run_all:
         # dataset name needed for optional dumping of filtered data
-        process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name)
+        process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval)
 
         # Get sentence idx mapping to be able to subsample slices
         get_idx_mapping(data_prep_dir, dataset_name)
@@ -886,7 +890,7 @@ def main():
     formatter = logging.Formatter('%(asctime)s %(message)s')
     numeric_level = getattr(logging, args.run_config.loglevel.upper(), None)
     if not isinstance(numeric_level, int):
-        raise ValueError('Invalid log level: %s' % loglevel)
+        raise ValueError('Invalid log level: %s' % args.run_config.loglevel)
     logging.basicConfig(level=numeric_level, format='%(asctime)s %(message)s')
     log = logging.getLogger()
 

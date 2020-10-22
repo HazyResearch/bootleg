@@ -61,6 +61,9 @@ def get_stage_head_name(stage_idx):
 def get_prestage():
     return f'{FINAL_LOSS}_prestage'
 
+def get_type_head_name():
+    return f"{FINAL_LOSS}_type"
+
 def get_slice_head_pred_name(slice_name):
     return f"slice:{slice_name}_pred"
 

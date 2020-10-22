@@ -21,7 +21,7 @@ class EntitySymbols:
           _alias_trie: alias Trie
     """
     def __init__(self, load_dir=None, max_candidates=None, max_alias_len=None,
-        alias2qids=None, qid2title=None, alias_cand_map_file=None):
+        alias2qids=None, qid2title=None, alias_cand_map_file="alias2qids.json"):
         # We support different candidate mappings for the same set of entities
         self.alias_cand_map_file = alias_cand_map_file
         if load_dir is not None:
@@ -31,12 +31,14 @@ class EntitySymbols:
             # Used if we need to do any string searching for aliases. This keep track of the largest n-gram needed.
             self.max_alias_len = max_alias_len
             self._alias2qids: Dict[str, list] = alias2qids
+            # Assert that max_candidates is true
+            for al in self._alias2qids:
+                assert len(self._alias2qids[al]) <= self.max_candidates, f"You have a alias {al} that has more than {self.max_candidates} candidates. This can't happen."
             self._qid2title: Dict[str, str] = qid2title
             # Add 1 for the noncand class
             # We only make these inside the else because of json ordering being nondeterministic
             # If we load stuff up in self.load() and regenerate these, the eid values may be nondeterministic
             self._qid2eid: Dict[str, int] = {v: i+1 for i, v in enumerate(qid2title)}
-
         self._eid2qid: Dict[int, str] = {eid:qid for qid, eid in self._qid2eid.items()}
         # generate trie of aliases for quick entity generation in sentences (trie generates alias ids, too)
         self._alias_trie = marisa_trie.Trie(self._alias2qids.keys())
@@ -44,7 +46,9 @@ class EntitySymbols:
         self.num_entities = len(self._qid2eid)
         self.num_entities_with_pad_and_nocand = self.num_entities + 2
 
-    def dump(self, save_dir, stats={}, args=None):
+    def dump(self, save_dir, stats=None, args=None):
+        if stats is None:
+            stats = {}
         self._sort_alias_cands()
         utils.ensure_dir(save_dir)
         utils.dump_json_file(filename=os.path.join(save_dir, "config.json"), contents={"max_candidates":self.max_candidates,

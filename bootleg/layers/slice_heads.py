@@ -21,20 +21,11 @@ class NoSliceHeads(nn.Module):
 
     def forward(self, context_matrix_dict, entity_pack, sent_emb, alias_idx_pair_sent, batch_prepped, raw_entity_emb):
         out = {DISAMBIG: {}}
-        assert "context_matrix_main" in context_matrix_dict, f"context_matrix_main must be a key in the output of the attention network"
-        batch_size, M, K, H = context_matrix_dict["context_matrix_main"].shape
-        pred_kg = self.prediction_head(context_matrix_dict["context_matrix_main"])
-        pred_kg = pred_kg.squeeze(2).reshape(batch_size, M, K)
-        # Needed for contextualized entity embeddings
-        context_matrix = context_matrix_dict["context_matrix_main"]
-        if len(context_matrix_dict) == 2:
-            pred = self.prediction_head(context_matrix_dict["context_matrix_nokg"])
-            pred = pred.squeeze(2).reshape(batch_size, M, K)
-            out[DISAMBIG][FINAL_LOSS] = torch.max(torch.cat([pred.unsqueeze(3), pred_kg.unsqueeze(3)],dim=-1), dim=-1)[0]
-        else:
-            out[DISAMBIG][FINAL_LOSS] = pred_kg
-
-        return out, context_matrix
+        score = model_utils.max_score_context_matrix(context_matrix_dict, self.prediction_head)
+        out[DISAMBIG][FINAL_LOSS] = score
+        if "context_matrix_main" not in context_matrix_dict:
+            context_matrix_dict["context_matrix_main"] = model_utils.generate_final_context_matrix(context_matrix_dict, ending_key_to_exclude="_nokg")
+        return out, context_matrix_dict["context_matrix_main"]
 
 
 class SliceHeadsSBL(nn.Module):
@@ -105,6 +96,9 @@ class SliceHeadsSBL(nn.Module):
         indicator_outputs = {}
         expert_slice_repr = {}
         predictor_outputs = {}
+
+        if "context_matrix_main" not in context_matrix_dict:
+            context_matrix_dict["context_matrix_main"] = model_utils.generate_final_context_matrix(context_matrix_dict)
 
         context_matrix = context_matrix_dict["context_matrix_main"]
 

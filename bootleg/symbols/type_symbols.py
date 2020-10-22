@@ -69,5 +69,8 @@ class TypeSymbols:
         return qid2typenames, qid2typeid, typeid2typename
 
     def get_types(self, qid):
-        types = self.qid2typenames[qid]
+        types = self.qid2typenames.get(qid, [])
         return types
+
+    def get_typeids(self, qid):
+        return self.qid2typeid.get(qid, [])

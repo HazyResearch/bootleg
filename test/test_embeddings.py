@@ -251,7 +251,7 @@ class TestLearnedEmbedding(unittest.TestCase):
         ])
 
         init_vec = torch.tensor([1.0,2.0,3.0,4.0])
-        init_vec_out = model_utils.init_tail_embeddings(self.learned_entity_embedding, {}, self.entity_symbols, pad_idx=-1, vec=init_vec)
+        init_vec_out = model_utils.init_embeddings_to_vec(self.learned_entity_embedding, pad_idx=-1, vec=init_vec)
         assert torch.equal(init_vec, init_vec_out)
         assert torch.equal(gold_emb, self.learned_entity_embedding.weight.data)
 
@@ -279,11 +279,11 @@ class TestTypeEmbedding(unittest.TestCase):
             [7,8,9],
             [0,0,0]
         ]).long()
-        true_type2row = np.array([1,2,3,4,5,6,7,8,9])
+        true_type2row = {0:1,1:2,2:3,3:4,4:5,5:6,6:7,7:8,8:9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(self.type_labels, max_types=3,
             entity_symbols=self.entity_symbols)
         assert torch.equal(pred_type_table, true_type_table)
-        np.testing.assert_array_equal(true_type2row, type2row)
+        self.assertDictEqual(true_type2row, type2row)
         # there are 9 real types so we expect (including unk and pad) there to be type indices up to 10
         assert max_labels == 10
 
@@ -296,12 +296,11 @@ class TestTypeEmbedding(unittest.TestCase):
             [7,8,9,10],
             [0,0,0,0]
         ]).long()
-        true_type2row = np.array([1,2,3,4,5,6,7,8,9])
+        true_type2row = {0:1,1:2,2:3,3:4,4:5,5:6,6:7,7:8,8:9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(self.type_labels, max_types=4,
             entity_symbols=self.entity_symbols)
-        print(true_type_table, pred_type_table)
         assert torch.equal(pred_type_table, true_type_table)
-        np.testing.assert_array_equal(true_type2row, type2row)
+        self.assertDictEqual(true_type2row, type2row)
         # there are 9 real types so we expect (including unk and pad) there to be type indices up to 10
         assert max_labels == 10
 
@@ -314,12 +313,12 @@ class TestTypeEmbedding(unittest.TestCase):
             [7],
             [0]
         ]).long()
-        true_type2row = np.array([1,2,3,4,5,6,7,8,9])
+        true_type2row = {0:1,1:2,2:3,3:4,4:5,5:6,6:7,7:8,8:9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(self.type_labels, max_types=1,
             entity_symbols=self.entity_symbols)
         print(true_type_table, pred_type_table)
         assert torch.equal(pred_type_table, true_type_table)
-        np.testing.assert_array_equal(true_type2row, type2row)
+        self.assertDictEqual(true_type2row, type2row)
         # there are 9 real types so we expect (including unk and pad) there to be type indices up to 10
         assert max_labels == 10
 

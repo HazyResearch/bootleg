@@ -53,6 +53,8 @@ def select_alias_word_sent(alias_idx_pair_sent, sent_embedding, index):
     alias_word_tensor = torch.gather(sent_tensor, 2, alias_idx_sent.long().unsqueeze(-1).unsqueeze(-1).expand(
         batch_size, M, 1, hidden_size)).squeeze(2)
     alias_word_tensor[alias_idx_sent_mask] = 0
+    # set indices back to -1
+    alias_idx_sent[alias_idx_sent_mask] = -1
     return alias_word_tensor
 
 # Mask of True means keep
@@ -69,6 +71,9 @@ def selective_avg(ids, mask, embeds):
 def normalize_matrix(mat, dim=3, p=2):
     mat_divided = F.normalize(mat, p=p, dim=dim)
     return mat_divided
+
+def emb_1d_dropout(training, mask_perc, tensor):
+    return nn.functional.dropout(tensor, p=mask_perc, training=training)
 
 # Masks an entire row of the embedding (2d mask). Each row gets masked with probability mask_perc.
 def emb_2d_dropout(training, mask_perc, tensor):
@@ -92,6 +97,28 @@ def emb_dropout_by_tensor(training, regularization_tensor, tensor):
         zero_mask = (torch.bernoulli(regularization_tensor) > 0).unsqueeze(-1)
         tensor = tensor.masked_fill(zero_mask, 0)
     return tensor
+
+def max_score_context_matrix(context_matrix_dict, prediction_head):
+    """For each context matrix value in a dict of matrices, project to BxMxK and take max as final score."""
+    batch_size, M, K, H = list(context_matrix_dict.values())[0].shape
+    preds_to_cat = []
+    for key in context_matrix_dict:
+        pred = prediction_head(context_matrix_dict[key])
+        pred = pred.squeeze(2).reshape(batch_size, M, K)
+        preds_to_cat.append(pred.unsqueeze(3))
+    score = torch.max(torch.cat(preds_to_cat, dim=-1), dim=-1)[0]
+    return score
+
+def generate_final_context_matrix(context_matrix_dict, ending_key_to_exclude="_nokg"):
+    """Takes the average of the context matrices where their key does not end in ending_key_to_exclude"""
+    new_ctx = []
+    for key, val in context_matrix_dict.items():
+        if not key.endswith(ending_key_to_exclude):
+            new_ctx.append(val)
+    assert len(new_ctx) > 0, f"You have provided a context matrix dict with only keys ending with _nokg. We average the context matrices " \
+                             f"that do not end in _nokg as the final context matrix. Please rename the final matrix."
+    return torch.sum(torch.stack(new_ctx), dim=0)/len(new_ctx)
+
 
 def remove_batched_masked_rows(embeds, unshortened_masks):
     assert len(unshortened_masks.size()) == 2, "<unshortened_masks> should have regular size Bx(M*K[*T]) for some M, K, T"
@@ -166,28 +193,25 @@ def init_weights(module):
     if isinstance(module, nn.Linear) and module.bias is not None:
         module.bias.data.zero_()
 
-def init_tail_embeddings(module, qid_count_dict, entity_symbols, pad_idx, vec=None):
+def init_embeddings_to_vec(module, pad_idx, vec=None):
     assert pad_idx == 0 or pad_idx == -1, f"Only accept pads of 0 or -1; you gave {pad_idx}"
     assert isinstance(module, (nn.Embedding))
     embedding_dim = module.embedding_dim
 
-    # generate index to fill based on counts
-    tail_idx = []
-    for qid in entity_symbols.get_all_qids():
-        eid = entity_symbols.get_eid(qid)
-        weight = qid_count_dict.get(qid, 0)
-        if weight <= 0:
-            tail_idx.append(eid)
-    tail_idx = torch.tensor(tail_idx)
     if vec is None:
         # Follows how nn.Embedding intializes their weights
         vec = torch.Tensor(1, embedding_dim)
         init.normal_(vec)
-    pad_row = module.weight.data[pad_idx][:]
-    module.weight.data[tail_idx] = vec
+    # Copy the pad row via clone
+    pad_row = module.weight.data[pad_idx].clone()
+    test_equal = False
+    if not torch.equal(pad_row, vec):
+        test_equal = True
+    module.weight.data[:] = vec
+    module.weight.data[pad_idx] = pad_row
+    # Assert the pad row is different from the vec
+    if test_equal:
+        assert not torch.equal(pad_row, vec)
     # We want the pad row to stay the same as it was before (i.e., all zeros) and not become a tail embedding
     assert torch.equal(pad_row, module.weight.data[pad_idx][:])
-    # Can only verify sameness for more than two embeddings
-    if tail_idx.shape[0] > 2:
-        assert torch.equal(module.weight.data[tail_idx[0]], module.weight.data[tail_idx[1]])
     return vec

@@ -1,22 +1,52 @@
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 import jsonlines
 import numpy as np
 import os
 import tagme
-import torch
 import ujson
 
 import pandas as pd
+from tqdm import tqdm
+
 pd.options.display.max_colwidth = 500
 
-from bootleg.utils import data_utils, sentence_utils, eval_utils
-from bootleg.utils.parser_utils import get_full_config
-from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.symbols.alias_entity_table import AliasEntityTable
 from bootleg.symbols.constants import *
-from bootleg.model import Model
-from bootleg.extract_mentions import find_aliases_in_sentence_tag, get_all_aliases
-from bootleg.utils.utils import import_class
+
+def copy_candidates(from_alias, to_alias, alias2qids, max_candidates=30, qids_to_add=None):
+    """This will copy the candidates from from_alias to to_alias. We assume to_alias does not exist and from_alias does exists.
+    qids_to_add will be added to the beginning of the candidate list to ensure they are among the top 30"""
+    if qids_to_add is None:
+        qids_to_add = []
+    assert from_alias in alias2qids, f"The from_alias {from_alias} must be in the alias2qids mapping. Use add_new_alias command from a new alias"
+    assert to_alias not in alias2qids, f"The to_alias {to_alias} must not be in alias2qids."
+    candidates = alias2qids[from_alias]
+    # Add the qids to add to candidates. As the user wants these qids, give them the highest score
+    if len(qids_to_add) > 0:
+        top_score = candidates[0][1]
+        new_candidates = [[q, top_score] for q in qids_to_add]
+        candidates = new_candidates + candidates
+        if len(candidates) > max_candidates:
+            print(f"Filtering candidates down to top {max_candidates}")
+            candidates = candidates[:max_candidates]
+    alias2qids[to_alias] = candidates
+    return alias2qids
+
+
+def add_new_alias(new_alias, alias2qids, qids_to_add, max_candidates=30):
+    assert new_alias not in alias2qids, f"The new_alias {new_alias} must not be in alias2qids."
+    # Assign each qid a score of 1.0
+    candidates = [[q, 1.0] for q in qids_to_add]
+    if len(candidates) > max_candidates:
+        print(f"Filtering candidates down to top {max_candidates}")
+        candidates = candidates[:max_candidates]
+    alias2qids[new_alias] = candidates
+    return alias2qids
+
+def load_title_map(entity_mapping_dir):
+    return ujson.load(open(os.path.join(entity_mapping_dir, 'qid2title.json')))
+
+def load_cand_map(entity_mapping_dir, alias_map_file):
+    return ujson.load(open(os.path.join(entity_mapping_dir, alias_map_file)))
 
 def load_predictions(file):
     lines = {}
@@ -25,14 +55,21 @@ def load_predictions(file):
             lines[line['sent_idx_unq']] = line
     return lines
 
-def score_predictions(orig_file, pred_file, entity_mapping_dir, type_symbols=[]):
-    title_mapping = ujson.load(open(os.path.join(entity_mapping_dir, 'qid2title.json')))
+def score_predictions(orig_file, pred_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None):
+    """Loads a jsonl file and joins with the results from dump_preds"""
+    if cands_map is None:
+        cands_map = {}
+    if type_symbols is None:
+        type_symbols = []
+    if kg_symbols is None:
+        kg_symbols = []
+    num_lines = sum(1 for line in open(orig_file))
     preds = load_predictions(pred_file)
     correct = 0
     total = 0
     rows = []
     with jsonlines.open(orig_file) as f:
-        for line in f:
+        for line in tqdm(f, total=num_lines):
             sent_idx = line['sent_idx_unq']
             gold_qids = line['qids']
             pred_qids = preds[sent_idx]['qids']
@@ -43,20 +80,48 @@ def score_predictions(orig_file, pred_file, entity_mapping_dir, type_symbols=[])
             for alias_idx in range(len(gold_qids)):
                 res = {
                     'sentence': line['sentence'],
+                    'sent_idx': line['sent_idx_unq'],
                     'aliases': line['aliases'],
+                    'span': line['spans'][alias_idx],
+                    'slices': line.get('slices', {}),
                     'alias': line['aliases'][alias_idx],
                     'alias_idx': alias_idx,
+                    'is_gold_label': line['gold'][alias_idx],
                     'gold_qid': gold_qids[alias_idx],
                     'pred_qid': pred_qids[alias_idx],
-                    'gold_title': title_mapping[gold_qids[alias_idx]],
-                    'pred_title': title_mapping[pred_qids[alias_idx]]
+                    'gold_title': title_map[gold_qids[alias_idx]],
+                    'pred_title': title_map[pred_qids[alias_idx]],
+                    'all_gold_qids': gold_qids,
+                    'all_pred_qids': pred_qids,
+                    'gold_label_aliases': [al for i, al in enumerate(line['aliases']) if line['gold'][i] is True],
+                    'all_is_gold_labels': line['gold'],
+                    'all_spans': line['spans']
                 }
+                slices = []
+                if 'slices' in line:
+                    for sl_name in line['slices']:
+                        if str(alias_idx) in line['slices'][sl_name] and line['slices'][sl_name][str(alias_idx)] > 0.5:
+                            slices.append(sl_name)
+                res['slices'] = slices
+                if len(cands_map) > 0:
+                    res["cands"] = [tuple([title_map[q[0]], preds[sent_idx]["cand_probs"][alias_idx][i]]) for i, q in enumerate(cands_map[line['aliases'][alias_idx]])]
                 for type_sym in type_symbols:
                     type_nm = os.path.basename(os.path.splitext(type_sym.type_file)[0])
                     gold_types = type_sym.get_types(gold_qids[alias_idx])
                     pred_types = type_sym.get_types(pred_qids[alias_idx])
                     res[f"{type_nm}_gld"] = gold_types
                     res[f"{type_nm}_pred"] = pred_types
+                for kg_sym in kg_symbols:
+                    kg_nm = os.path.basename(os.path.splitext(kg_sym.kg_adj_file)[0])
+                    connected_pairs_gld = []
+                    connected_pairs_pred = []
+                    for alias_idx2 in range(len(gold_qids)):
+                        if kg_sym.is_connected(gold_qids[alias_idx], gold_qids[alias_idx2]):
+                            connected_pairs_gld.append(gold_qids[alias_idx2])
+                        if kg_sym.is_connected(pred_qids[alias_idx], pred_qids[alias_idx2]):
+                            connected_pairs_pred.append(pred_qids[alias_idx2])
+                    res[f"{kg_nm}_gld"] = connected_pairs_gld
+                    res[f"{kg_nm}_pred"] = connected_pairs_gld
                 rows.append(res)
     return pd.DataFrame(rows)
 
