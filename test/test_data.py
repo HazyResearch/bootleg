@@ -18,20 +18,6 @@ ARR_KEYS_TO_COMPARE = [
     f'slice:slice2_pred',f'slice:slice2_ind',
 ]
 
-# max_aliases-len(aliases) aliases will be -1 padded
-# Other aliases get 1s for their candidates and -1 otherwise (as these are padded candidates)
-def get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands):
-    max_cands = 6
-    arr = np.ones((max_aliases, max_cands+int(not train_in_cands)))*-1
-    for al_idx, alias in enumerate(aliases):
-        cand_arr = np.ones(max_cands+int(not train_in_cands))*-1
-        for i in range(len(alias2wpids[alias])):
-            cand_arr[i+int(not train_in_cands)] = 1
-        if not train_in_cands:
-            cand_arr[0] = 1
-        arr[al_idx] = cand_arr
-    return arr
-
 def get_data_train_in_candidates():
     """ Return artificial datasets when train_in_candidates = True """
 
@@ -52,7 +38,6 @@ def get_data_train_in_candidates():
     # Sentence 1:
     # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|alias1 or multi word alias2
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -75,7 +60,6 @@ def get_data_train_in_candidates():
     # Sentence 2:
     # 1|0~*~1|alias3~*~alias4|Q1~*~Q4|0:1~*~2:3|alias3 cat alias4
     aliases = ['alias3', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[1] = [1]
     truedata[1] = {
         'sent_idx': 1,
@@ -98,7 +82,6 @@ def get_data_train_in_candidates():
     # Sentence 3:
     # 2|0|multi word alias2|Q4|1:4|cat multi word alias2
     aliases = ['multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[2] = [2]
     truedata[2] = {
         'sent_idx': 2,
@@ -121,7 +104,6 @@ def get_data_train_in_candidates():
     # Sentence 4:
     #3|0|alias4|Q3|2:3|alias3 cat alias4
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[3] = [3]
     truedata[3] = {
         'sent_idx': 3,
@@ -164,7 +146,6 @@ def get_data_missing_gold():
     # Sentence 1:
     # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|alias1 or multi word alias2
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=False)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -187,7 +168,6 @@ def get_data_missing_gold():
     # Sentence 2:
     # 1|0~*~1|alias3~*~alias4|Q1~*~Q4|0:1~*~2:3|alias3 cat alias4
     aliases = ['alias3', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=False)
     sent_idx_to_idx[1] = [1]
     truedata[1] = {
         'sent_idx': 1,
@@ -210,7 +190,6 @@ def get_data_missing_gold():
     # Sentence 3:
     # 2|0|multi word alias2|Q4|1:4|cat multi word alias2
     aliases = ['multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=False)
     sent_idx_to_idx[2] = [2]
     truedata[2] = {
         'sent_idx': 2,
@@ -233,7 +212,6 @@ def get_data_missing_gold():
     # Sentence 4: Note that Q2 is not a candidate for alias3!
     #3|0~*~1|alias3~*~alias4|Q2~*~Q3|0:1~*~2:3|alias3 cat alias4
     aliases = ['alias3', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=False)
     sent_idx_to_idx[3] = [3]
     truedata[3] = {
         'sent_idx': 3,
@@ -272,20 +250,7 @@ def get_data_train_long_sentence():
     # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}|
     truedata = [None, None, None, None, None]
     # Sentence 1:
-    # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|alias1 or multi word alias2|"slices":{"base": [0,1], "slice1": [0], "slice2": [0]}
-    # "filters": "slice1": {"0": [0], "1": [1,2]}, "slice2": {"0": [0], "1": [1,2]}}}
-    aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    no_filt_arr_s1 = np.array(no_filt_arr, copy=True)
-    # Make candidate 1 not be in filter (alias1 has two candidates)
-    no_filt_arr_s1[0, 1] = 0
-    # Make candidate 0 not be in filter (multi word alias2 has three candidates)
-    no_filt_arr_s1[1, 0] = 0
-    no_filt_arr_s2 = np.array(no_filt_arr, copy=True)
-    # Make candidate 1 not be in filter (alias1 has two candidates)
-    no_filt_arr_s2[0, 1] = 0
-    # Make candidate 0 not be in filter (multi word alias2 has three candidates)
-    no_filt_arr_s2[1, 0] = 0
+    # {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "slices": {"slice1": {"0": 1.0, "1": 0.0}, "slice2": {"0": 1.0, "1": 0.0}}, "gold": [true, true]}
 
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
@@ -309,7 +274,6 @@ def get_data_train_long_sentence():
     # Sentence 2:
     # 1|0~*~1|alias3~*~alias4|Q1~*~Q4|0:1~*~2:3|alias3 cat cat cat cat cat cat alias4|"slices":{"base": [0,1], "slice1": [0], "slice2": [1]}}
     aliases = ['alias3']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     truedata[1] = {
         'sent_idx': 1,
         'subsent_idx': 0,
@@ -329,7 +293,6 @@ def get_data_train_long_sentence():
     }
 
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[1] = [1, 2]
     truedata[2] = {
         'sent_idx': 1,
@@ -354,7 +317,6 @@ def get_data_train_long_sentence():
     # Sentence 3:
     # 2|0|multi word alias2|Q4|1:4|cat multi word alias2|"slices":{"base": [0], "slice1": [], "slice2": []}
     aliases = ['multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[2] = [3]
     truedata[3] = {
         'sent_idx': 2,
@@ -377,7 +339,6 @@ def get_data_train_long_sentence():
     # Sentence 4: Because this sentence is long, we'll focus on the first alias and recenter.
     #3|0|alias4|Q3|2:3|alias3 cat alias4 cat cat cat cat|"slices":{"base": [0], "slice1": [0], "slice2": []}
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[3] = [4]
     truedata[4] = {
         'sent_idx': 3,
@@ -420,7 +381,6 @@ def get_data_train_many_alias():
     # Sentence 1:
     # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|alias1 or multi word alias2|"slices":{"base": [0,1], "slice1": [1]}
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -443,11 +403,6 @@ def get_data_train_many_alias():
     # Sentence 2:
     # 1|0~*~1~*~2|alias3~*~alias4~*~alias3|Q1~*~Q4~*~Q1|0:1~*~2:3~*~3:4|alias3 cat alias4 alias3|"slices":{"base": [0,1,2], "slice1": [1,2]}
     aliases = ['alias3', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    no_filt_arr_s1 = np.array(no_filt_arr, copy=True)
-    # Make candidate 1 and 2 not be in filter (alias4 has three candidates)
-    no_filt_arr_s1[1, 1] = 0
-    no_filt_arr_s1[1, 2] = 0
     truedata[1] = {
         'sent_idx': 1,
         'subsent_idx': 0,
@@ -467,7 +422,6 @@ def get_data_train_many_alias():
     }
 
     aliases = ['alias3']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[1] = [1, 2]
     truedata[2] = {
         'sent_idx': 1,
@@ -491,7 +445,6 @@ def get_data_train_many_alias():
     # Sentence 3:
     # 2|0|multi word alias2|Q4|1:4|cat multi word alias2|"slices":{"base": [0], "slice1": []}
     aliases = ['multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[2] = [3]
     truedata[3] = {
         'sent_idx': 2,
@@ -514,7 +467,6 @@ def get_data_train_many_alias():
     # Sentence 4:
     #3|0|alias4|Q3|2:3|alias3 cat alias4|"slices":{"base": [0], "slice1": []}
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[3] = [4]
     truedata[4] = {
         'sent_idx': 3,
@@ -536,8 +488,8 @@ def get_data_train_many_alias():
 
     return alias2wpids, truedata, sent_idx_to_idx
 
-def get_data_train_anchors_noaug():
-    """ Return artificial dataset where the False anchors are removed"""
+def get_data_train_golds_noaug():
+    """ Return artificial dataset where the False golds are removed"""
 
     sent_idx_to_idx = {}
 
@@ -552,12 +504,11 @@ def get_data_train_anchors_noaug():
     max_aliases = 2
     # Manually set sentence data. Remember each line in the data file corresponds to an independent sample, with:
     # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}
-    truedata = [None, None, None, None, None]
+    truedata = [None, None, None]
 
     # Sentence 1:
-    # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|alias1 or multi word alias2|"slices":{"base": [0,1], "slice1": [1]}
+    # {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "importance": {"base": {"0": 1.0, "1": 0.0}, "slice1": {"0": 0.0, "1": 1.0}}, "slices": {"slice1": {"0": 0.0, "1": 0.9}, "slice2": {"0": 0.0, "1": 0.0}}, "gold": [true, true]}
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -578,9 +529,8 @@ def get_data_train_anchors_noaug():
     }
 
     # Sentence 2: we drop the second alias and then to sentence parsing after its removal
-    # 1|0~*~1~*~2|alias3~*~alias4~*~alias3|true~*~false~*~true|Q1~*~Q4~*~Q1|0:1~*~2:3~*~3:4|alias3 cat alias4 alias3|"slices":{"base": [0,1,2], "slice1": [1,2]}, "importance": {"base": {"0": 1.0, "1": 0.0, "2": 0.0}, "slice1": {"0": 0.0, "1": 1.0, "2": 1.0}}, "filters": {"slice1": {"0": [0], "1": [0], "2": [0]}}
+    # {"aliases": ["alias3", "alias4", "alias3"], "qids": ["Q1", "Q4", "Q1"], "sent_idx": "1", "sent_idx_unq": "1", "sentence": "alias3 cat alias4 alias3", "spans": [[0, 1], [2, 3], [3, 4]], "slices": {"slice1": {"0": 0.0, "1": 1.0, "2": 1.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0}}, "gold": [true, false, true]}
     aliases = ['alias3', 'alias3']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[1] = [1]
     truedata[1] = {
         'sent_idx': 1,
@@ -600,12 +550,32 @@ def get_data_train_anchors_noaug():
         f'slice:slice2_ind': np.array([0, 0])
     }
 
-    # Sentence 3: droped because anchor is false
+    # Sentence 3:
+    # {"aliases": ["multi word alias2"], "qids": ["Q4"], "sent_idx": "2", "sent_idx_unq": "2", "sentence": "cat multi word alias2", "spans": [[1, 4]], "importance": {"base": {"0": 1.0}}, "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [false]}
+    # WE DROP ONLY FALSE SENTENCES FROM TRAINING DATA - WE KEEP FOR EVAL
+    # aliases = ['multi word alias2']
+    # sent_idx_to_idx[2] = [3]
+    # truedata[3] = {
+    #     'sent_idx': 2,
+    #     'subsent_idx': 0,
+    #     'start_idx_in_sent': np.array([1,-1]),
+    #     'end_idx_in_sent': np.array([3,-1]),
+    #     'alias_idx': np.array([alias_trie['multi word alias2'], -1]),
+    #     'word_indices': np.array([7, 5, 0, 2, -1]),
+    #     'alias_list_pos': np.array([0, -1]),
+    #     f'slice:{FINAL_LOSS}_pred': np.array([2, -1]),
+    #     f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+    #     f'slice:{BASE_SLICE}_pred': np.array([2, -1]),
+    #     f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+    #     f'slice:slice1_pred': np.array([-1, -1]),
+    #     f'slice:slice1_ind': np.array([0, -1]),
+    #     f'slice:slice2_pred': np.array([-1, -1]),
+    #     f'slice:slice2_ind': np.array([0, -1])
+    # }
 
     # Sentence 4:
-    #3|0|alias4|Q3|2:3|alias3 cat alias4|"slices":{"base": [0], "slice1": []}
+    # {"aliases": ["alias4"], "qids": ["Q3"], "sent_idx": "3", "sent_idx_unq": "3", "sentence": "alias3 cat alias4", "spans": [[2, 3]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [true]}
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[3] = [2]
     truedata[2] = {
         'sent_idx': 3,
@@ -627,7 +597,7 @@ def get_data_train_anchors_noaug():
 
     return alias2wpids, truedata, sent_idx_to_idx
 
-def get_data_train_anchors_eval_yesaug():
+def get_data_train_golds_eval_yesaug():
     sent_idx_to_idx = {}
 
     # Manually set alias map
@@ -641,12 +611,11 @@ def get_data_train_anchors_eval_yesaug():
     max_aliases = 2
     # Manually set sentence data. Remember each line in the data file corresponds to an independent sample, with:
     # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}
-    truedata = [None, None, None, None]
+    truedata = [None, None, None, None, None]
 
     # Sentence 1:
-    # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|true,true|alias1 or multi word alias2|"slices":{"base": [0,1], "slice1": [1]}
+    # {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "slices": {"slice1": {"0": 0.0, "1": 0.9}, "slice2": {"0": 0.0, "1": 0.0}}, "gold": [true, true]}
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -666,15 +635,11 @@ def get_data_train_anchors_eval_yesaug():
         f'slice:slice2_ind': np.array([0, 0])
     }
 
-    # dataset_is_eval is set in test so we want to NOT predict on indicators or prediction heads for
-    # false anchors
-
     # Sentence 2:
-    # 1|0~*~1~*~2|alias3~*~alias4~*~alias3|Q1~*~Q4~*~Q1|0:1~*~2:3~*~3:4|true,false,true|alias3 cat alias4 alias3|"slices":{"base": [0,1,2], "slice1": [1,2]}
-    # Alias4 gets seen by the model, but not predicted on because it's a False anchor and this is eval (we know it gets seen because alias_idx != -1)
+    # {"aliases": ["alias3", "alias4", "alias3"], "qids": ["Q1", "Q4", "Q1"], "sent_idx": "1", "sent_idx_unq": "1", "sentence": "alias3 cat alias4 alias3", "spans": [[0, 1], [2, 3], [3, 4]], "slices": {"slice1": {"0": 0.0, "1": 1.0, "2": 1.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0}}, "gold": [true, false, true]}
+    # Alias4 gets seen by the model, but not predicted on because it's a False gold and this is eval (we know it gets seen because alias_idx != -1)
     aliases = ['alias3', 'alias4']
-    # Limit to the first alias because anchor is false for the second
-    no_filt_arr = get_no_filter(max_aliases, aliases[:1], alias2wpids, train_in_cands=True)
+    # Limit to the first alias because gold is false for the second
     truedata[1] = {
         'sent_idx': 1,
         'subsent_idx': 0,
@@ -694,7 +659,6 @@ def get_data_train_anchors_eval_yesaug():
     }
 
     aliases = ['alias3']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[1] = [1, 2]
     truedata[2] = {
         'sent_idx': 1,
@@ -717,15 +681,33 @@ def get_data_train_anchors_eval_yesaug():
     }
 
     # Sentence 3:
-    # dropped because only false anchor
+    # {"aliases": ["multi word alias2"], "qids": ["Q4"], "sent_idx": "2", "sent_idx_unq": "2", "sentence": "cat multi word alias2", "spans": [[1, 4]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [false]}
+    aliases = ["multi word alias2"]
+    sent_idx_to_idx[2] = [3]
+    truedata[3] = {
+        'sent_idx': 2,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([1, -1]),
+        'end_idx_in_sent': np.array([3, -1]),
+        'alias_idx': np.array([alias_trie["multi word alias2"], -1]),
+        'word_indices': np.array([7, 5, 0, 2, -1]),
+        'alias_list_pos': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([-1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([-1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([-1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([-1, -1])
+    }
 
     # Sentence 4:
-    #3|0|alias4|Q3|2:3|true|alias3 cat alias4|"slices":{"base": [0], "slice1": []}
+    # {"aliases": ["alias4"], "qids": ["Q3"], "sent_idx": "3", "sent_idx_unq": "3", "sentence": "alias3 cat alias4", "spans": [[2, 3]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [true]}
 
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    sent_idx_to_idx[3] = [3]
-    truedata[3] = {
+    sent_idx_to_idx[3] = [4]
+    truedata[4] = {
         'sent_idx': 3,
         'subsent_idx': 0,
         'start_idx_in_sent': np.array([2, -1]),
@@ -745,7 +727,270 @@ def get_data_train_anchors_eval_yesaug():
 
     return alias2wpids, truedata, sent_idx_to_idx
 
-def get_data_train_anchors_eval_yesaug_long():
+def get_data_train_golds_eval_yesaug_nic():
+    sent_idx_to_idx = {}
+
+    # Manually set alias map
+    alias2wpids = {
+        'alias1': [["Q1", 10], ["Q4", 6]],
+        'multi word alias2': [["Q2", 5], ["Q1", 3], ["Q4", 2]],
+        'alias3': [["Q1", 30]],
+        'alias4': [["Q4", 20], ["Q3", 15], ["Q2", 1]]
+    }
+    alias_trie = marisa_trie.Trie(alias2wpids.keys())
+    max_aliases = 2
+    # Manually set sentence data. Remember each line in the data file corresponds to an independent sample, with:
+    # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}
+    truedata = [None, None, None, None, None]
+
+    # Sentence 1:
+    # {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q3"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "slices": {"slice1": {"0": 0.0, "1": 0.9}, "slice2": {"0": 0.0, "1": 0.0}}, "gold": [true, true]}
+    # As Q3 is not in candidates, the index should be -2 as train in candidates is true
+    aliases = ['alias1', 'multi word alias2']
+    sent_idx_to_idx[0] = [0]
+    truedata[0] = {
+        'sent_idx': 0,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([0, 2]),
+        'end_idx_in_sent': np.array([0, 4]),
+        'alias_idx': np.array([alias_trie['alias1'], alias_trie['multi word alias2']]),
+        'word_indices': np.array([1, 6, 5, 0, 2]),
+        'alias_list_pos': np.array([0, 1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([0, -2]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, 1]),
+        f'slice:{BASE_SLICE}_pred': np.array([0, -2]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, 1]),
+        f'slice:slice1_pred': np.array([-1, -2]),
+        f'slice:slice1_ind': np.array([0, 0.9]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, 0])
+    }
+
+    # Sentence 2:
+    # {"aliases": ["alias3", "alias4", "alias3"], "qids": ["Q1", "Q4", "Q1"], "sent_idx": "1", "sent_idx_unq": "1", "sentence": "alias3 cat alias4 alias3", "spans": [[0, 1], [2, 3], [3, 4]], "slices": {"slice1": {"0": 0.0, "1": 1.0, "2": 1.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0}}, "gold": [true, false, true]}
+    aliases = ['alias3', 'alias4']
+    # Limit to the first alias because gold is false for the second
+    truedata[1] = {
+        'sent_idx': 1,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([0, 2]),
+        'end_idx_in_sent': np.array([0, 2]),
+        'alias_idx': np.array([alias_trie['alias3'], alias_trie['alias4']]),
+        'word_indices': np.array([3, 7, 4, 3, -1]),
+        'alias_list_pos': np.array([0, 1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([0, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([0, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+    }
+
+    aliases = ['alias3']
+    sent_idx_to_idx[1] = [1, 2]
+    truedata[2] = {
+        'sent_idx': 1,
+        'subsent_idx': 1,
+        'start_idx_in_sent': np.array([3, -1]),
+        'end_idx_in_sent': np.array([3, -1]),
+        'alias_idx': np.array([alias_trie['alias3'], -1]),
+        'word_indices': np.array([3, 7, 4, 3, -1]),
+        'alias_list_pos': np.array([2, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([0, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([0, -1]),
+        f'slice:slice1_ind': np.array([1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+        # across sentences
+        # across sentence
+    }
+
+    # Sentence 3:
+    # {"aliases": ["multi word alias2"], "qids": ["Q4"], "sent_idx": "2", "sent_idx_unq": "2", "sentence": "cat multi word alias2", "spans": [[1, 4]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [false]}
+    aliases = ["multi word alias2"]
+    sent_idx_to_idx[2] = [3]
+    truedata[3] = {
+        'sent_idx': 2,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([1, -1]),
+        'end_idx_in_sent': np.array([3, -1]),
+        'alias_idx': np.array([alias_trie["multi word alias2"], -1]),
+        'word_indices': np.array([7, 5, 0, 2, -1]),
+        'alias_list_pos': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([-1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([-1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([-1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([-1, -1])
+    }
+
+
+    # Sentence 4:
+    # {"aliases": ["alias4"], "qids": ["Q3"], "sent_idx": "3", "sent_idx_unq": "3", "sentence": "alias3 cat alias4", "spans": [[2, 3]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [true]}
+
+    aliases = ['alias4']
+    sent_idx_to_idx[3] = [4]
+    truedata[4] = {
+        'sent_idx': 3,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([2, -1]),
+        'end_idx_in_sent': np.array([2, -1]),
+        'alias_idx': np.array([alias_trie['alias4'], -1]),
+        'word_indices': np.array([3, 7, 4, -1, -1]),
+        'alias_list_pos': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([0, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+    }
+
+    return alias2wpids, truedata, sent_idx_to_idx
+
+def get_data_train_golds_eval_yesaug_nic_false():
+    # train in candidates is false
+    sent_idx_to_idx = {}
+
+    # Manually set alias map
+    alias2wpids = {
+        'alias1': [["Q1", 10], ["Q4", 6]],
+        'multi word alias2': [["Q2", 5], ["Q1", 3], ["Q4", 2]],
+        'alias3': [["Q1", 30]],
+        'alias4': [["Q4", 20], ["Q3", 15], ["Q2", 1]]
+    }
+    alias_trie = marisa_trie.Trie(alias2wpids.keys())
+    max_aliases = 2
+    # Manually set sentence data. Remember each line in the data file corresponds to an independent sample, with:
+    # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}
+    truedata = [None, None, None, None, None]
+
+    # Sentence 1:
+    # {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q3"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "slices": {"slice1": {"0": 0.0, "1": 0.9}, "slice2": {"0": 0.0, "1": 0.0}}, "gold": [true, true]}
+    aliases = ['alias1', 'multi word alias2']
+    sent_idx_to_idx[0] = [0]
+    truedata[0] = {
+        'sent_idx': 0,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([0, 2]),
+        'end_idx_in_sent': np.array([0, 4]),
+        'alias_idx': np.array([alias_trie['alias1'], alias_trie['multi word alias2']]),
+        'word_indices': np.array([1, 6, 5, 0, 2]),
+        'alias_list_pos': np.array([0, 1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([1, 0]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, 1]),
+        f'slice:{BASE_SLICE}_pred': np.array([1, 0]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, 1]),
+        f'slice:slice1_pred': np.array([-1, 0]),
+        f'slice:slice1_ind': np.array([0, 0.9]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, 0])
+    }
+
+    # dataset_is_eval is set in test so we want to NOT predict on indicators or prediction heads for
+    # false golds
+
+    # Sentence 2:
+    # {"aliases": ["alias3", "alias4", "alias3"], "qids": ["Q1", "Q4", "Q1"], "sent_idx": "1", "sent_idx_unq": "1", "sentence": "alias3 cat alias4 alias3", "spans": [[0, 1], [2, 3], [3, 4]], "slices": {"slice1": {"0": 0.0, "1": 1.0, "2": 1.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0}}, "gold": [true, false, true]}
+    aliases = ['alias3', 'alias4']
+    # Limit to the first alias because gold is false for the second
+    truedata[1] = {
+        'sent_idx': 1,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([0, 2]),
+        'end_idx_in_sent': np.array([0, 2]),
+        'alias_idx': np.array([alias_trie['alias3'], alias_trie['alias4']]),
+        'word_indices': np.array([3, 7, 4, 3, -1]),
+        'alias_list_pos': np.array([0, 1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([0, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+    }
+
+    aliases = ['alias3']
+    sent_idx_to_idx[1] = [1, 2]
+    truedata[2] = {
+        'sent_idx': 1,
+        'subsent_idx': 1,
+        'start_idx_in_sent': np.array([3, -1]),
+        'end_idx_in_sent': np.array([3, -1]),
+        'alias_idx': np.array([alias_trie['alias3'], -1]),
+        'word_indices': np.array([3, 7, 4, 3, -1]),
+        'alias_list_pos': np.array([2, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([1, -1]),
+        f'slice:slice1_ind': np.array([1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+    }
+
+    # Sentence 3:
+    # {"aliases": ["multi word alias2"], "qids": ["Q4"], "sent_idx": "2", "sent_idx_unq": "2", "sentence": "cat multi word alias2", "spans": [[1, 4]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [false]}
+    aliases = ["multi word alias2"]
+    sent_idx_to_idx[2] = [3]
+    truedata[3] = {
+        'sent_idx': 2,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([1, -1]),
+        'end_idx_in_sent': np.array([3, -1]),
+        'alias_idx': np.array([alias_trie["multi word alias2"], -1]),
+        'word_indices': np.array([7, 5, 0, 2, -1]),
+        'alias_list_pos': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([-1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([-1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([-1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([-1, -1])
+    }
+
+
+    # Sentence 4:
+    # {"aliases": ["alias4"], "qids": ["Q3"], "sent_idx": "3", "sent_idx_unq": "3", "sentence": "alias3 cat alias4", "spans": [[2, 3]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [true]}
+
+    aliases = ['alias4']
+    sent_idx_to_idx[3] = [4]
+    truedata[4] = {
+        'sent_idx': 3,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([2, -1]),
+        'end_idx_in_sent': np.array([2, -1]),
+        'alias_idx': np.array([alias_trie['alias4'], -1]),
+        'word_indices': np.array([3, 7, 4, -1, -1]),
+        'alias_list_pos': np.array([0, -1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([2, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([2, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([0, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([0, -1])
+    }
+
+    return alias2wpids, truedata, sent_idx_to_idx
+
+def get_data_train_golds_eval_yesaug_long():
     """ Return artificial dataset where the number of aliases exceeds the limit and such that one of the splits has all false aliases.
     In a eval setting, these subsentences need to be dropped, too."""
 
@@ -764,12 +1009,11 @@ def get_data_train_anchors_eval_yesaug_long():
     max_aliases = 2
     # Manually set sentence data. Remember each line in the data file corresponds to an independent sample, with:
     # {sentence_index}|{alias to predict}~*~...|{alias}~*~...|{true QID}~*~...|{spans}~*~|{sentence}
-    truedata = [None, None, None, None, None]
+    truedata = [None, None, None, None, None, None]
 
     # Sentence 1:
-    # 0|0~*~1|alias1~*~multi word alias2|Q1~*~Q4|0:1~*~2:5|true,true|alias1 or multi word alias2|"slices":{"base": [0,1], "slice1": [1]}
+    # {"aliases": ["alias1", "multi word alias2"], "parent_qid": "-1", "parent_title": "-1", "qids": ["Q1", "Q4"], "sent_idx": "0", "sent_idx_unq": "0", "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "slices": {"slice1": {"0": 0.0, "1": 1.0}, "slice2": {"0": 0.0, "1": 0.0}}, "gold": [true, true]}
     aliases = ['alias1', 'multi word alias2']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
     sent_idx_to_idx[0] = [0]
     truedata[0] = {
         'sent_idx': 0,
@@ -790,29 +1034,28 @@ def get_data_train_anchors_eval_yesaug_long():
     }
 
     # Sentence 2:
-    # 1|0~*~1~*~2|alias3~*~alias4~*~alias3|Q1~*~Q4~*~Q1~*~Q4|0:1~*~2:3~*~3:4|false,false,true,true|alias3 cat alias4 alias3 alias4|"slices":{"base": [0,1,2,4], "slice1": [1,2]}
-    # First part of sentence gets dropped because of two false anchors
-    # truedata[1] = {
-    #     'sent_idx': 1,
-    #     'subsent_idx': 0,
-    #     'start_idx_in_sent': np.array([0, 2]),
-    #     'end_idx_in_sent': np.array([0, 2]),
-    #     'alias_idx': np.array([alias_trie['alias3'], alias_trie['alias4']]),
-    #     'word_indices': np.array([3, 7, 4, 3, -1, -1, -1, -1, -1, -1]),
-    #     'alias_list_pos': np.array([0, 1]),
-    #     f'slice:{FINAL_LOSS}_pred' np.array([0, -1]),
-    #     f'slice:{FINAL_LOSS}_ind' np.array([0, -1]),
-    #     f'slice:{BASE_SLICE}_ind': np.array([1, 0]),
-    #     f'slice:slice1_pred': np.array([-1, -1]),
-    #     f'slice:slice1_ind': np.array([0, 0]),
-    #     f'slice:slice2_pred': np.array([-1, -1]),
-    #     f'slice:slice2_ind': np.array([0, 0])
-    # }
+    # {"aliases": ["alias3", "alias4", "alias3", "alias4"], "parent_qid": "-1", "parent_title": "-1", "qids": ["Q1", "Q4", "Q1", "Q4"], "sent_idx": "1", "sent_idx_unq": "1", "sentence": "alias3 cat alias4 alias3 alias4", "spans": [[0, 1], [2, 3], [3, 4], [4, 5]], "slices": {"slice1": {"0": 0.0, "1": 1.0, "2": 1.0, "3": 0.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0, "3": 0.0}}, "gold": [false, false, true, true]}
+    truedata[1] = {
+        'sent_idx': 1,
+        'subsent_idx': 0,
+        'start_idx_in_sent': np.array([0, 2]),
+        'end_idx_in_sent': np.array([0, 2]),
+        'alias_idx': np.array([alias_trie['alias3'], alias_trie['alias4']]),
+        'word_indices': np.array([3, 7, 4, 3, 4, -1, -1, -1, -1, -1]),
+        'alias_list_pos': np.array([0, 1]),
+        f'slice:{FINAL_LOSS}_pred': np.array([-1, -1]),
+        f'slice:{FINAL_LOSS}_ind': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_ind': np.array([-1, -1]),
+        f'slice:{BASE_SLICE}_pred': np.array([-1, -1]),
+        f'slice:slice1_pred': np.array([-1, -1]),
+        f'slice:slice1_ind': np.array([-1, -1]),
+        f'slice:slice2_pred': np.array([-1, -1]),
+        f'slice:slice2_ind': np.array([-1, -1])
+    }
 
     aliases = ['alias3', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    sent_idx_to_idx[1] = [1]
-    truedata[1] = {
+    sent_idx_to_idx[1] = [1, 2]
+    truedata[2] = {
         'sent_idx': 1,
         'subsent_idx': 1,
         'start_idx_in_sent': np.array([3, 4]),
@@ -833,15 +1076,9 @@ def get_data_train_anchors_eval_yesaug_long():
     }
 
     # Sentence 3:
-    # {"aliases":["multi word alias2", "alias4", "alias4", "alias4"],"gold":[false,true,false,true],"qids":["Q4","Q4","Q4","Q4"],"sent_idx_unq":"2",
-    # "sentence":"cat multi word alias2 alias4 alias4 cat cat cat alias4","slices":{"base": [0,1,2,3], "slice1": []}}
-    # First two aliases in this subsentence
-    aliases = ['multi word alias2', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    # First alias is False and gets -1 labels
-    no_filt_arr[0,:] = -1
-    sent_idx_to_idx[2] = [2, 3]
-    truedata[2] = {
+    # {"aliases": ["multi word alias2", "alias4", "alias4", "alias4"], "parent_qid": "-1", "parent_title": "-1", "qids": ["Q4", "Q4", "Q4", "Q4"], "sent_idx": "2", "sent_idx_unq": "2", "sentence": "cat multi word alias2 alias4 alias4 cat cat cat alias4", "spans": [[1, 4], [4, 5], [5, 6], [6, 7]], "slices": {"slice1": {"0": 0.0, "1": 0.0, "2": 0.0, "3": 0.0}, "slice2": {"0": 0.0, "1": 0.0, "2": 0.0, "3": 0.0}}, "gold": [false, true, false, true]}
+    sent_idx_to_idx[2] = [3, 4]
+    truedata[3] = {
         'sent_idx': 2,
         'subsent_idx': 0,
         'start_idx_in_sent': np.array([1, 4]),
@@ -860,8 +1097,7 @@ def get_data_train_anchors_eval_yesaug_long():
     }
 
     aliases = ['alias4', 'alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases[1:], alias2wpids, train_in_cands=True)
-    truedata[3] = {
+    truedata[4] = {
         'sent_idx': 2,
         'subsent_idx': 1,
         'start_idx_in_sent': np.array([5, 6]),
@@ -879,10 +1115,11 @@ def get_data_train_anchors_eval_yesaug_long():
         f'slice:slice2_ind': np.array([-1, 0])
     }
 
+    # Sentence 4:
+    # {"aliases": ["alias4"], "parent_qid": "-1", "parent_title": "-1", "qids": ["Q3"], "sent_idx": "3", "sent_idx_unq": "3", "sentence": "alias3 cat alias4", "spans": [[2, 3]], "slices": {"slice1": {"0": 0.0}, "slice2": {"0": 0.0}}, "gold": [true]}
     aliases = ['alias4']
-    no_filt_arr = get_no_filter(max_aliases, aliases, alias2wpids, train_in_cands=True)
-    sent_idx_to_idx[3] = [4]
-    truedata[4] = {
+    sent_idx_to_idx[3] = [5]
+    truedata[5] = {
         'sent_idx': 3,
         'subsent_idx': 0,
         'start_idx_in_sent': np.array([2, -1]),
@@ -902,9 +1139,9 @@ def get_data_train_anchors_eval_yesaug_long():
 
     return alias2wpids, truedata, sent_idx_to_idx
 
-def get_slice_data_test_anchors_yesaug():
-    ''' Get artificial test dataset (where you can onlp predict anchors with True) for slice indexes where use_weak_label is True'''
-    # The max number of aliases to predict in the data will be 2 (for the number of true anchors)
+def get_slice_data_test_golds_yesaug():
+    ''' Get artificial test dataset (where you can onlp predict golds with True) for slice indexes where use_weak_label is True'''
+    # The max number of aliases to predict in the data will be 2 (for the number of true golds)
     slice_dt = np.dtype([('sent_idx', int), ('alias_to_predict', int, 3), ('prob_labels', float, 3)])
     storage_type = np.dtype([(slice_name, slice_dt, 1) for slice_name in [FINAL_LOSS, BASE_SLICE, "slice1", "slice2"]])
 
@@ -934,19 +1171,22 @@ def get_slice_data_test_anchors_yesaug():
             np.rec.array([(0), (1, 1, 0), (1.0, 0.9, -1.0)], dtype=slice_dt), np.rec.array([(0), (0, 0, 0), (0.0, 0.0, -1.0)], dtype=slice_dt)]
     ex2 = [np.rec.array([(1), (1, 0, 1), (1.0, -1.0, 1.0)], dtype=slice_dt), np.rec.array([(1), (1, 0, 1), (1.0, -1.0, 1.0)], dtype=slice_dt),
            np.rec.array([(1), (0, 0, 0), (0.0, -1.0, 0.0)], dtype=slice_dt), np.rec.array([(1), (0, 0, 1), (0.0, -1.0, 1.0)], dtype=slice_dt)]
-    ex3 = [np.rec.array([(3), (1, 0, 0), (1.0, -1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (1, 0, 0), (1.0, -1.0, -1.0)], dtype=slice_dt),
+    ex3 = [np.rec.array([(2), (0, 0, 0), (-1.0, -1.0, -1.0)], dtype=slice_dt), np.rec.array([(2), (0, 0, 0), (-1.0, -1.0, -1.0)], dtype=slice_dt),
+           np.rec.array([(2), (0, 0, 0), (-1.0, -1.0, -1.0)], dtype=slice_dt), np.rec.array([(2), (0, 0, 0), (-1.0, -1.0, -1.0)], dtype=slice_dt)]
+    ex4 = [np.rec.array([(3), (1, 0, 0), (1.0, -1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (1, 0, 0), (1.0, -1.0, -1.0)], dtype=slice_dt),
            np.rec.array([(3), (1, 0, 0), (1.0, -1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (0, 0, 0), (0.0, -1.0, -1.0)], dtype=slice_dt)]
     # There is weird behavior giving a rec array a list of exs with this storage_type
     mat1 = np.rec.array(ex1, dtype=storage_type).reshape(1,1)
     mat2 = np.rec.array(ex2, dtype=storage_type).reshape(1,1)
     mat3 = np.rec.array(ex3, dtype=storage_type).reshape(1,1)
-    res = np.vstack((mat1,mat2,mat3))
+    mat4 = np.rec.array(ex4, dtype=storage_type).reshape(1,1)
+    res = np.vstack((mat1,mat2,mat3,mat4))
     return res
 
 
-def get_slice_data_test_anchors_noaug():
-    ''' Get artificial test dataset (where you can onlp predict anchors with True) for slice indexes where use_weak_label is False'''
-    # The max number of aliases to predict in the data will be 2 (for the number of true anchors)
+def get_slice_data_test_golds_noaug():
+    ''' Get artificial test dataset (where you can onlp predict golds with True) for slice indexes where use_weak_label is False'''
+    # The max number of aliases to predict in the data will be 2 (for the number of true golds)
     slice_dt = np.dtype([('sent_idx', int), ('alias_to_predict', int, 2), ('prob_labels', float, 2)])
     storage_type = np.dtype([(slice_name, slice_dt, 1) for slice_name in [FINAL_LOSS, BASE_SLICE, "slice1", "slice2"]])
 
@@ -975,13 +1215,16 @@ def get_slice_data_test_anchors_noaug():
             np.rec.array([(0), (1, 1), (1.0, 0.9)], dtype=slice_dt), np.rec.array([(0), (0, 0), (0.0, 0.0)], dtype=slice_dt)]
     ex2 =  [np.rec.array([(1), (1, 1), (1.0, 1.0)], dtype=slice_dt), np.rec.array([(1), (1, 1), (1.0, 1.0)], dtype=slice_dt),
            np.rec.array([(1), (0, 0),  (0.0, 0.0)], dtype=slice_dt), np.rec.array([(1), (0, 1), (0.0, 1.0)], dtype=slice_dt)]
-    ex3 =  [np.rec.array([(3), (1, 0), (1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (1, 0),(1.0, -1.0)], dtype=slice_dt),
+    ex3 =  [np.rec.array([(2), (0, 0), (-1.0, -1.0)], dtype=slice_dt), np.rec.array([(2), (0, 0),(-1.0, -1.0)], dtype=slice_dt),
+           np.rec.array([(2), (0, 0),  (-1.0, -1.0)], dtype=slice_dt), np.rec.array([(2), (0, 0),(-1.0, -1.0)], dtype=slice_dt)]
+    ex4 =  [np.rec.array([(3), (1, 0), (1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (1, 0),(1.0, -1.0)], dtype=slice_dt),
            np.rec.array([(3), (1, 0),  (1.0, -1.0)], dtype=slice_dt), np.rec.array([(3), (0, 0),(0.0, -1.0)], dtype=slice_dt)]
     # There is weird behavior giving a rec array a list of exs with this storage_type
     mat1 = np.rec.array(ex1, dtype=storage_type).reshape(1,1)
     mat2 = np.rec.array(ex2, dtype=storage_type).reshape(1,1)
     mat3 = np.rec.array(ex3, dtype=storage_type).reshape(1,1)
-    res = np.vstack((mat1,mat2,mat3))
+    mat4 = np.rec.array(ex4, dtype=storage_type).reshape(1,1)
+    res = np.vstack((mat1,mat2,mat3,mat4))
     return res
 
 
@@ -1182,52 +1425,6 @@ class DataLoaderTest(unittest.TestCase):
                 if key not in keys_to_ignore:
                     np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
-    def test_load_data_normal_train_no_filt(self):
-        # With Normal mode and NOT eval, we should not see a base head
-
-        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_in_candidates()
-        # Slice method changes what slices we see so we need to regen the args
-        args = parser_utils.get_full_config("test/run_args/test_data.json")
-        args.train_config.slice_method = "Normal"
-        train_utils.setup_train_heads_and_eval_slices(args)
-        word_symbols = data_utils.load_wordsymbols(args.data_config)
-        entity_symbols = EntitySymbols(os.path.join(args.data_config.entity_dir, args.data_config.entity_map_dir),
-            alias_cand_map_file=args.data_config.alias_cand_map)
-        slices = WikiSlices(
-            args=args,
-            use_weak_label=False,
-            input_src=os.path.join(args.data_config.data_dir, "train_small.jsonl"),
-            dataset_name=os.path.join(args.data_config.data_dir,
-                                      data_utils.generate_save_data_name(data_args=args.data_config, use_weak_label=False, split_name="slice_train_small")),
-            is_writer=True,
-            distributed=args.run_config.distributed,
-            dataset_is_eval=False
-        )
-        data = WikiDataset(
-            args=args,
-            use_weak_label=False,
-            input_src=os.path.join(args.data_config.data_dir, "train_small.jsonl"),
-            dataset_name=os.path.join(args.data_config.data_dir,
-                                      data_utils.generate_save_data_name(data_args=args.data_config, use_weak_label=False, split_name="train_small")),
-            is_writer=True,
-            distributed=args.run_config.distributed,
-            word_symbols=word_symbols,
-            entity_symbols=entity_symbols,
-            slice_dataset=slices,
-            dataset_is_eval=False
-        )
-
-        self.assertEqual(len(data), 4)
-        self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
-        keys_to_ignore = [f'slice:{BASE_SLICE}_pred', f'slice:{BASE_SLICE}_ind']
-        for i in range(4):
-            for key in keys_to_ignore:
-                assert key not in data[i]
-            self.assertEqual(data[i]['sent_idx'], truedata[i]['sent_idx'])
-            self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
-            for key in ARR_KEYS_TO_COMPARE:
-                if key not in keys_to_ignore:
-                    np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
     def test_long_sentence(self):
         # Test loading data when the sentence is very very long
@@ -1316,9 +1513,9 @@ class DataLoaderTest(unittest.TestCase):
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
 
-    def test_anchors(self):
-        # This will first test that when use_weak_label is True, the loading keeps False anchors.
-        # We use the same data as many_aliases except we flip some aliases to have False anchors.
+    def test_golds(self):
+        # This will first test that when use_weak_label is True, the loading keeps False golds.
+        # We use the same data as many_aliases except we flip some aliases to have False golds.
         # Therefore for the first test, the loaded data should be the same as the many_aliases test
         # For the second test, we set use_weak_label to False and make sure aliases are dropped.
 
@@ -1364,7 +1561,7 @@ class DataLoaderTest(unittest.TestCase):
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
         # Testing with use_weak_label is False
-        _, truedata, correct_sent_idx_to_idx = get_data_train_anchors_noaug()
+        _, truedata, correct_sent_idx_to_idx = get_data_train_golds_noaug()
         slices = WikiSlices(
             args=self.args,
             use_weak_label=False,
@@ -1398,13 +1595,13 @@ class DataLoaderTest(unittest.TestCase):
             for key in ARR_KEYS_TO_COMPARE:
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
-    def test_anchors_with_eval(self):
-        # This will first test that when use_weak_label is True, the loading keeps False anchors.
-        # We use the same data as many_aliases except we flip some aliases to have False anchors.
+    def test_golds_with_eval(self):
+        # This will first test that when use_weak_label is True, the loading keeps False golds.
+        # We use the same data as many_aliases except we flip some aliases to have False golds.
         # Therefore for the first test, the loaded data should be the same as the many_aliases test
         # For the second test, we set use_weak_label to False and make sure aliases are dropped.
 
-        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_anchors_eval_yesaug()
+        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_golds_eval_yesaug()
 
         # Set limit on max_aliases
         self.args.data_config.max_aliases = 2
@@ -1436,9 +1633,9 @@ class DataLoaderTest(unittest.TestCase):
             dataset_is_eval=True
         )
         # Test with use_weak_label of True
-        self.assertEqual(len(data), 4)
+        self.assertEqual(len(data), 5)
         self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
-        for i in range(4):
+        for i in range(5):
             print(i)
             self.assertEqual(data[i]['sent_idx'], truedata[i]['sent_idx'], f"index: {i}")
             self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
@@ -1447,7 +1644,7 @@ class DataLoaderTest(unittest.TestCase):
 
         # Testing with use_weak_label is False
         # The noaug is the same with or without dataset_is_eval
-        _, truedata, correct_sent_idx_to_idx = get_data_train_anchors_noaug()
+        _, truedata, correct_sent_idx_to_idx = get_data_train_golds_noaug()
         slices = WikiSlices(
             args=self.args,
             use_weak_label=False,
@@ -1471,7 +1668,7 @@ class DataLoaderTest(unittest.TestCase):
             slice_dataset=slices,
             dataset_is_eval=True
         )
-
+        # Test weak label false
         self.assertEqual(len(data), 3)
         self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
         for i in range(3):
@@ -1481,13 +1678,94 @@ class DataLoaderTest(unittest.TestCase):
             for key in ARR_KEYS_TO_COMPARE:
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
-    def test_anchors_with_eval_long(self):
-        # This will first test that when use_weak_label is True, the loading keeps False anchors.
-        # We use the same data as many_aliases except we flip some aliases to have False anchors.
+    def test_golds_with_not_in_cand(self):
+        # This will first test that when the gold qid given to the model for eval is not in the candidate set, we set the true index
+        # to be -2 in the case of train_in_candidates being true. When train in candidates is false, it should be 0.
+
+        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_golds_eval_yesaug_nic()
+
+        # Set limit on max_aliases
+        self.args.data_config.max_aliases = 2
+        self.args.data_config.train_in_candidates = True
+        word_symbols = data_utils.load_wordsymbols(self.args.data_config)
+        entity_symbols = EntitySymbols(os.path.join(self.args.data_config.entity_dir, self.args.data_config.entity_map_dir),
+            alias_cand_map_file=self.args.data_config.alias_cand_map)
+
+        slices = WikiSlices(
+            args=self.args,
+            use_weak_label=True,
+            input_src=os.path.join(self.args.data_config.data_dir, "train_anchor_nic.jsonl"),
+            dataset_name=os.path.join(self.args.data_config.data_dir,
+                                      data_utils.generate_save_data_name(data_args=self.args.data_config, use_weak_label=True, split_name="slice_train_anchor")),
+            is_writer=True,
+            distributed=self.args.run_config.distributed,
+            dataset_is_eval=True
+        )
+        data = WikiDataset(
+            args=self.args,
+            use_weak_label=True,
+            input_src=os.path.join(self.args.data_config.data_dir, "train_anchor_nic.jsonl"),
+            dataset_name=os.path.join(self.args.data_config.data_dir,
+                                      data_utils.generate_save_data_name(data_args=self.args.data_config, use_weak_label=True, split_name="train_anchor")),
+            is_writer=True,
+            distributed=self.args.run_config.distributed,
+            word_symbols=word_symbols,
+            entity_symbols=entity_symbols,
+            slice_dataset=slices,
+            dataset_is_eval=True
+        )
+        self.assertEqual(len(data), 5)
+        self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
+        for i in range(5):
+            print(i)
+            self.assertEqual(data[i]['sent_idx'], truedata[i]['sent_idx'], f"index: {i}")
+            self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
+            for key in ARR_KEYS_TO_COMPARE:
+                np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
+
+        # Testing with not in candidates false
+        _, truedata, correct_sent_idx_to_idx = get_data_train_golds_eval_yesaug_nic_false()
+        self.args.data_config.train_in_candidates = False
+        slices = WikiSlices(
+            args=self.args,
+            use_weak_label=True,
+            input_src=os.path.join(self.args.data_config.data_dir, "train_anchor_nic.jsonl"),
+            dataset_name=os.path.join(self.args.data_config.data_dir,
+                                      data_utils.generate_save_data_name(data_args=self.args.data_config, use_weak_label=False, split_name="slice_train_anchor")),
+            is_writer=True,
+            distributed=self.args.run_config.distributed,
+            dataset_is_eval=True
+        )
+        data = WikiDataset(
+            args=self.args,
+            use_weak_label=True,
+            input_src=os.path.join(self.args.data_config.data_dir, "train_anchor_nic.jsonl"),
+            dataset_name=os.path.join(self.args.data_config.data_dir,
+                                      data_utils.generate_save_data_name(data_args=self.args.data_config, use_weak_label=False, split_name="train_anchor")),
+            is_writer=True,
+            distributed=self.args.run_config.distributed,
+            word_symbols=word_symbols,
+            entity_symbols=entity_symbols,
+            slice_dataset=slices,
+            dataset_is_eval=True
+        )
+
+        self.assertEqual(len(data), 5)
+        self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
+        for i in range(5):
+            print(i)
+            self.assertEqual(data[i]['sent_idx'], truedata[i]['sent_idx'], f"index: {i}")
+            self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
+            for key in ARR_KEYS_TO_COMPARE:
+                np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
+
+    def test_golds_with_eval_long(self):
+        # This will first test that when use_weak_label is True, the loading keeps False golds.
+        # We use the same data as many_aliases except we flip some aliases to have False golds.
         # Therefore for the first test, the loaded data should be the same as the many_aliases test
         # For the second test, we set use_weak_label to False and make sure aliases are dropped.
 
-        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_anchors_eval_yesaug_long()
+        alias2wpids, truedata, correct_sent_idx_to_idx = get_data_train_golds_eval_yesaug_long()
 
         # Set limit on max_aliases
         self.args.data_config.max_aliases = 2
@@ -1520,19 +1798,19 @@ class DataLoaderTest(unittest.TestCase):
             dataset_is_eval=True
         )
         # Test with use_weak_label of True
-        self.assertEqual(len(data), 5)
+        self.assertEqual(len(data), 6)
         self.assertEqual(data.sent_idx_to_idx, correct_sent_idx_to_idx)
-        for i in range(3):
+        for i in range(6):
             print(i)
             self.assertEqual(data[i]['sent_idx'], truedata[i]['sent_idx'], f"index: {i}")
             self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
             for key in ARR_KEYS_TO_COMPARE:
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
-    def test_eval_anchors_slice(self):
-        # Same test as above except dataset_is_eval is set to True. This means aliases to predict must be altered to be only of True anchors.
+    def test_eval_golds_slice(self):
+        # Same test as above except dataset_is_eval is set to True. This means aliases to predict must be altered to be only of True golds.
 
-        truedata = get_slice_data_test_anchors_yesaug()
+        truedata = get_slice_data_test_golds_yesaug()
 
         # Set limit on max_aliases
         self.args.data_config.max_aliases = 2
@@ -1548,12 +1826,12 @@ class DataLoaderTest(unittest.TestCase):
             dataset_is_eval=True
         )
 
-        self.assertEqual(len(data), 3)
+        self.assertEqual(len(data), 4)
         for i in range(len(data)):
             np.testing.assert_array_equal(truedata[i], data.data[i])
 
         # Testing with use_weak_label is False
-        truedata = get_slice_data_test_anchors_noaug()
+        truedata = get_slice_data_test_golds_noaug()
         data = WikiSlices(
             args=self.args,
             use_weak_label=False,
@@ -1565,7 +1843,7 @@ class DataLoaderTest(unittest.TestCase):
             dataset_is_eval=True
         )
 
-        self.assertEqual(len(data), 3)
+        self.assertEqual(len(data), 4)
         for i in range(len(data)):
             np.testing.assert_array_equal(truedata[i], data.data[i])
 

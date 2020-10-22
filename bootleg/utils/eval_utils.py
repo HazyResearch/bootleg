@@ -8,6 +8,7 @@ from sklearn.metrics import precision_recall_fscore_support
 from tabulate import tabulate
 import time
 import torch
+from tqdm import tqdm
 
 from bootleg.symbols.constants import *
 from bootleg.utils import train_utils, utils
@@ -76,7 +77,7 @@ def run_eval_all_dev_sets(args, global_step, dev_dataset_collection, logger, sta
     for dev_id, dev_data_file in enumerate(dev_dataset_collection):
         dev_dataloader = dev_dataset_collection[dev_data_file].data_loader
         logger.info(f"************************RUNNING DEV EVAL {dev_data_file} AT STEP {global_step}")
-        # False is for if it's test or not
+        # False is for if it's test or dev file so we know what loss dump to use
         run_batched_eval(args, False, global_step, logger, trainer, dev_dataloader, status_reporter, dev_data_file)
 
 def batch_eval_pretty_json(all_dev_results, train_head, eval_slice, topk_val):
@@ -159,7 +160,7 @@ def run_batched_eval(args, is_test, global_step, logger, trainer, dataloader, st
     # reset counts to zero for next eval
     trainer.eval_wrapper.reset_buffers()
     logger.info(f'Evaluating {len(dataloader)} batches')
-    for i, batch in enumerate(dataloader):
+    for i, batch in tqdm(enumerate(dataloader), desc="Running eval", total=len(dataloader)):
         outs, loss_pack, entity_pack, _ = trainer.update(batch, eval=True)
     is_sbl_model = train_utils.is_slicing_model(args)
     all_dev_results = trainer.eval_wrapper.compute_scores()
@@ -171,17 +172,19 @@ def run_batched_eval(args, is_test, global_step, logger, trainer, dataloader, st
     train_head_keys.append(FINAL_LOSS)
     eval_slice_keys = sorted(list(all_dev_results[FINAL_LOSS].keys()))
     pretty_dict_for_printing = []
+    dict_for_dumping = []
     for train_head in train_head_keys:
-        # do not include stage outputs in dump
-        if 'stage' in train_head:
-            continue
         eval_slice_name_for_head = train_utils.get_inv_head_name_eval(train_head)
         for eval_slice in eval_slice_keys:
             # base head and overall slice are the same
-            if eval_slice == BASE_SLICE:
-                continue
             all_dev_results[train_head][eval_slice]['step'] = global_step
+            # if eval_slice == BASE_SLICE:
+            #     continue
             dict_for_printing = batch_eval_pretty_json(all_dev_results, train_head, eval_slice, topk_val=args.run_config.topk)
+            dict_for_dumping.append(dict_for_printing)
+            # do not include stage outputs in pretty dump
+            if 'stage' in train_head or (not is_sbl_model and eval_slice == BASE_SLICE):
+                continue
             if eval_slice == eval_slice_name_for_head or train_head == train_utils.get_slice_head_eval_name(BASE_SLICE) \
                     or FINAL_LOSS in train_head or eval_slice == FINAL_LOSS or args.run_config.verbose:
                 # Order the columns
@@ -190,13 +193,18 @@ def run_batched_eval(args, is_test, global_step, logger, trainer, dataloader, st
                 pretty_dict_for_printing.append(ordered_dict)
     logger.info(f'\n{tabulate(pretty_dict_for_printing, headers="keys", tablefmt="grid")}')
     if status_reporter is not None:
-        status_reporter.dump_results(all_dev_results, pretty_dict_for_printing, file, is_test)
+        status_reporter.dump_results(dict_for_dumping, file, is_test)
     return all_dev_results
 
 def select_embs(embs, pred_cands, batch_size, M):
     return embs[torch.arange(batch_size).unsqueeze(-1), torch.arange(M).unsqueeze(0), pred_cands]
 
 def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_symbols, dump_embs=False):
+    """
+    Dumpes Preds:
+    Remember that if a sentence has all gold=False anchors, it's dropped and will not be seen
+    If a subsplit of a sentence has all gold=False anchors, it will also be dropped and not seen
+    """
     # we only care about the entity embeddings for the final slice head
     eval_folder = train_utils.get_eval_folder(args, test_data_file)
     utils.ensure_dir(eval_folder)
@@ -210,16 +218,19 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
     # TODO: fix extra dimension issue
     if dump_embs:
         storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int), ('alias_list_pos', int, M), ('entity_emb', float, M*args.model_config.hidden_size),
-        ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M)])
+        ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M), ('final_loss_cand_probs', float, M*K)])
     else:
         # don't need to extract contextualized entity embedding
-        storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int), ('alias_list_pos', int, M), ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M)])
+        storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int), ('alias_list_pos', int, M),
+                                 ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M), ('final_loss_cand_probs', float, M*K)])
     mmap_file = np.memmap(entity_emb_file, dtype=storage_type, mode='w+', shape=(len(dataloader.dataset),))
+    # Init sent_idx to -1 for debugging
+    mmap_file[:]['sent_idx'] = -1
     np.save(emb_file_config, storage_type, allow_pickle=True)
     logger.debug(f'Created file {entity_emb_file} to save predictions.')
 
     start_idx = 0
-    logger.info(f'{len(dataloader)*args.run_config.eval_batch_size} samples, {len(dataloader)} batches')
+    logger.info(f'{len(dataloader)*args.run_config.eval_batch_size} samples, {len(dataloader)} batches, {len(dataloader.dataset)} len dataset')
     for i, batch in enumerate(dataloader):
         curr_batch_size = batch["sent_idx"].shape[0]
         end_idx = start_idx + curr_batch_size
@@ -234,16 +245,15 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
         mmap_file[start_idx:end_idx]['sent_idx'] = batch["sent_idx"]
         mmap_file[start_idx:end_idx]['subsent_idx'] = batch["subsent_idx"]
         mmap_file[start_idx:end_idx]['alias_list_pos'] = batch['alias_list_pos']
-
-        # TODO: rename this
+        # This will give all aliases seen by the model during training, independent of if it's gold or not
         mmap_file[start_idx:end_idx][f'final_loss_true'] = batch['true_entity_idx_for_train'].reshape(curr_batch_size, M).cpu().numpy()
-        # mmap_file[start_idx:end_idx][f'final_loss_true'] = batch[train_utils.get_slice_head_pred_name(FINAL_LOSS)][j].flatten().cpu().numpy()
 
         # get max for each alias, probs is batch x M x K
         max_probs, pred_cands = probs.max(dim=2)
 
         mmap_file[start_idx:end_idx]['final_loss_pred'] = pred_cands.cpu().numpy()
         mmap_file[start_idx:end_idx]['final_loss_prob'] = max_probs.cpu().numpy()
+        mmap_file[start_idx:end_idx]['final_loss_cand_probs'] = probs.cpu().numpy().reshape(curr_batch_size,-1)
 
         # final_entity_embs is batch x M x K x hidden_size, pred_cands in batch x M
         if dump_embs:
@@ -259,7 +269,7 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
 
     # restitch together and write data file
     result_file = os.path.join(eval_folder, args.run_config.result_label_file)
-    logger.info(f'Writing predictions...')
+    logger.info(f'Writing predictions to {result_file}...')
     filt_pred_data = merge_subsentences(os.path.join(args.data_config.data_dir, test_data_file),
         mmap_file,
         dump_embs=dump_embs)
@@ -275,7 +285,7 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
         out_emb_file = os.path.join(eval_folder, args.run_config.result_emb_file)
         np.save(out_emb_file, filt_pred_data['entity_emb'].reshape(-1,hidden_size))
         logger.info(f'Saving contextual entity embeddings to {out_emb_file}')
-
+    logger.info(f'Wrote predictions to {result_file}')
     return result_file, out_emb_file
 
 def calc_ind_prec_recall(pred_correct_in_slice, total_pred_in_slice, true_total_in_slice):
@@ -304,8 +314,10 @@ def get_sent_start_map(data_file):
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of aliases)
             assert line['sent_idx_unq'] not in sent_start_map, f'Sentence indices must be unique. {line["sent_idx_unq"]} already seen.'
             sent_start_map[line['sent_idx_unq']] = total_num_mentions
-            # include false aliases for debugging (and alias_pos includes them)
+            # We include false aliases for debugging (and alias_pos includes them)
             total_num_mentions += len(line['aliases'])
+    # for k in sent_start_map:
+    #     print("K", k, sent_start_map[k])
     logging.info(f'Total number of mentions across all sentences: {total_num_mentions}')
     return sent_start_map, total_num_mentions
 
@@ -314,6 +326,7 @@ def get_sent_start_map(data_file):
 def merge_subsentences(data_file, full_pred_data, dump_embs=False):
     sent_start_map, total_num_mentions = get_sent_start_map(data_file)
     M = int(full_pred_data[0]['M'])
+    K = int(full_pred_data[0]['K'])
     hidden_size = int(full_pred_data[0]['hidden_size'])
     if dump_embs:
         storage_type = np.dtype([('hidden_size', int),
@@ -321,25 +334,31 @@ def merge_subsentences(data_file, full_pred_data, dump_embs=False):
                              ('alias_list_pos', int),
                              ('entity_emb', float, hidden_size),
                              ('final_loss_pred', int),
-                             ('final_loss_prob', float)])
+                             ('final_loss_prob', float),
+                             ('final_loss_cand_probs', float, K)])
     else:
         storage_type = np.dtype([('hidden_size', int),
                              ('sent_idx', int),
                              ('alias_list_pos', int),
                              ('final_loss_pred', int),
-                             ('final_loss_prob', float)])
+                             ('final_loss_prob', float),
+                             ('final_loss_cand_probs', float, K)])
     filt_emb_data = np.zeros(total_num_mentions, dtype=storage_type)
     filt_emb_data['hidden_size'] = hidden_size
+
+    filt_emb_data['sent_idx'][:] = -1
+    filt_emb_data['alias_list_pos'][:] = -1
+
     start = time.time()
     seen_ids = set()
     seen_data = {}
-    for row in full_pred_data:
+    for r_idx, row in enumerate(full_pred_data):
         # get corresponding row to start writing into condensed memory mapped file
         sent_idx = row['sent_idx']
         sent_start_idx = sent_start_map[sent_idx]
         # for each VALID mention, need to write into original alias list pos in list
         for i, (true_val, alias_orig_pos) in enumerate(zip(row['final_loss_true'], row['alias_list_pos'])):
-            # bc we are are using the gold mentions which include false anchors, true_val == -1 only for padded mentions or sub-sentence mentions
+            # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for padded mentions or sub-sentence mentions
             if true_val != -1:
                 # id in condensed embedding
                 emb_id = sent_start_idx + alias_orig_pos
@@ -350,6 +369,7 @@ def merge_subsentences(data_file, full_pred_data, dump_embs=False):
                 filt_emb_data['alias_list_pos'][emb_id] = alias_orig_pos
                 filt_emb_data['final_loss_pred'][emb_id] = row['final_loss_pred'].reshape(M)[i]
                 filt_emb_data['final_loss_prob'][emb_id] = row['final_loss_prob'].reshape(M)[i]
+                filt_emb_data['final_loss_cand_probs'][emb_id] = row['final_loss_cand_probs'].reshape(M, K)[i]
                 seen_ids.add(emb_id)
                 seen_data[emb_id] = row
     logging.debug(f'Time to merge sub-sentences {time.time()-start}s')
@@ -361,6 +381,7 @@ def get_sent_idx_map(filt_emb_data):
     for i, row in enumerate(filt_emb_data):
         sent_idx = row['sent_idx']
         alias_idx = row['alias_list_pos']
+        assert sent_idx != -1 and alias_idx != -1, f"Sent {sent_idx}, Al {alias_idx}"
         sent_idx_map[(sent_idx, alias_idx)] = i
     return sent_idx_map
 
@@ -376,22 +397,26 @@ def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
             ctx_emb_ids = []
             entity_ids = []
             probs = []
+            cand_probs = []
             entity_cands_qid = map_aliases_to_candidates(train_in_candidates, entity_dump, aliases)
             # eid is entity id
             entity_cands_eid = map_aliases_to_candidates_eid(train_in_candidates, entity_dump, aliases)
             for al_idx, alias in enumerate(aliases):
-                assert (sent_idx, al_idx) in sent_idx_map, 'Dumped prediction data does not match data file'
+                assert (sent_idx, al_idx) in sent_idx_map, f'Dumped prediction data does not match data file. Can not find {sent_idx} - {al_idx}'
                 emb_idx = sent_idx_map[(sent_idx, al_idx)]
                 ctx_emb_ids.append(emb_idx)
                 prob = filt_pred_data[emb_idx]['final_loss_prob']
+                cand_prob = filt_pred_data[emb_idx]['final_loss_cand_probs']
                 pred_cand = filt_pred_data[emb_idx]['final_loss_pred']
                 eid = entity_cands_eid[al_idx][pred_cand]
                 qid = entity_cands_qid[al_idx][pred_cand]
                 qids.append(qid)
                 probs.append(prob)
+                cand_probs.append(list(cand_prob))
                 entity_ids.append(eid)
             line['qids'] = qids
             line['probs'] = probs
+            line['cand_probs'] = cand_probs
             line['entity_ids'] = entity_ids
             if dump_embs:
                 line['ctx_emb_ids'] = ctx_emb_ids

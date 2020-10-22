@@ -15,6 +15,9 @@
         "entity_dir": "test/data/entity_loader/entity_data",
         "data_dir": "test/data/entity_loader",
         "emb_dir": "test/data",
+        "type_prediction": {
+            "use_type_pred": false
+        },
         "train_dataset": {
             "file": "train_small_dis.txt",
             "load_class": "wiki_dataset.WikiDataset",

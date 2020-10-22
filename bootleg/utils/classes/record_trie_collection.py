@@ -153,3 +153,6 @@ class RecordTrieCollection:
 
     def is_key_in_trie(self, tri_name, key):
         return key in self._record_tris[tri_name]
+
+    def is_tri_in_collection(self, tri_name):
+        return tri_name in self._record_tris

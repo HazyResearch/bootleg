@@ -7,7 +7,6 @@ from bootleg.utils import train_utils
 
 def get_log_name(args, mode):
     log_name = os.path.join(train_utils.get_save_folder(args.run_config), f"log_{mode}")
-    print(train_utils.get_file_suffix(args))
     log_name += train_utils.get_file_suffix(args)
     log_name += f'_gpu{args.run_config.gpu}'
     return log_name
@@ -15,7 +14,7 @@ def get_log_name(args, mode):
 
 def create_logger(args, mode):
     if args.run_config.distributed:
-        logger = multiprocessing.get_logger()
+        logger = logging.getLogger("bootleg")
     else:
         logger = logging.getLogger("bootleg")
 
@@ -39,12 +38,12 @@ def create_logger(args, mode):
             sh.setFormatter(formatter)
             logger.addHandler(sh)
     else:
-        print('here')
+        print('Something went wrong in the logger')
         exit()
     return logger
 
 def get_logger(args):
     if args.run_config.distributed:
-        return multiprocessing.get_logger()
+        return logging.getLogger("bootleg")
     else:
         return logging.getLogger("bootleg")

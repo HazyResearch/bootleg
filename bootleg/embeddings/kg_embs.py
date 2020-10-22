@@ -1,24 +1,19 @@
 """Knowledge graph embeddings"""
-import ujson as json
+import os
+import pickle
+import time
+from collections import defaultdict
 
 import networkx as nx
-import os
-import time
-import pandas as pd
-import torch
-from torch import nn
-import torch.nn.functional as F
-import scipy.sparse
-import sys
-import pickle
 import numpy as np
+import scipy.sparse
+import ujson as json
 
 from bootleg.embeddings import EntityEmb
 from bootleg.layers.layers import *
-from bootleg.utils import logging_utils, data_utils, utils, train_utils
+from bootleg.utils import logging_utils, data_utils, utils
 from bootleg.utils.model_utils import selective_avg
 
-from collections import defaultdict
 
 class KGAdjEmb(EntityEmb):
     """
@@ -66,15 +61,15 @@ class KGAdjEmb(EntityEmb):
             log_func(f'Loaded existing KG adj in {round(time.time() - start, 2)}s')
         else:
             start = time.time()
-            log_func(f'Building KG adj')
             kg_adj_file = os.path.join(main_args.data_config.emb_dir, emb_args.kg_adj)
-            kg_adj = cls.build_kg_adj(kg_adj_file, entity_symbols)
+            log_func(f'Building KG adj from {kg_adj_file}')
+            kg_adj = cls.build_kg_adj(kg_adj_file, entity_symbols, emb_args)
             scipy.sparse.save_npz(prep_file, kg_adj)
             log_func(f"Finished building and saving KG adj in {round(time.time() - start, 2)}s.")
         return kg_adj, prep_file
 
     @classmethod
-    def build_kg_adj(cls, kg_adj_file, entity_symbols):
+    def build_kg_adj(cls, kg_adj_file, entity_symbols, emb_args):
         """Constructs the KG adjacency matrix from file. Build a binary adjacency matrix if two entity are connected"""
         G = nx.Graph()
         qids = set(entity_symbols.get_all_qids())
@@ -112,7 +107,7 @@ class KGAdjEmb(EntityEmb):
         # do sum over all candidates for MxK candidates
         kg_feat = np.squeeze(subset_adj.sum(1))
         # return summed MxK feature indicating a candidates relatedness to other aliases' candidates
-        return kg_feat.astype(np.int16)
+        return kg_feat
 
     # this is defines what the dataloader calls to prepare data for the batch
     def batch_prep(self, alias_indices, entity_indices):
@@ -124,7 +119,7 @@ class KGAdjEmb(EntityEmb):
         orig_shape = entity_package.tensor.shape
         # needs to be size: batch x m x k x hidden_dim (in this case hidden dim is 1)
         assert self.key in batch_prepped_data or self.key in batch_on_the_fly_data, f'KGAdjEmb missing from batch prepped data. It must be there for KGEmb.' \
-                                                             f'Check if you KGEmb looks like "load_class": "<load_class>","batch_prep": true,"args":...'
+                                                             f' Check if you KGEmb looks like "load_class": "<load_class>","batch_prep": true,"args":...'
         if self.key in batch_prepped_data:
             kg_feat = batch_prepped_data[self.key].reshape(orig_shape).unsqueeze(-1).float()
         else:
@@ -182,10 +177,47 @@ class KGIndices(KGAdjEmb):
         self.kg_adj, self.prep_file = self.prep(main_args=main_args, emb_args=emb_args,
             entity_symbols=entity_symbols, log_func=self.logger.debug)
         self._dim = 0
-        self.logger.debug(f'Using {self._dim}-dim relation embedding')
         self.logger.debug(f"You are using the KGIndices class with key {key}."
-                         f"This key need to be used in the attention network to access the kg bias matrix."
-                         f"This embedding is not appended to the payload.")
+                         f" This key need to be used in the attention network to access the kg bias matrix."
+                         f" This embedding is not appended to the payload.")
+
+    @classmethod
+    def build_kg_adj(cls, kg_adj_file, entity_symbols, emb_args):
+        """This class sets the adjacency value to be the log of the value stored in the value if that value is > 10. This can be overwritten and
+        demonstrates how to overwrite the adjacency class."""
+        G = nx.Graph()
+        qids = set(entity_symbols.get_all_qids())
+        edges_to_add = []
+        num_added = 0
+        num_total = 0
+        file_ending = os.path.splitext(kg_adj_file)[1][1:]
+        # Get ending to determine if txt or json file
+        assert file_ending in ["json", "txt"], f"We only support loading txt or json files for edge weights. You provided {file_ending}"
+        with open(kg_adj_file) as f:
+            if file_ending == "json":
+                all_edges = json.load(f)
+                for head in all_edges:
+                    for tail in all_edges[head]:
+                        weight = all_edges[head][tail]
+                        num_total += 1
+                        if head in qids and tail in qids and weight > 10:
+                            num_added += 1
+                            edges_to_add.append((head, tail, np.log(weight)))
+            else:
+                for line in f:
+                    head, tail = line.strip().split()
+                    num_total += 1
+                    # head and tail must be in list of qids
+                    if head in qids and tail in qids:
+                        num_added += 1
+                        edges_to_add.append((head, tail, 1.0))
+        print(f"Adding {num_added} out of {num_total} cooccurrence items from {kg_adj_file}")
+        G.add_weighted_edges_from(edges_to_add)
+        # convert to entityids
+        G = nx.relabel_nodes(G, entity_symbols.get_qid2eid())
+        # create adjacency matrix
+        adj = nx.adjacency_matrix(G, nodelist=range(entity_symbols.num_entities_with_pad_and_nocand))
+        return adj
 
     def batch_prep(self, alias_indices, entity_indices):
         """Queries the adjacency matrix"""
@@ -204,7 +236,7 @@ class KGIndices(KGAdjEmb):
             # https://stackoverflow.com/questions/33508322/create-block-diagonal-numpy-array-from-a-given-numpy-array
             full_mask = np.kron(np.eye(M,dtype=bool),single_mask)
             subset_adj[full_mask] = 0
-        return subset_adj.astype(np.int16).flatten()
+        return subset_adj.flatten()
 
     def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
         """This is the forward of the kg_adjacency matrix that gets used in the bias term of our kg attention. We do NOT want this
@@ -266,8 +298,8 @@ class KGRelEmbBase(EntityEmb):
             log_func(f'Loaded existing KG adj in {round(time.time() - start, 2)}s')
         else:
             start = time.time()
-            log_func(f'Building KG adj')
             kg_triples_file = os.path.join(main_args.data_config.emb_dir, emb_args.kg_triples)
+            log_func(f'Building KG adj from {kg_triples_file}')
             kg_triples, kg_relations, rel_table = cls.build_kg_triples(kg_triples_file, entity_symbols,
                 relations=emb_args.relations, log_func=log_func)
             scipy.sparse.save_npz(prep_file_adj, kg_triples)
@@ -446,7 +478,6 @@ class KGRelEmb(KGRelEmbBase):
         # initialize learned relation embedding
         self.num_relations_with_pad = len(self.kg_relations) + 1
         self._dim = emb_args.rel_dim
-        self.logger.debug(f'{key}: Using {self._dim}-dim relation embedding for {len(self.kg_relations)} relations with 1 pad relation')
         # Sparse cannot be true for the relation embedding or we get distributed Gloo errors depending on the batch (Gloo EnforceNotMet...)
         self.relation_emb = torch.nn.Embedding(self.num_relations_with_pad, self._dim, padding_idx=0, sparse=False).to(model_device)
         self.merge_func = self.average_rels
@@ -473,7 +504,7 @@ class KGRelEmb(KGRelEmbBase):
                 self.add_attn = PositionAwareAttention(input_size=self._dim, attn_size=attn_hidden_size, feature_size=0)
                 self.merge_func = self.add_attn_merge
         self.normalize = True
-        self.logger.debug(f'{key}: Normalize {self.normalize}')
+        self.logger.debug(f'{key}: Using {self._dim}-dim relation embedding for {len(self.kg_relations)} relations with 1 pad relation. Normalize is {self.normalize}')
 
     @classmethod
     def prep(cls, main_args, emb_args, entity_symbols, log_func=print, word_symbols=None):
@@ -497,8 +528,8 @@ class KGRelEmb(KGRelEmbBase):
             log_func(f'Loaded existing KG adj in {round(time.time() - start, 2)}s')
         else:
             start = time.time()
-            log_func(f'Building KG adj')
             kg_triples_file = os.path.join(main_args.data_config.emb_dir, emb_args.kg_triples)
+            log_func(f'Building KG adj from {kg_triples_file}')
             kg_triples, rel2rowid, kg_relations = cls.build_kg_triples(kg_triples_file, entity_symbols,
                 relations=emb_args.relations, log_func=log_func)
             scipy.sparse.save_npz(prep_file_adj, kg_triples)
@@ -590,7 +621,7 @@ class KGWeightedAdjEmb(KGAdjEmb):
             entity_symbols=entity_symbols, log_func=self.logger.debug)
 
     @classmethod
-    def build_kg_adj(cls, kg_adj_file, entity_symbols):
+    def build_kg_adj(cls, kg_adj_file, entity_symbols, emb_args):
         """This class sets the adjacency value to be the log of the value stored in the value if that value is > 10. This can be overwritten and
         demonstrates how to overwrite the adjacency class."""
         G = nx.Graph()

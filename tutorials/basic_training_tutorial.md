@@ -146,6 +146,7 @@ emb_data/
 
 entity_data/
     entity_mappings/
+        config.json
         qid2title.json
         alias2qids.json
         ...
@@ -201,7 +202,7 @@ As described in the `README`, Bootleg takes in a set of embeddings to form an **
                    "type_labels": "qid2types.json",
                    "max_types": 3,
                    "type_dim": 128,
-                   "merge_func": "softattn",
+                   "merge_func": "addattn",
                    "attn_hidden_size": 128
                }
             }]
@@ -279,7 +280,7 @@ We get the following results after the 10th epoch (on a NVIDIA P100 GPU).
 +------------+------------+-------+--------+-------------+------------+-------+-----------+----------+-------+
 | head       | slice      |   men |   crct |   crct_top5 |   crct_pop |    f1 |   f1_top5 |   f1_pop |   stp |
 +============+============+=======+========+=============+============+=======+===========+==========+=======+
-| final_loss | final_loss |    51 |     31 |          46 |         43 | 0.608 |     0.902 |    0.843 |   100 |
+| final_loss | final_loss |    51 |     32 |          44 |         43 | 0.627 |     0.863 |    0.843 |   100 |
 +------------+------------+-------+--------+-------------+------------+-------+-----------+----------+-------+
 ```
 While the test performance is poor as expected (this sample is too small!), we do see the loss in the log decreasing indicating that the model is memorizing the examples. We explain the column headers below:

@@ -33,6 +33,7 @@ class EntityEmb(nn.Module):
         __metaclass__ = RequiredAttributes("normalize")
         self.logger = logging_utils.get_logger(main_args)
         self.entity_symbols = entity_symbols
+        self.model_device = model_device
         self.key = key
         self.dropout_perc = 0
         self.mask_perc = 0
@@ -42,8 +43,8 @@ class EntityEmb(nn.Module):
             self.logger.debug(f'Setting {self.key} mask perc to {self.mask_perc}')
         # Used for 1d dropout
         if "dropout" in emb_args:
-            self.dropout_perc = emb_args.dropout_perc
-            self.logger.debug(f'Setting {self.key} dropout to {self.dropout}')
+            self.dropout_perc = emb_args.dropout
+            self.logger.debug(f'Setting {self.key} dropout to {self.dropout_perc}')
 
     def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
         raise ValueError("Not implemented")

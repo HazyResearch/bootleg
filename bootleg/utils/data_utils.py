@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torch.utils.data.distributed import DistributedSampler
+from tqdm import tqdm
 
 from bootleg.dataloaders.distr_wrapper import DistributedIndicesWrapper
 import bootleg.symbols.word_symbols as word_module
@@ -11,29 +12,29 @@ from bootleg.utils.utils import import_class
 from bootleg.utils import logging_utils, utils
 
 # We must correct all mappings with alias indexes in them
-# This is because the indexing will change when we remove False anchors (see example in prep.py)
-def correct_not_augmented_max_cands(anchor, max_cands_dict):
-    anchor_idx = [i for i in range(len(anchor)) if anchor[i] is True]
-    new_max_cands = {str(anchor_idx.index(int(i))):max_cands_dict[i] for i in max_cands_dict if int(i) in anchor_idx}
+# This is because the indexing will change when we remove False golds (see example in prep.py)
+def correct_not_augmented_max_cands(gold, max_cands_dict):
+    gold_idx = [i for i in range(len(gold)) if gold[i] is True]
+    new_max_cands = {str(gold_idx.index(int(i))):max_cands_dict[i] for i in max_cands_dict if int(i) in gold_idx}
     return new_max_cands
 
 # used for slices
-def correct_not_augmented_dict_values(anchor, dict_values):
+def correct_not_augmented_dict_values(gold, dict_values):
     new_dict_values = {}
-    anchor_idx = [i for i in range(len(anchor)) if anchor[i] is True]
+    gold_idx = [i for i in range(len(gold)) if gold[i] is True]
     for slice_name in list(dict_values.keys()):
         alias_dict = dict_values[slice_name]
-        # i will not be in anchor_idx if it wasn't an anchor to being with
-        new_dict_values[slice_name] = {str(anchor_idx.index(int(i))):alias_dict[i] for i in alias_dict if int(i) in anchor_idx}
+        # i will not be in gold_idx if it wasn't an gold to being with
+        new_dict_values[slice_name] = {str(gold_idx.index(int(i))):alias_dict[i] for i in alias_dict if int(i) in gold_idx}
         if len(new_dict_values[slice_name]) <= 0:
             del new_dict_values[slice_name]
     return new_dict_values
 
-def get_base_slice(anchor, slices, slice_names, dataset_is_eval):
+def get_base_slice(gold, slices, slice_names, dataset_is_eval):
     if dataset_is_eval:
-        return {str(i):1.0 for i in range(len(anchor)) if anchor[i] is True}
+        return {str(i):1.0 for i in range(len(gold)) if gold[i] is True}
     else:
-        return {str(i):1.0 for i in range(len(anchor))}
+        return {str(i):1.0 for i in range(len(gold))}
 
 def generate_save_data_name(data_args, use_weak_label, split_name):
     return f"{split_name}_{data_args.word_embedding.word_symbols}_L{data_args.max_word_token_len}" \
@@ -147,7 +148,7 @@ def create_dataloader(args, dataset, batch_size, eval_slice_dataset=None, world_
 
 
 def create_slice_dataset(args, data_args, is_writer, dataset_is_eval):
-    # Note that the weak labelling is going to alter our indexing for the slices. Our slices still only score anchor==True
+    # Note that the weak labelling is going to alter our indexing for the slices. Our slices still only score gold==True
     dataset_name = generate_slice_name(args, args.data_config, use_weak_label=data_args.use_weak_label,
                                            split_name="slice_" + os.path.splitext(data_args.file)[0],
                                            dataset_is_eval=dataset_is_eval)
@@ -166,3 +167,42 @@ def load_wordsymbols(data_args, is_writer=True, distributed=False):
     word_symbols = my_class(data_args, is_writer=is_writer,
         distributed=distributed)
     return word_symbols
+
+
+def load_glove(file_path, log_func):
+    log_func('  Loading Glove format file {}'.format(file_path))
+    embeddings = {}
+    embedding_size = 0
+
+    # collect embeddings size assuming the first line is correct
+    num_lines = 0
+    with open(file_path, 'r', encoding='utf-8') as f:
+        found_line = False
+        for line in f:
+            num_lines += 1
+            if not found_line:
+                embedding_size = len(line.split()) - 1
+                found_line = True
+
+    # collect embeddings
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line_number, line in tqdm(enumerate(f), total=num_lines):
+            if line:
+                try:
+                    split = line.split()
+                    if len(split) != embedding_size + 1:
+                        raise ValueError
+                    word = split[0]
+                    embedding = np.array(
+                        [float(val) for val in split[-embedding_size:]]
+                    )
+                    embeddings[word] = embedding
+                except ValueError:
+                    log_func(
+                        'Line {} in the GloVe file {} is malformed, '
+                        'skipping it'.format(
+                            line_number, file_path
+                        )
+                    )
+    log_func('  {0} embeddings loaded'.format(len(embeddings)))
+    return embeddings, embedding_size

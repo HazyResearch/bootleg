@@ -151,8 +151,7 @@ class EvalWrapper(nn.Module):
             model_outs[DISAMBIG] = {}
             for out_head_key in self.head_key_to_idx:
                 model_outs[DISAMBIG][out_head_key] = torch.ones(batch_size, M, K).to(entity_indices.device)
-
-        padded_entities = (true_entity_idx==-1)
+        padded_entities = (true_entity_idx == -1)
 
         # we need to filter out cases where true_entity_idx is -1 bc alias occurs
         # in multiple subsentences to not double count it for a slice

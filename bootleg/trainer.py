@@ -13,7 +13,7 @@ from bootleg.model import Model
 from bootleg.scorer import Scorer
 from bootleg.optimizers.sparsedenseadam import SparseDenseAdam
 from bootleg.eval_wrapper import EvalWrapper
-from bootleg.symbols.constants import DISAMBIG, INDICATOR, FINAL_LOSS, BASE_SLICE
+from bootleg.symbols.constants import DISAMBIG, INDICATOR, FINAL_LOSS, BASE_SLICE, TYPEPRED
 from bootleg.utils import logging_utils, model_utils, train_utils
 from bootleg.utils.model_utils import count_parameters
 from bootleg.utils.utils import import_class
@@ -84,7 +84,7 @@ class Trainer:
             self.model.train()
             self.optimizer.zero_grad()
         # merge slice head labels for scorer
-        true_entity_class = {DISAMBIG: {}, INDICATOR: {}}
+        true_entity_class = {DISAMBIG: {}, INDICATOR: {}, TYPEPRED: {}}
         for head_name in self.args.train_config.train_heads:
             if head_name != BASE_SLICE or train_utils.model_has_base_head_loss(self.args):
                 # These are labels for the correct disambiguation for a slice head. The labels are the same as for
@@ -95,7 +95,12 @@ class Trainer:
                 true_entity_class[INDICATOR][train_utils.get_slice_head_ind_name(head_name)] =\
                     batch[train_utils.get_slice_head_ind_name(head_name)].to(self.model_device)
         true_entity_class[DISAMBIG][FINAL_LOSS] = batch[train_utils.get_slice_head_pred_name(FINAL_LOSS)].to(self.model_device)
-
+        # Check that if it's training, there are no NIC candidate labels with a train in candidates model (these will get label -2)
+        if not eval:
+            assert -2 not in true_entity_class
+        # If type prediction is part of the model
+        if "type_labels" in batch:
+            true_entity_class[TYPEPRED][train_utils.get_type_head_name()] = batch["type_labels"].to(self.model_device)
         # true_entity_class
         entity_indices = batch['entity_indices'].to(self.model_device)
 
@@ -117,7 +122,8 @@ class Trainer:
             entity_indices=entity_indices,
             batch_prepped_data=batch_prepped_data,
             batch_on_the_fly_data=batch_on_the_fly_data)
-        loss_pack = self.scorer.calc_loss(outs, true_entity_class, entity_pack)
+        # calc_loss takes in if this is a training loss or not, the outputs, the labels, and the entity package
+        loss_pack = self.scorer.calc_loss(not eval, outs, true_entity_class, entity_pack)
         # If using eval_wrapper
         if eval and self.use_eval_wrapper:
             self.eval_wrapper(
@@ -212,14 +218,14 @@ class Trainer:
             self.start_step = checkpoint['step'] + 1
             # Roll over epoch
             if self.start_step >= self.total_steps_per_epoch:
-                assert self.start_step == self.total_steps_per_epoch, 'The steps do not match total steps'
+                # assert self.start_step == self.total_steps_per_epoch, 'The steps do not match total steps'
                 self.start_step = 0
                 self.start_epoch = checkpoint['epoch'] + 1
             else:
                 raise ValueError('Continuing training from a partial epoch is not currently supported.')
 
             # Continuing training
-            assert self.args.train_config.batch_size == checkpoint['batch_size'], 'The training batch size does not match that used for the ckpt. Cannot resume training from step.'
+            # assert self.args.train_config.batch_size == checkpoint['batch_size'], 'The training batch size does not match that used for the ckpt. Cannot resume training from step.'
         else:
             self.start_epoch = checkpoint['epoch'] + 1
         self.logger.info(f"Successfully loaded model from {filename} starting from checkpoint epoch {self.start_epoch} and step {self.start_step}.")
