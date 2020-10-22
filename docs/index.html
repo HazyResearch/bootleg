@@ -4,7 +4,7 @@ layout: default
 
 <h1>About</h1>
 <p>
-  Bootleg is a guidable, self-supervised named entity disambiguation (NED) system that links mentions in text to entities in a knowledge base. Bootleg is built to improve disambiguation of tail entities using a simple transformer-based architecture.
+  Bootleg is a self-supervised named entity disambiguation (NED) system that links mentions in text to entities in a knowledge base. Bootleg is built to improve disambiguation of rare, also called tail, entities using a simple Transformer-based architecture.
   <!-- Bootleg leverages guidability mechanisms--augmentation, weak labeling, and slice-based learning---to quickly patch errors. -->
   Bootleg is still in active development, but is already in use at industry and research labs.
 </p>
@@ -16,9 +16,9 @@ layout: default
   <a target="blank" href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3NlOXjzaEubyBV1XAxR81guFtOmkUBJssPyAIwC6UVUNzJaRDFSN0M3MUgyWVNRNU5LS09YQk04Ri4u&embed=true">questionnaire</a> so that we can get in touch.</p>
 
 <h1>Results</h1>
-Bootleg achieves state-of-the-art on NED benchmarks and improves over a standard BERT NED baseline by over 50 F1 points on the tail. Bootleg can even correctly disambiguate entities which were never seen during train!
+Bootleg achieves state of the art on NED benchmarks and improves over a standard BERT NED baseline by over 40 F1 points on the tail, which we define as entities occurring 10 or fewer times in the training data. Bootleg can even correctly disambiguate entities which were never seen during train!
 <h3>NED Benchmarks</h3>
-We compare Bootleg against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
+We compare the newest version Bootleg as of October 2020 against the current reported SotA numbers on two standard sentence-level benchmarks (KORE50 and RSS500) and the standard document-level benchmark (AIDA CoNLL-YAGO).
 <p>
   <table class="ui structured red table small-font">
     <thead>
@@ -40,32 +40,32 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
       </tr>
     </tr>
     <td>Bootleg</td>
-        <td><b>87.5</b></td>
-        <td><b>83.2</b></td>
-        <td><b>85.3</b></td>
+        <td><b>86.0</b></td>
+        <td><b>85.4</b></td>
+        <td><b>85.7</b></td>
       <tr>
         <td rowspan="2">RSS500<sup><a href="#note1">2</a></sup></td>
           <td>Phan et al., 2019<sup><a href="#note1">5</a></sup></td>
           <td>82.3 </td>
-          <td><b>82.3</b></td>
+          <td>82.3</td>
           <td>82.3</td>
       </tr>
       <td>Bootleg</td>
-      <td><b>89.2</b> </td>
-      <td>80.3</td>
-      <td><b>84.5</b></td>
+      <td><b>82.5</b> </td> 
+      <td><b>82.5</b></td>
+      <td><b>82.5</b></td>
     </tr>
       <tr>
         <td rowspan="2">AIDA CoNLL YAGO<sup><a href="#note1">3</a></sup></td>
           <td>Fevry et al., 2020<sup><a href="#note1">6</a></sup></td>
           <td>-</td>
-          <td>96.7</td>
+          <td><b>96.7</b></td>
           <td>-</td>
       </tr>
     </tr>
     <td>Bootleg</td>
-    <td>97.0</td>
-    <td>96.7</td>
+    <td>96.9</td>
+    <td><b>96.7</b></td>
     <td>96.8</td>
   </tr>
 </tr>
@@ -74,7 +74,7 @@ We compare Bootleg against the current reported SotA numbers on two standard sen
 </p>
 <h3>Tail Performance</h3>
 We also evaluate the performance of Bootleg on the tail compared to a standard BERT NED baseline.
-We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores.
+We create evaluation sets from Wikipedia by filtering by the frequency of the true entities in the training dataset and report micro F1 scores. The slight increase in performance over unseen entities compared to tail entities is due to the lower degree of ambiguity among the unseen entities compared to the tail entities.
 <p>
   <table class="ui structured red table small-font">
     <thead>
@@ -87,22 +87,22 @@ We create evaluation sets from Wikipedia by filtering by the frequency of the tr
     <tbody>
       <tr>
         <td>All Entities</td>
-          <td>92.8</td>
-          <td><b>96.2</b></td>
+          <td>85.9</td>
+          <td><b>91.3</b></td>
       </tr>
     </tr>
     <td>Torso Entities</td>
-        <td>62.1</td>
-        <td><b>80.2</b></td>
+        <td>79.3</td>
+        <td><b>87.3</b></td>
     </tr>
       <td>Tail Entities</td>
-          <td>19.2</td>
-          <td><b>71.3</b></td>
+          <td>27.8</td>
+          <td><b>69.0</b></td>
       </tr>
       <tr>
           <td>Unseen Entities</td>
-          <td>11.4</td>
-          <td><b>65.8</b></td>
+          <td>18.5</td>
+          <td><b>68.5</b></td>
       </tr>
     </tbody>
 </table>
