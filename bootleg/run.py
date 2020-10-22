@@ -48,6 +48,10 @@ def main(args, mode):
         assert os.path.exists(args.run_config.init_checkpoint),\
             f"The resume model file of {args.run_config.init_checkpoint} doesn't exist"
 
+    if mode == "dump_preds" or mode == "dump_embs":
+        assert args.run_config.perc_eval == 1.0, f"If you are running dump_preds or dump_embs, run_config.perc_eval must be 1.0. You have {args.run_config.perc_eval}"
+        assert args.data_config.test_dataset.use_weak_label is True, f"We do not support dumping when the test dataset gold is set to false. You can filter the dataset and run with filtered data."
+
     utils.dump_json_file(filename=os.path.join(train_utils.get_save_folder(args.run_config), f"config_{mode}.json"), contents=args)
     if args.run_config.distributed:
         mp.spawn(main_worker, nprocs=args.run_config.ngpus_per_node, args=(args, mode, world_size))
@@ -106,9 +110,10 @@ def main_worker(gpu, args, mode, world_size):
 
 
 def train(args, is_writer, logger, world_size, rank):
+    mode = "train"
     # This is main but call again in case train is called directly
     train_utils.setup_train_heads_and_eval_slices(args)
-    train_utils.setup_run_folders(args, "train")
+    train_utils.setup_run_folders(args, mode)
 
     # Load word symbols (like tokenizers) and entity symbols (aka entity profiles)
     word_symbols = data_utils.load_wordsymbols(args.data_config, is_writer, distributed=args.run_config.distributed)
@@ -152,7 +157,8 @@ def train(args, is_writer, logger, world_size, rank):
     eval_steps = int(args.run_config.eval_steps)
     log_steps = int(args.run_config.log_steps)
     save_steps = max(int(args.run_config.save_every_k_eval * eval_steps), 1)
-    logger.info(f"Eval steps {eval_steps}, Log steps {log_steps}, Save steps {save_steps}, Total training examples per epoch {len(train_dataset)}")
+    logger.info(f"Eval steps {eval_steps}, Log steps {log_steps}, Steps per epoch {len(train_dataloader)}, Save steps {save_steps} (will also save at end of epoch)")
+    logger.info(f"Total training examples per epoch {len(train_dataset)}")
     status_reporter = StatusReporter(args, logger, is_writer, max_epochs, total_steps_per_epoch, is_eval=False)
     global_step = 0
     for epoch in range(trainer.start_epoch, trainer.start_epoch + max_epochs):
@@ -201,6 +207,7 @@ def train(args, is_writer, logger, world_size, rank):
 
 def model_eval(args, mode, is_writer, logger, world_size=1, rank=0):
     assert args.run_config.init_checkpoint != "", "You can't have an empty model file to do eval"
+    dump_mode = mode == 'dump_preds' or mode == 'dump_embs'
     # this is in main but call again in case eval is called directly
     train_utils.setup_train_heads_and_eval_slices(args)
     train_utils.setup_run_folders(args, mode)
@@ -217,9 +224,17 @@ def model_eval(args, mode, is_writer, logger, world_size=1, rank=0):
                                              word_symbols, entity_symbols,
                                              slice_dataset=test_slice_dataset,
                                              dataset_is_eval=True)
-    test_dataloader, test_sampler = data_utils.create_dataloader(args, test_dataset,
-                                                                 eval_slice_dataset=test_slice_dataset,
+    if dump_mode:
+        # For dump_mode, we want to dump ALL predictions for all mentions, weakly labeled or not
+        # In the create dataloader, if eval_slice_dataset is not none, we sample indices that have sentences with
+        # at least one non-weakly-labeled mentions. We don't want to do this in dump_mode so set the eval_slice_dataset to None
+        test_dataloader, test_sampler = data_utils.create_dataloader(args, test_dataset,
+                                                                 eval_slice_dataset=None,
                                                                  batch_size=args.run_config.eval_batch_size)
+    else:
+        test_dataloader, test_sampler = data_utils.create_dataloader(args, test_dataset,
+                                                                     eval_slice_dataset=test_slice_dataset,
+                                                                     batch_size=args.run_config.eval_batch_size)
     dataset_collection = DatasetCollection(args.data_config.test_dataset, args.data_config.test_dataset.file, test_dataset, test_dataloader, test_slice_dataset,
                                            test_sampler)
     test_dataset_collection[args.data_config.test_dataset.file] = dataset_collection
@@ -230,7 +245,7 @@ def model_eval(args, mode, is_writer, logger, world_size=1, rank=0):
                       model_eval=True)
 
     # Run evaluation numbers without dumping predictions (quick, batched)
-    if mode == 'eval':
+    if not dump_mode: # mode == "eval"
         status_reporter = StatusReporter(args, logger, is_writer, max_epochs=None, total_steps_per_epoch=None, is_eval=True)
         # results are written to json file
         for test_data_file in test_dataset_collection:
@@ -240,8 +255,7 @@ def model_eval(args, mode, is_writer, logger, world_size=1, rank=0):
             eval_utils.run_batched_eval(args=args,
                 is_test=True, global_step=None, logger=logger, trainer=trainer, dataloader=test_dataloader,
                 status_reporter=status_reporter, file=test_data_file)
-
-    elif mode == 'dump_preds' or mode == 'dump_embs':
+    else:
         # get predictions and optionally dump the corresponding contextual entity embeddings
         # TODO: support dumping ids for other embeddings as well (static entity embeddings, type embeddings, relation embeddings)
         # TODO: remove collection abstraction

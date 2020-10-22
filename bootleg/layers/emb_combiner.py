@@ -23,6 +23,8 @@ class EmbCombinerProj(nn.Module):
         self.sent_emb_size = sent_emb_size
         # Don't include sizes from the relation indices
         total_dim = sum([v for k,v in emb_sizes.items()])
+        if args.data_config.type_prediction.use_type_pred:
+            total_dim += args.data_config.type_prediction.dim
         self.position_enc = nn.ModuleDict()
         # These are NOT learned parameters so we will use it for first and last positional tokens
         self.position_enc['alias'] = PositionalEncoding(self.hidden_size)

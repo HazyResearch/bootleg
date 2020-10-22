@@ -25,7 +25,7 @@ class Annotator():
         cand_map=None, threshold=0.0):
         self.args = config_args
         self.device = device
-        self.entity_db =  EntitySymbols(os.path.join(self.args.data_config.entity_dir,
+        self.entity_db = EntitySymbols(os.path.join(self.args.data_config.entity_dir,
                                                      self.args.data_config.entity_map_dir),
                                         alias_cand_map_file=self.args.data_config.alias_cand_map)
         self.word_db = data_utils.load_wordsymbols(self.args.data_config, is_writer=True, distributed=False)
@@ -41,8 +41,12 @@ class Annotator():
         # minimum probability of prediction to return mention
         self.threshold = threshold
 
+        # get batch_on_the_fly embeddings _and_ the batch_prep embeddings
         self.batch_on_the_fly_embs = {}
-        for emb in self.args.data_config.ent_embeddings:
+        for i, emb in enumerate(self.args.data_config.ent_embeddings):
+            if 'batch_prep' in emb and emb['batch_prep'] is True:
+                self.args.data_config.ent_embeddings[i]['batch_on_the_fly'] = True
+                del self.args.data_config.ent_embeddings[i]['batch_prep']
             if 'batch_on_the_fly' in emb and emb['batch_on_the_fly'] is True:
                 mod, load_class = import_class("bootleg.embeddings", emb.load_class)
                 try:
@@ -83,7 +87,7 @@ class Annotator():
                 'spans': found_spans,
                 # we don't know the true QID
                 'qids': ['Q-1'for i in range(len(found_aliases))],
-                'anchor': [True for i in range(len(found_aliases))]}
+                'gold': [True for i in range(len(found_aliases))]}
 
     def set_threshold(self, value):
         self.threshold = value

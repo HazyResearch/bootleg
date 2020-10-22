@@ -5,120 +5,125 @@
         "ngpus_per_node": 8,
         "eval_batch_size": 512,
         "dataloader_threads": 4,
-	"eval_steps": 5000,
+	    "eval_steps": 5000,
         "perc_eval": 1.0,
         "eval_slices": [
-            "not_most_popular_toes",
-            "not_most_popular_tail",
-            "not_most_popular_torso"
+            "unif_NPOP_TS", //unif sample of not the most popular unseen (or toe) entity
+            "unif_NPOP_TL", //unif sample of not the most popular tail entity
+            "unif_NPOP_TO" //unif sample of not the most popular torso entity
         ],
-        "save_dir": "results/wiki"
+        "save_dir": "tutorial_data/results/wiki"
     },
     "train_config": {
         "batch_size": 512,
         "dropout": 0.1,
         "lr": 0.0001,
-        "weight_decay": 1e-05,
-        "slice_method": "Normal"
+        "weight_decay": 1e-05
     },
     "model_config": {
         "attn_load_class": "Bootleg",
-	"ff_inner_size": 512,
-        "hidden_size": 256,
+	    "ff_inner_size": 1024,
+        "hidden_size": 512,
         "num_fc_layers": 1,
         "num_heads": 16,
         "num_model_stages": 2
     },
     "data_config": {
         "ent_embeddings": [
-            {
-                "key": "learned",
-                "load_class": "LearnedEntityEmb",
-                "freeze": false,
-                "args": {
-                    "learned_embedding_size": 256,
-                    "mask_perc": 0.8
-                }
-            },
-           {
-               "key": "avg_title_proj",
-               "load_class": "AvgTitleEmbProj",
-               "freeze": false,
-               "args": {
-                   "freeze_word_emb_for_titles": true,
-                   "merge_func": "average",
-                   "attn_hidden_size": 128
-               }
-           },
-           {
-               "key": "learned_type",
-               "load_class": "LearnedTypeEmb",
-               "freeze": false,
-               "args": {
-                   "type_labels": "hyena_types.json",
-                   "max_types": 3,
-                   "type_dim": 128,
-                   "merge_func": "softattn",
-                   "attn_hidden_size": 128
-               }
-           },
-           {
-               "key": "learned_type_wiki",
-               "load_class": "LearnedTypeEmb",
-               "freeze": false,
-               "args": {
-                   "type_labels": "wikidata_types_wiki_filt.json",
-                   "max_types": 3,
-                   "type_dim": 128,
-                   "merge_func": "softattn",
-                   "attn_hidden_size": 128
-               }
-           },
-           {
-               "key": "page_adj",
-               "load_class": "KGAdjEmb",
-               "batch_on_the_fly":true,
-               "dtype": "int16",
-               "dim": 1,
-               "args": {
-                   "kg_adj": "wiki_coo_adj.txt",
-                   "mask": true
-               }
-           },
-           {
-               "key": "adj_index",
-               "dim": -1,
-               "load_class": "KGIndices",
-               "batch_on_the_fly": true,
-               "batch_prep": false,
-               "dtype": "int16",
-               "args": {
-                   "kg_adj": "kg_adj_complete.txt",
-                   "mask": true
-               }
-           },
-           {
-               "key": "learned_type_relations",
-               "load_class": "LearnedTypeEmb",
-               "freeze": false,
-               "args": {
-                   "type_labels": "kg_relation_types.json",
-                   "max_types": 3,
-                   "type_dim": 128,
-                   "merge_func": "softattn",
-                   "attn_hidden_size": 128
-               }
-		   }
+          {
+            "key": "learned",
+            "load_class": "LearnedEntityEmb",
+            "freeze": false,
+            "args": {
+              "learned_embedding_size": 256,
+              "mask_perc": 0.8
+            }
+          },
+          {
+            "key": "avg_title_proj",
+            "load_class": "AvgTitleEmbProj",
+            "freeze": false,
+            "args": {
+              "freeze_word_emb_for_titles": true,
+              "merge_func": "average"
+            }
+          },
+          {
+            "key": "learned_type",
+            "load_class": "LearnedTypeEmb",
+            "freeze": false,
+            "args": {
+              "type_labels": "hyena_types_0905.json",
+              "max_types": 3,
+              "type_dim": 128,
+              "merge_func": "addattn",
+              "attn_hidden_size": 128
+            }
+          },
+          {
+            "key": "learned_type_relations",
+            "load_class": "LearnedTypeEmb",
+            "freeze": false,
+            "args": {
+              "type_labels": "kg_relation_types_0905.json",
+              "max_types": 50,
+              "type_dim": 128,
+              "merge_func": "addattn",
+              "attn_hidden_size": 128
+            }
+          },
+          {
+            "key": "learned_type_wiki",
+            "load_class": "LearnedTypeEmb",
+            "freeze": false,
+            "args": {
+              "type_labels": "wikidata_types_0905.json",
+              "max_types": 3,
+              "type_dim": 128,
+              "merge_func": "addattn",
+              "attn_hidden_size": 128
+            }
+          },
+          {
+            "key": "page_adj",
+            "load_class": "KGAdjEmb",
+            "batch_prep": true,
+            "dtype": "int16",
+            "dim": 1,
+            "args": {
+              "kg_adj": "wiki_coo_adj_0905.txt"
+            }
+          },
+          {
+            "key": "adj_index_cooc",
+            "dim": -1,
+            "load_class": "KGIndices",
+            "batch_on_the_fly": true,
+            "dtype": "float",
+            "args": {
+              "kg_adj": "sent_cooccur_map_0905.json"
+            }
+          },
+          {
+            "key": "adj_index",
+            "dim": -1,
+            "load_class": "KGIndices",
+            "batch_on_the_fly": true,
+            "dtype": "int16",
+            "args": {
+              "kg_adj": "kg_adj_0905.txt"
+            }
+          }
         ],
-        "data_dir": "/scratch/data/wiki",
-        "emb_dir": "data/emb_data",
-        "entity_dir": "data/wiki_entity_data",
-        "alias_cand_map": "alias2qids_wiki_full.json",
+        "data_dir": "tutorial_data/wiki",
+        "emb_dir": "tutorial_data/emb_data",
+        "entity_dir": "tutorial_data/wiki_entity_data",
+        "alias_cand_map": "alias2qids.json",
         "max_aliases": 10,
         "max_word_token_len": 100,
         "train_in_candidates": true,
         "train_dataset": {
-            "file": "train_large.jsonl"
+            "file": "train.jsonl"
         },
         "dev_dataset": {
             "file": "dev.jsonl"
@@ -127,7 +132,7 @@
             "file": "dev.jsonl"
         },
         "word_embedding": {
-            "cache_dir": "pretrained_bert_models",
+            "cache_dir": "tutorial_data/pretrained_bert_models",
             "custom_proj_size": -1,
             "custom_vocab_embedding_file": "",
             "freeze_sent_emb": true,

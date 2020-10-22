@@ -16,6 +16,9 @@
         "max_aliases": 5,
         "data_dir": "test/data/data_loader",
         "emb_dir": "test/data",
+        "type_prediction": {
+            "use_type_pred": false
+        },
         "train_dataset": {
             "file": "train_small_dis.txt",
             "load_class": "wiki_dataset.WikiDataset",

@@ -13,9 +13,9 @@
     },
     "model_config": {
 		"ff_inner_size": 512,
-        "hidden_size": 256,
+        "hidden_size": 128,
         "num_fc_layers": 1,
-        "num_heads": 16,
+        "num_heads": 8,
         "num_model_stages": 2
     },
     "data_config": {
@@ -35,7 +35,7 @@
                    "type_labels": "qid2types.json",
                    "max_types": 3,
                    "type_dim": 128,
-                   "merge_func": "softattn",
+                   "merge_func": "addattn",
                    "attn_hidden_size": 128
                }
            },
@@ -58,7 +58,7 @@
                    "type_labels": "qid2relations.json",
                    "max_types": 50,
                    "type_dim": 128,
-                   "merge_func": "softattn",
+                   "merge_func": "addattn",
                    "attn_hidden_size": 128
                }
 		   }

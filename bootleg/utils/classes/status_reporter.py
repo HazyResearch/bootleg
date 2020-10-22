@@ -1,6 +1,7 @@
 import os
 import json
 import ujson
+from jsonlines import jsonlines
 
 from bootleg.utils import train_utils
 
@@ -76,7 +77,7 @@ class StatusReporter:
                 f.write('\n')
         return
 
-    def dump_results(self, eval_results, pretty_results_printing, file, is_test):
+    def dump_results(self, dict_for_dumping, file, is_test):
         if self.is_writer:
             if is_test:
                 assert file in self.test_files, f'The dump file {file} is not in our possible files from {self.test_files.keys()}'
@@ -88,8 +89,7 @@ class StatusReporter:
             else:
                 file = self.test_files[file]
                 file_mode = 'a'
-            with open(file, file_mode) as f:
-                # json (rather than ujson) allows nans which may occur if an eval slice is empty
-                json.dump(eval_results, f)
-                f.write('\n')
+            with jsonlines.open(file, file_mode) as f:
+                for json_obj in dict_for_dumping:
+                    f.write(json_obj)
         return

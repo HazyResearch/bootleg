@@ -33,9 +33,9 @@ def create_out_line(sent_obj, final_aliases, final_spans):
     sent_obj["spans"] = final_spans
     # we don't know the true QID (or even if there is one) at this stage
     # we assign to the most popular candidate for now so models w/o NIL can also evaluate this data
-    # sent_obj["qids"] = ["Q-1"]*len(final_aliases)
-    global alias2qids
-    sent_obj["qids"] = [alias2qids[alias][0] for alias in final_aliases]
+    sent_obj["qids"] = ["Q-1"]*len(final_aliases)
+    # global alias2qids
+    # sent_obj["qids"] = [alias2qids[alias][0] for alias in final_aliases]
     sent_obj[ANCHOR_KEY] = [True]*len(final_aliases)
     return sent_obj
 
@@ -214,9 +214,14 @@ def extract_mentions(in_filepath, out_filepath, cand_map_file, max_alias_len=6, 
     else:
         logger.info(f'Using 1 worker...')
         with jsonlines.open(in_filepath, 'r') as in_file, jsonlines.open(out_filepath, 'w') as out_file:
+            sent_idx_unq = 0
             for line in in_file:
                 found_aliases, found_spans = find_aliases_in_sentence_tag(line["sentence"], all_aliases_trie, max_alias_len)
-                out_file.write(create_out_line(line, found_aliases, found_spans))
+                new_line = create_out_line(line, found_aliases, found_spans)
+                if 'sent_idx_unq' not in new_line:
+                    new_line['sent_idx_unq'] = sent_idx_unq
+                    sent_idx_unq += 1
+                out_file.write(new_line)
 
     logger.info(f"Finished in {time.time() - start_time} seconds. Wrote out to {out_filepath}")
 

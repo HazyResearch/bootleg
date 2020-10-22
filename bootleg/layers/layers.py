@@ -5,10 +5,56 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from bootleg.utils.classes.dotted_dict import DottedDict
 from torch.nn import Parameter
 from torch.nn.init import xavier_uniform_, xavier_normal_, constant_
 
 from bootleg.utils import eval_utils, model_utils
+
+class TypePred(nn.Module):
+    """
+    Basic type prediction class using MLP over mention embedding.
+
+    For each M mention, predictions with type that mention is. Extracts that type embedding
+    and concats to each candidate's entity embedding.
+    """
+    def __init__(self, input_size, emb_size, num_types):
+        super(TypePred, self).__init__()
+        # self.type_embedding = nn.Embedding(
+        #     num_types,
+        #     emb_size)
+        # num_types x emb_size
+        self.emb_size = emb_size
+        self.type_embedding = torch.nn.Parameter(torch.Tensor(num_types, emb_size))
+        xavier_normal_(self.type_embedding)
+        self.type_embedding.requires_grad = True
+        # Two layer MLP
+        self.prediction = MLP(input_size=input_size, num_hidden_units=input_size, output_size=num_types, num_layers=2)
+        self.type_softmax = nn.Softmax(dim=2)
+
+    def forward(self, sent_emb, entity_package, entity_embs):
+        batch, M, K = entity_package.tensor.shape
+        # Get alias tensor and expand to be for each candidate for soft attn
+        alias_word_tensor = model_utils.select_alias_word_sent(entity_package.pos_in_sent, sent_emb, index=0)
+        alias_mask = entity_package.alias_indices == -1
+
+        # batch x M x num_types
+        batch_type_pred = self.prediction(alias_word_tensor)
+        batch_type_weights = self.type_softmax(batch_type_pred)
+        # batch x M x emb_size
+        batch_type_embs = torch.matmul(batch_type_weights, self.type_embedding.unsqueeze(0))
+        # mask out unk alias embeddings
+        batch_type_embs[alias_mask] = 0
+        batch_type_embs = batch_type_embs.unsqueeze(2).expand(batch, M, K, self.emb_size)
+
+        res = DottedDict(tensor=batch_type_embs,
+                         pos_in_sent=entity_package.pos_in_sent,
+                         alias_indices=entity_package.alias_indices,
+                         mask=entity_package.mask,
+                         normalize=True)
+        entity_embs.append(res)
+        return entity_embs, batch_type_pred
+
 
 class PositionAwareAttention(nn.Module):
     """

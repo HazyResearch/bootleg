@@ -4,6 +4,7 @@ import os
 import ujson as json
 import time
 import torch
+import pandas as pd
 from bootleg.embeddings import EntityEmb
 from bootleg.layers.layers import SoftAttn, PositionAwareAttention
 from bootleg.utils.model_utils import selective_avg
@@ -36,7 +37,6 @@ class TypeEmb(EntityEmb):
                     attn_hidden_size = emb_args.attn_hidden_size
                 else:
                     attn_hidden_size = 100
-                self.logger.debug(f"{key}: Setting merge_func to be soft_attn in type emb with context size {attn_hidden_size}")
                 # Softmax of types using the sentence context
                 self.soft_attn = SoftAttn(emb_dim=self.orig_dim, context_dim=main_args.model_config.hidden_size, size=attn_hidden_size)
                 self.merge_func = self.soft_attn_merge
@@ -45,17 +45,25 @@ class TypeEmb(EntityEmb):
                     attn_hidden_size = emb_args.attn_hidden_size
                 else:
                     attn_hidden_size = 100
-                self.logger.debug(f"{key}: Setting merge_func to be add_attn in type emb with context size {attn_hidden_size}")
                 # Softmax of types using the sentence context
                 self.add_attn = PositionAwareAttention(input_size=self.orig_dim, attn_size=attn_hidden_size, feature_size=0)
                 self.merge_func = self.add_attn_merge
         self.normalize = True
         self.entity_symbols = entity_symbols
         self.max_types = emb_args.max_types
-        self.eid2typeids_table, self.type2rowid, num_types_with_unk, self.prep_file = self.prep(main_args=main_args,
+        self.eid2typeids_table, self.type2row_dict, num_types_with_unk, self.prep_file = self.prep(main_args=main_args,
             emb_args=emb_args, entity_symbols=entity_symbols, log_func=self.logger.debug)
         self.num_types_with_pad_and_unk = num_types_with_unk + 1
         self.eid2typeids_table = self.eid2typeids_table.to(model_device)
+        # Regularization mapping goes from typeid to 2d dropout percent
+        self.typeid2reg = None
+        if "regularize_mapping" in emb_args:
+            self.logger.debug(f"Using regularization mapping in enity embedding from {emb_args.regularize_mapping}")
+            self.typeid2reg = self.load_regularization_mapping(main_args, self.num_types_with_pad_and_unk, self.type2row_dict, emb_args.regularize_mapping, self.logger.debug)
+            self.typeid2reg = self.typeid2reg.to(model_device)
+        assert self.eid2typeids_table.shape[1] == emb_args.max_types, f"Something went wrong with loading type file." \
+                                                             f" The given max types {emb_args.max_types} does not match that of type table {self.eid2typeids_table.shape[1]}"
+        self.logger.debug(f"{key}: Type embedding with {self.max_types} types with dim {self.orig_dim}. Setting merge_func to be {self.merge_func.__name__} in type emb.")
 
     @classmethod
     def prep(cls, main_args, emb_args, entity_symbols, log_func=print, word_symbols=None):
@@ -68,17 +76,17 @@ class TypeEmb(EntityEmb):
             and os.path.exists(prep_file)):
             log_func(f'Loading existing type table from {prep_file}')
             start = time.time()
-            eid2typeids_table, type2row, num_types_with_unk = torch.load(prep_file)
+            eid2typeids_table, type2row_dict, num_types_with_unk = torch.load(prep_file)
             log_func(f'Loaded existing type table in {round(time.time() - start, 2)}s')
         else:
             start = time.time()
-            log_func(f'Building type table')
             type_labels = os.path.join(main_args.data_config.emb_dir, emb_args.type_labels)
-            eid2typeids_table, type2row, num_types_with_unk = cls.build_type_table(type_labels=type_labels,
+            log_func(f'Building type table from {type_labels}')
+            eid2typeids_table, type2row_dict, num_types_with_unk = cls.build_type_table(type_labels=type_labels,
                 max_types=emb_args.max_types, entity_symbols=entity_symbols)
-            torch.save((eid2typeids_table, type2row, num_types_with_unk), prep_file)
+            torch.save((eid2typeids_table, type2row_dict, num_types_with_unk), prep_file)
             log_func(f"Finished building and saving type table in {round(time.time() - start, 2)}s.")
-        return eid2typeids_table, type2row, num_types_with_unk, prep_file
+        return eid2typeids_table, type2row_dict, num_types_with_unk, prep_file
 
     @classmethod
     def build_type_table(cls, type_labels, max_types, entity_symbols):
@@ -121,11 +129,43 @@ class TypeEmb(EntityEmb):
         assert (max_type_id_all+1) <= labeled_num_types
         eid2typeids[eid2typeids == -1] = labeled_num_types
         print(f"{round(type_hit/entity_symbols.num_entities, 2)*100}% of entities are assigned types")
-        # As max_type_id is +1, it accounts for 0 indexing
-        type2row = [0]*(max_type_id_all)
-        for type_id in type2row_dict:
-            type2row[type_id] = type2row_dict[type_id]
-        return eid2typeids.long(), type2row, labeled_num_types
+        return eid2typeids.long(), type2row_dict, labeled_num_types
+
+    def load_regularization_mapping(cls, main_args, num_types_with_pad_and_unk, type2row_dict, reg_file, log_func):
+        """
+        Reads in a csv file with columns [qid, regularization].
+        In the forward pass, the entity id with associated qid will be regularized with probability regularization.
+        """
+        reg_str = reg_file.split(".csv")[0]
+        prep_dir = data_utils.get_data_prep_dir(main_args)
+        prep_file = os.path.join(prep_dir,
+            f'entity_regularization_mapping_{reg_str}.pt')
+        utils.ensure_dir(os.path.dirname(prep_file))
+        log_func(f"Looking for regularization mapping in {prep_file}")
+        if (not main_args.data_config.overwrite_preprocessed_data
+            and os.path.exists(prep_file)):
+            log_func(f'Loading existing entity regularization mapping from {prep_file}')
+            start = time.time()
+            typeid2reg = torch.load(prep_file)
+            log_func(f'Loaded existing entity regularization mapping in {round(time.time() - start, 2)}s')
+        else:
+            start = time.time()
+            reg_file = os.path.join(main_args.data_config.data_dir, reg_file)
+            log_func(f'Building entity regularization mapping from {reg_file}')
+            typeid2reg_raw = pd.read_csv(reg_file)
+            assert "typeid" in typeid2reg_raw.columns and "regularization" in typeid2reg_raw.columns, f"Expected typeid and regularization as the column names for {reg_file}"
+            # default of no mask
+            typeid2reg_arr = [0.0]*num_types_with_pad_and_unk
+            for row_idx, row in typeid2reg_raw.iterrows():
+                # Happens when we filter QIDs not in our entity dump and the max typeid is smaller than the total number
+                if int(row["typeid"]) not in type2row_dict:
+                    continue
+                typeid = type2row_dict[int(row["typeid"])]
+                typeid2reg_arr[typeid] = row["regularization"]
+            typeid2reg = torch.tensor(typeid2reg_arr)
+            torch.save(typeid2reg, prep_file)
+            log_func(f"Finished building and saving entity regularization mapping in {round(time.time() - start, 2)}s.")
+        return typeid2reg
 
     def get_typeids(self, entity_package):
         batch_type_ids = self.eid2typeids_table[entity_package.tensor].long()
@@ -195,8 +235,6 @@ class LearnedTypeEmb(TypeEmb):
         self.orig_dim = emb_args.type_dim
         self._dim = main_args.model_config.hidden_size
         self.type_emb = torch.nn.Embedding(self.num_types_with_pad_and_unk, self.orig_dim, padding_idx=-1).to(model_device)
-        if emb_args.type_dim == 0:
-            self.type_emb.weight.requires_grad = False
 
     @classmethod
     def prep(cls, main_args, emb_args, entity_symbols, log_func=print, word_symbols=None):
@@ -206,6 +244,9 @@ class LearnedTypeEmb(TypeEmb):
     def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
         batch_type_ids = self.eid2typeids_table[entity_package.tensor].long()
         batch_type_emb = self.type_emb(batch_type_ids)
+        if self.typeid2reg is not None:
+            regularization_tensor = self.typeid2reg[batch_type_ids]
+            batch_type_emb = model_utils.emb_dropout_by_tensor(self.training, regularization_tensor, batch_type_emb)
         batch_type_emb = self.merge_func(entity_package, batch_type_ids, batch_type_emb, sent_emb)
         res = self._package(tensor=batch_type_emb,
                             pos_in_sent=entity_package.pos_in_sent,

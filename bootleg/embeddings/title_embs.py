@@ -36,13 +36,12 @@ class AvgTitleEmb(EntityEmb):
             self.requires_grad_title = not emb_args.freeze_word_emb_for_titles
         assert not self.requires_grad_title or word_emb.requires_grad,\
             "Inconsistent Args: You have to not freeze word embeddings for titles but freeze word embeddings"
-        self.entity2titleid_table = self.prep(main_args=main_args, word_symbols=word_symbols, entity_symbols=entity_symbols,
-            log_func=self.logger.debug)
+        self.entity2titleid_table = self.prep(main_args=main_args, emb_args=emb_args, entity_symbols=entity_symbols,
+            word_symbols=word_symbols, log_func=self.logger.debug)
         self.entity2titleid_table = self.entity2titleid_table.to(model_device)
 
     @classmethod
-    def prep(cls, main_args, word_symbols, entity_symbols, log_func=print,
-        emb_args=None):
+    def prep(cls, main_args, emb_args, entity_symbols, word_symbols, log_func=print):
         prep_dir = data_utils.get_emb_prep_dir(main_args)
         prep_file = os.path.join(prep_dir,
             f'avg_title_table_{main_args.data_config.word_embedding.word_symbols}.pt')

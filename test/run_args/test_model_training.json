@@ -24,6 +24,9 @@
         "entity_dir": "test/data/model_training/entity_data",
         "overwrite_preprocessed_data": true,
         "emb_dir": "test/data/model_training",
+        "type_prediction": {
+            "use_type_pred": false
+        },
         "train_dataset" :
         {
             "file": "train.jsonl",

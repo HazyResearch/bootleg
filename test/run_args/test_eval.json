@@ -29,6 +29,9 @@
         "data_dir": "test/data/data_loader",
         "overwrite_preprocessed_data": true,
         "emb_dir": "test/data",
+        "type_prediction": {
+            "use_type_pred": false
+        },
         "train_dataset":
         {
             "train_file_prefix": "train_small.txt",

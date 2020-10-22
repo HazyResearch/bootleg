@@ -64,7 +64,10 @@ class BERTWordSymbols(WordSymbols):
         # cache_dir = "pretrained_bert_models"
         # tokenizer = BertTokenizer.from_pretrained('bert-base-cased', cache_dir=cache_dir, do_lower_case=False)
         # torch.save(tokenizer, os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))
-        self.tokenizer = torch.load(os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))
+        if args.word_embedding.use_lower_case:
+            self.tokenizer = torch.load(os.path.join(cache_dir, "bert_base_uncased_tokenizer.pt"))
+        else:
+            self.tokenizer = torch.load(os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))
         self.vocab = self.tokenizer.vocab
         self.num_words = len(self.vocab)
         self.word_embedding_dim = 768
