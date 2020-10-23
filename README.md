@@ -6,7 +6,7 @@
 
 ***Self-Supervision for Named Entity Disambiguation at the Tail***
 
-Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of tail entities using a simple transformer-based architecture (see the [overview](#bootleg-overview) below)
+Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of tail entities using a simple transformer-based architecture ([overview](#bootleg-overview) below). For details, please see our [paper](http://arxiv.org/abs/2010.10363).
 
 Note that Bootleg is *actively under development* and feedback is welcome. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
 
