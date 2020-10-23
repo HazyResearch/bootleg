@@ -41,7 +41,7 @@ From the [Basic Training Tutorial](basic_training_tutorial.md), recall that the 
   - `cache_dir` in `data_config.word_embedding`
   - `data_dir`, `entity_dir`, and `emb_dir` in `data_config`.
 
-We have already set these directories in the [provided Wikipedia config](../configs/wiki_config.json), but you will need to update `data_dir` to where you downloaded the Wikipedia data in [Downloading the Data](#1-downloading-the-data) and may want to update `save_dir` to where you want to save the model checkpoints and logs.
+We have already set these directories in the [provided Wikipedia config](../configs/wiki_config.json), but you will need to update `data_dir`, `entity_dir`, and `emb_dir` to where you downloaded the data in [Downloading the Data](#1-downloading-the-data) and may want to update `save_dir` to where you want to save the model checkpoints and logs.
 
 ## 3. Training the Model
 
@@ -59,10 +59,10 @@ If we want to change the config (e.g. change the maximum number of aliases or th
 
 We use evaluation slices to understand the performance of Bootleg on important subsets of the dataset. To use evaluation slices, alias-entity pairs are labelled as belonging to specific slices in the `slices` key of the dataset.
 
-In the Wikipedia data in this tutorial, we provide three "slices" of the dev dataset in addition to the "final_loss" (all examples) slice. For each of these three slices, the gold entity is not the most popular candidate for the alias. This also filters trivial examples where there is only a single candidate for an alias.
-- `not_most_popular_toes`: The gold entity does not occur in the training dataset.
-- `not_most_popular_tail`: The gold entity occurs globally 10 or fewer times in the training dataset.
-- `not_most_popular_torso`: The gold entity occurs globally between 11-1000 times in the training dataset.
+In the Wikipedia data in this tutorial, we provide three "slices" of the dev dataset in addition to the "final_loss" (all examples) slice. For each of these three slices, the alias being scored must have more than one candidate. This filters trivial examples all models get correct.
+- `unif_NS_TS`: The gold entity does not occur in the training dataset.
+- `unif_NS_TL`: The gold entity occurs globally 10 or fewer times in the training dataset.
+- `unif_NS_TO`: The gold entity occurs globally between 11-1000 times in the training dataset.
 
 To use the slices for evaluation, they must also be specified in the `eval_slices` section of the `run_config` (see the [Wikipedia config](../configs/wiki_config.json) as an example).
 

@@ -1,18 +1,20 @@
 {
     "run_config": {
         "dataset_threads": 70,
+        "loglevel": "debug",
         "distributed": true,
         "ngpus_per_node": 8,
         "eval_batch_size": 512,
         "dataloader_threads": 4,
 	    "eval_steps": 5000,
         "perc_eval": 1.0,
+        "dist_url": "tcp://127.0.0.1:8001",
         "eval_slices": [
-            "unif_NPOP_TS", //unif sample of not the most popular unseen (or toe) entity
-            "unif_NPOP_TL", //unif sample of not the most popular tail entity
-            "unif_NPOP_TO" //unif sample of not the most popular torso entity
+            "unif_NS_TS", //unif sample of unseen (or toe) entities s.t. the mention has more than on candidate
+            "unif_NS_TL", //unif sample of tail entities s.t. the mention has more than on candidate
+            "unif_NS_TO" //unif sample of torso entities s.t. the mention has more than on candidate
         ],
-        "save_dir": "tutorial_data/results/wiki"
+        "save_dir": "results/wiki"
     },
     "train_config": {
         "batch_size": 512,
@@ -115,9 +117,9 @@
             }
           }
         ],
-        "data_dir": "tutorial_data/wiki",
-        "emb_dir": "tutorial_data/emb_data",
-        "entity_dir": "tutorial_data/wiki_entity_data",
+        "data_dir": "data/wiki",
+        "emb_dir": "data/emb_data",
+        "entity_dir": "data/wiki_entity_data",
         "alias_cand_map": "alias2qids.json",
         "max_aliases": 10,
         "max_word_token_len": 100,
@@ -132,7 +134,7 @@
             "file": "dev.jsonl"
         },
         "word_embedding": {
-            "cache_dir": "tutorial_data/pretrained_bert_models",
+            "cache_dir": "pretrained_bert_models",
             "custom_proj_size": -1,
             "custom_vocab_embedding_file": "",
             "freeze_sent_emb": true,
