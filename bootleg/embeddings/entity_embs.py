@@ -78,7 +78,6 @@ class LearnedEntityEmb(EntityEmb):
             log_func(f'Loaded existing entity regularization mapping in {round(time.time() - start, 2)}s')
         else:
             start = time.time()
-            reg_file = os.path.join(main_args.data_config.data_dir, reg_file)
             log_func(f'Building entity regularization mapping from {reg_file}')
             qid2reg = pd.read_csv(reg_file)
             assert "qid" in qid2reg.columns and "regularization" in qid2reg.columns, f"Expected qid and regularization as the column names for {reg_file}"
@@ -94,6 +93,123 @@ class LearnedEntityEmb(EntityEmb):
 
     def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
         tensor = self.learned_entity_embedding(entity_package.tensor)
+        if self.eid2reg is not None:
+            regularization_tensor = self.eid2reg[entity_package.tensor.long()]
+            tensor = model_utils.emb_dropout_by_tensor(self.training, regularization_tensor, tensor)
+        emb = self._package(tensor=tensor, pos_in_sent=entity_package.pos_in_sent, alias_indices=entity_package.alias_indices,
+                            mask=entity_package.mask)
+        return emb
+
+    def get_dim(self):
+        return self.learned_embedding_size
+
+
+class TopKEntityEmb(EntityEmb):
+    """Class for loading the learned embeddings of only the top K entities, ranked by occurrence in training data. To use this embedding
+    for a pretrained model, see utils.postprocessing.compress_topk_entity_embeddings.py"""
+    def __init__(self, main_args, emb_args, model_device, entity_symbols, word_symbols, word_emb, key):
+        super(TopKEntityEmb, self).__init__(main_args=main_args, emb_args=emb_args, model_device=model_device,
+                                               entity_symbols=entity_symbols, word_symbols=word_symbols, word_emb=word_emb, key=key)
+        self.logger = logging_utils.get_logger(main_args)
+        self.learned_embedding_size = emb_args.learned_embedding_size
+        self.normalize = True
+        assert "perc_emb_drop" in emb_args, f"To use TopKEntityEmb we need perc_emb_drop to be in the args. This gives the percentage of embeddings" \
+                                            f" removed."
+        # We remove perc_emb_drop percent of the embeddings and add one to represent the new toes embedding
+        num_topk_entities_with_pad_and_nocand = entity_symbols.num_entities_with_pad_and_nocand - int(emb_args.perc_emb_drop*entity_symbols.num_entities) + 1
+        # Mapping of entity to the new eid mapping
+        qid2topk_eid = {}
+        eid2topkeid = torch.arange(0, entity_symbols.num_entities_with_pad_and_nocand)
+        # There are issues with using -1 index into the embeddings; so we manually set it to be the last value
+        eid2topkeid[-1] = num_topk_entities_with_pad_and_nocand-1
+        if "qid2topk_eid" not in emb_args:
+            assert len(main_args.run_config.init_checkpoint) > 0, f"If you don't provide the qid2topk_eid mapping as an argument to TopKEntityEmb, " \
+                                                                  f"you must be loading a model from a checkpoint to build this index mapping"
+        else:
+            qid2topk_eid = utils.load_json_file(emb_args.qid2topk_eid)
+            assert len(qid2topk_eid) == entity_symbols.num_entities, f"You must have an item in qid2topk_eid for each qid in entity_symbols"
+            for qid in entity_symbols.get_all_qids():
+                old_eid = entity_symbols.get_eid(qid)
+                new_eid = qid2topk_eid[qid]
+                eid2topkeid[old_eid] = new_eid
+            assert eid2topkeid[0] == 0, f"The 0 eid shouldn't be changed"
+            assert eid2topkeid[-1] == num_topk_entities_with_pad_and_nocand-1, "The -1 eid should still map to -1"
+        self.learned_entity_embedding = nn.Embedding(
+            num_topk_entities_with_pad_and_nocand,
+            self.learned_embedding_size,
+            padding_idx=-1, sparse=True)
+        # Keep this mapping so a topK model can simply be loaded without needing the new eid mapping
+        self.register_buffer("eid2topkeid", eid2topkeid)
+        # If tail_init is false, all embeddings are randomly intialized.
+        # If tail_init is true, we initialize all embeddings to be the same.
+        self.tail_init = True
+        self.tail_init_zeros = False
+        # None init vec will be random
+        init_vec = None
+        if "tail_init" in emb_args:
+            self.tail_init = emb_args.tail_init
+        if "tail_init_zeros" in emb_args:
+            self.tail_init_zeros = emb_args.tail_init_zeros
+            self.tail_init = False
+            init_vec = torch.zeros(1, self.learned_embedding_size)
+        assert not (self.tail_init and self.tail_init_zeros), f"Can only have one of tail_init or tail_init_zeros set"
+        if self.tail_init or self.tail_init_zeros:
+            if self.tail_init_zeros:
+                self.logger.debug(f"All learned entity embeddings are initialized to zero.")
+            else:
+                self.logger.debug(f"All learned entity embeddings are initialized to the same value.")
+            init_vec = model_utils.init_embeddings_to_vec(self.learned_entity_embedding, pad_idx=-1, vec=init_vec)
+            vec_save_file = os.path.join(train_utils.get_save_folder(main_args.run_config), "init_vec_entity_embs.npy")
+            self.logger.debug(f"Saving init vector to {vec_save_file}")
+            np.save(vec_save_file, init_vec)
+        else:
+            self.logger.debug(f"All learned embeddings are randomly initialized.")
+        self._dim = main_args.model_config.hidden_size
+        self.eid2reg = None
+        # Regularization mapping goes from eid to 2d dropout percent
+        if "regularize_mapping" in emb_args:
+            self.logger.warning(f"You are using regularization mapping with a topK entity embedding. This means all QIDs that are mapped to the same"
+                                f" EID will get the same regularization value.")
+            self.logger.debug(f"Using regularization mapping in enity embedding from {emb_args.regularize_mapping}")
+            self.eid2reg = self.load_regularization_mapping(main_args, qid2topk_eid, num_topk_entities_with_pad_and_nocand, emb_args.regularize_mapping, self.logger.debug)
+            self.eid2reg = self.eid2reg.to(model_device)
+
+
+    def load_regularization_mapping(cls, main_args, qid2topk_eid, num_entities_with_pad_and_nocand, reg_file, log_func):
+        """
+        Reads in a csv file with columns [qid, regularization].
+        In the forward pass, the entity id with associated qid will be regularized with probability regularization.
+        """
+        reg_str = reg_file.split(".csv")[0]
+        prep_dir = data_utils.get_data_prep_dir(main_args)
+        prep_file = os.path.join(prep_dir,
+            f'entity_topk_regularization_mapping_{reg_str}.pt')
+        utils.ensure_dir(os.path.dirname(prep_file))
+        log_func(f"Looking for regularization mapping in {prep_file}")
+        if (not main_args.data_config.overwrite_preprocessed_data
+            and os.path.exists(prep_file)):
+            log_func(f'Loading existing entity regularization mapping from {prep_file}')
+            start = time.time()
+            eid2reg = torch.load(prep_file)
+            log_func(f'Loaded existing entity regularization mapping in {round(time.time() - start, 2)}s')
+        else:
+            start = time.time()
+            log_func(f'Building entity regularization mapping from {reg_file}')
+            qid2reg = pd.read_csv(reg_file)
+            assert "qid" in qid2reg.columns and "regularization" in qid2reg.columns, f"Expected qid and regularization as the column names for {reg_file}"
+            # default of no mask
+            eid2reg_arr = [0.0]*num_entities_with_pad_and_nocand
+            for row_idx, row in qid2reg.iterrows():
+                eid = qid2topk_eid[row["qid"]]
+                eid2reg_arr[eid] = row["regularization"]
+            eid2reg = torch.tensor(eid2reg_arr)
+            torch.save(eid2reg, prep_file)
+            log_func(f"Finished building and saving entity regularization mapping in {round(time.time() - start, 2)}s.")
+        return eid2reg
+
+    def forward(self, entity_package, batch_prepped_data, batch_on_the_fly_data, sent_emb):
+        entity_ids = self.eid2topkeid[entity_package.tensor]
+        tensor = self.learned_entity_embedding(entity_ids)
         if self.eid2reg is not None:
             regularization_tensor = self.eid2reg[entity_package.tensor.long()]
             tensor = model_utils.emb_dropout_by_tensor(self.training, regularization_tensor, tensor)

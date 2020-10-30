@@ -39,9 +39,15 @@ or
 ```
 conda install pytorch==1.5.0 torchvision==0.6.0 cudatoolkit=10.1 -c pytorch
 ```
+## Models
+We have four different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [benchmark](tutorials/benchmark_tutorial.ipynb) tutorial and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
+
+- [Bootleg](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz): our SotA benchmark model.
+- [BootlegMini](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz): our SotA benchmark model only using the entity embeddings of the 5% most popular entities. As we show in our [paper](http://arxiv.org/abs/2010.10363), this dramatically reduces the memory usage without any significant loss in performance.
+- [BootlegType](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz): Bootleg trained with _only_ type information.
+- [BootlegKG](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_kg.tar.gz): Bootleg trained with _only_ knowledge graph relation information.
 
 ## Tutorials
-
 We provide five tutorials to help users get familiar with Bootleg:
 ### Training
 - [basic training](tutorials/basic_training_tutorial.md): learn how to train a Bootleg model on new data, including formatting data, preprocessing data, and training with a sample dataset.
@@ -70,7 +76,7 @@ We use three embeddings for the entity payloads. Each entity gets the following 
 * Type: learned embedding for each of its types
 * Relation: learned embedding for each relation it participates in on Wikidata
 
-We also allow the use of other entity-based features. In this model, we use a title embedding and a Wikipedia page co-occurrence statistical feature.
+We also allow the use of other entity-based features. In our benchmark model, we use a title embedding and a Wikipedia page co-occurrence statistical feature.
 
 These embeddings are concatenated and projected to form an entity payload.
 
