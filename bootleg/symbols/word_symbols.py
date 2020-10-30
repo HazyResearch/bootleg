@@ -61,9 +61,11 @@ class BERTWordSymbols(WordSymbols):
         # import torch
         # import os
         # from transformers import BertTokenizer
-        # cache_dir = "pretrained_bert_models"
+        # cache_dir = "./"
         # tokenizer = BertTokenizer.from_pretrained('bert-base-cased', cache_dir=cache_dir, do_lower_case=False)
         # torch.save(tokenizer, os.path.join(cache_dir, "bert_base_cased_tokenizer.pt"))
+        # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', cache_dir=cache_dir, do_lower_case=True)
+        # torch.save(tokenizer, os.path.join(cache_dir, "bert_base_uncased_tokenizer.pt"))
         if args.word_embedding.use_lower_case:
             self.tokenizer = torch.load(os.path.join(cache_dir, "bert_base_uncased_tokenizer.pt"))
         else:
