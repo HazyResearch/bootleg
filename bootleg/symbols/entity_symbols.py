@@ -40,6 +40,8 @@ class EntitySymbols:
             # If we load stuff up in self.load() and regenerate these, the eid values may be nondeterministic
             self._qid2eid: Dict[str, int] = {v: i+1 for i, v in enumerate(qid2title)}
         self._eid2qid: Dict[int, str] = {eid:qid for qid, eid in self._qid2eid.items()}
+        assert -1 not in self._eid2qid, f"-1 can't be an eid"
+        assert 0 not in self._eid2qid, f"0 can't be an eid. It's reserved for null candidate"
         # generate trie of aliases for quick entity generation in sentences (trie generates alias ids, too)
         self._alias_trie = marisa_trie.Trie(self._alias2qids.keys())
         # this assumes that eid of 0 is NO_CAND and eid of -1 is NULL entity

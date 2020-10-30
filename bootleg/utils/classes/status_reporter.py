@@ -2,6 +2,7 @@ import os
 import json
 import ujson
 from jsonlines import jsonlines
+from torch.utils.tensorboard import SummaryWriter
 
 from bootleg.utils import train_utils
 
@@ -20,6 +21,11 @@ class StatusReporter:
             self.loss_file = self.setup_loss_file(args)
         else:
             self.test_files = self.setup_test_files(args)
+        self.tb_writer = self.setup_tensorboard(args)
+
+    def setup_tensorboard(self, args):
+        save_folder = os.path.join(train_utils.get_save_folder(args.run_config), "tensorboard")
+        return SummaryWriter(log_dir=save_folder)
 
     def setup_test_files(self, args):
         test_files = {}
@@ -66,6 +72,8 @@ class StatusReporter:
                                                 lr))
         if self.is_writer:
             self.dump_loss(epoch, step, loss_pack.loss_dict)
+            self.tb_writer.add_scalar(tag="loss", scalar_value=loss_pack.loss.data.item(), global_step=step)
+            self.tb_writer.add_scalar(tag="lr", scalar_value=lr, global_step=step)
         return
 
     def dump_loss(self, epoch, step, loss_dict):
@@ -91,5 +99,9 @@ class StatusReporter:
                 file_mode = 'a'
             with jsonlines.open(file, file_mode) as f:
                 for json_obj in dict_for_dumping:
+                    train_head = json_obj["train_head"]
+                    eval_slice = json_obj["eval_slice"]
+                    tag = "/".join([train_head, eval_slice])
+                    self.tb_writer.add_scalar(tag=tag, scalar_value=json_obj["f1_micro"], global_step=json_obj["global_step"])
                     f.write(json_obj)
         return
