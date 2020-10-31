@@ -44,6 +44,8 @@ We have four different Bootleg models you can download. Each download comes with
 
 - [Bootleg](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz): our SotA benchmark model.
 - [BootlegMini](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz): our SotA benchmark model only using the entity embeddings of the 5% most popular entities. As we show in our [paper](http://arxiv.org/abs/2010.10363), this dramatically reduces the memory usage without any significant loss in performance.
+- [BootlegSimple](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple.tar.gz): Bootleg with type, relation, and entity information but without our benchmark model's title embeddings and page co-occurrence statistic.
+- [BootlegSimpleMini](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple_mini.tar.gz): our BootlegSimple model using the entity embeddings of the 5% most popular entities.
 - [BootlegType](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz): Bootleg trained with _only_ type information.
 - [BootlegKG](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_kg.tar.gz): Bootleg trained with _only_ knowledge graph relation information.
 
