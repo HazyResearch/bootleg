@@ -549,8 +549,10 @@ def write_data_labels_hlp(args):
             aliases = line['aliases']
             sent_idx = line['sent_idx_unq']
             qids = []
+            cand_qids = []
             ctx_emb_ids = []
             entity_ids = []
+            cand_entity_ids = []
             probs = []
             cands = []
             cand_probs = []
@@ -566,17 +568,23 @@ def write_data_labels_hlp(args):
                 cand_prob = filt_emb_data_global[emb_idx]['final_loss_cand_probs']
                 pred_cand = filt_emb_data_global[emb_idx]['final_loss_pred']
                 eid = entity_cands_eid[al_idx][pred_cand]
+                entity_ids.append(eid)
+                cand_entity_ids.append(entity_cands_eid[al_idx])
                 qid = entity_cands_qid[al_idx][pred_cand]
                 qids.append(qid)
+                cand_qids.append(entity_cands_qid[al_idx])
                 probs.append(prob)
                 cands.append(list(entity_cands_qid[al_idx]))
                 cand_probs.append(list(cand_prob))
-                entity_ids.append(eid)
+                
             line['qids'] = qids
+            line['cand_qids'] = cand_qids
             line['probs'] = probs
             line['cands'] = cands
             line['cand_probs'] = cand_probs
             line['entity_ids'] = entity_ids
+            line['cand_entity_ids'] = cand_entity_ids
+
             if dump_embs_global:
                 line['ctx_emb_ids'] = ctx_emb_ids
             f_out.write(ujson.dumps(line) + "\n")
