@@ -1,6 +1,11 @@
 # Bootleg Downstream Tutorial
 
-NED is critical for numerous downstream applications, such as search, personal assistants, and Q&A, and in these tutorials, we show how to leverage [Bootleg's](https://github.com/HazyResearch/bootleg) output entity representations for one such downstream task that benefits from entity-based knowledge: TACRED. The goal in TACRED is to extract the relationship between a subject and object pair in text. Given the task data, we must (1) identify the entities in the examples, (2) obtain contextual Bootleg embeddings for these entities, (3) add the identified named entity as features in the TACRED data for each corresponding example, and (4) incorporate the Bootleg embeddings corresponding to these id's in the downstream task model. We show how to incorporate Bootleg embeddings in both an LSTM model (used in the original TACRED paper) and in a SpanBERT model. Using Bootleg, we set a new SotA result on TACRED revised test data at 80.3 F1 points; this improves upon SpanBERT without Bootleg by 2.3 F1 points and the prior SotA KnowBERT by 1.0 F1 points. 
+NED is critical for numerous downstream applications, such as search, personal assistants, and Q&A, and in these tutorials, we show how to leverage [Bootleg's](https://github.com/HazyResearch/bootleg) output entity representations for one such downstream task that benefits from entity-based knowledge: TACRED. The goal in TACRED is to extract the relationship between a subject and object pair in text. Given the task data, we must
+    - (1) identify the entities in the examples,
+    - (2) obtain contextual Bootleg embeddings for these entities,
+    - (3) add the identified named entity as features in the TACRED data for each corresponding example, and
+    - (4) incorporate the Bootleg embeddings corresponding to these id's in the downstream task model.
+We show how to incorporate Bootleg embeddings in both an LSTM model (used in the original TACRED paper) and in a SpanBERT model. Using Bootleg, we set a new SotA result on TACRED revised test data at 80.3 F1 points; this improves upon SpanBERT without Bootleg by 2.3 F1 points and the prior SotA KnowBERT by 1.0 F1 points. 
 
 First we will describe how to setup and then how to execute steps 1-4 from above.
 
@@ -14,6 +19,7 @@ Dependencies: For the Python dependencies, we recommend using a virtualenv. Once
 Once the virtual environment is created, activate it by running:
 
 ```source .venv/bin/activate```
+
 Any Python libraries installed will now be contained within this virtual environment. To deactivate the environment, simply run:
 
 ```deactivate```
@@ -26,9 +32,11 @@ We provide a requirements.txt file that includes requirements for Bootleg and th
 #### Bootleg Setup
 This tutorial assumes you have gone through the setup for installing Bootleg and downloaded the pretrained Bootleg model and configs, Wiki entity data and embedding data, and pretrained BERT model using the commands: 
 
-```bash download_model.sh```
-```bash download_data.sh```
-```bash download_bert.sh```
+```
+bash download_model.sh
+bash download_data.sh
+bash download_bert.sh
+```
 
 In total, these downloads require 12-13 GB of memory. 
 

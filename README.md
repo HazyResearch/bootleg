@@ -1,5 +1,5 @@
 <figure style="text-align: center">
-    <img style="width: 150px;" src="docs/images/full_logo.png" />
+    <img style="width: 20%;" src="docs/images/full_logo.png" />
 </figure>
 
 [![Build Status](https://travis-ci.com/HazyResearch/bootleg.svg?branch=master)](https://travis-ci.com/HazyResearch/bootleg)
@@ -40,12 +40,12 @@ or
 conda install pytorch==1.5.0 torchvision==0.6.0 cudatoolkit=10.1 -c pytorch
 ```
 ## Models
-We have four different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [benchmark](tutorials/benchmark_tutorial.ipynb) tutorial and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
+We have six different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [benchmark](tutorials/benchmark_tutorial.ipynb) tutorial and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
 
 | Model             | Description                     | Number Parameters | Link     |
 |-------------------|---------------------------------|-------------------|----------|
-| Bootleg           | All entity embeddings with type and KG embeddings. Has an addition title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 1.38B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz) |
-| BootlegMini       | Top 5 entity embeddings with type and KG embeddings. Has an addition title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 84M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz) | 
+| Bootleg           | All entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 1.38B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz) |
+| BootlegMini       | Top 5 entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 84M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz) | 
 | BootlegSimple     | All entity embeddings with type and KG embeddings.   | 1.37B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple.tar.gz) |
 | BootlegSimpleMini | Top 5 entity embeddings with type and KG embeddings. | 82M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple_mini.tar.gz) |
 | BootlegType       | Type embeddings.                                     | 13M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz) |
