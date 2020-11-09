@@ -1,6 +1,4 @@
-<figure style="text-align: center; width=150px">
-    <img src="docs/images/full_logo.png" />
-</figure>
+<img src="docs/images/full_logo.png" style="align: center; width: 150px;"/>
 
 [![Build Status](https://travis-ci.com/HazyResearch/bootleg.svg?branch=master)](https://travis-ci.com/HazyResearch/bootleg)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
