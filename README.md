@@ -1,5 +1,5 @@
-<figure style="text-align: center">
-    <img style="width: 20%;" src="docs/images/full_logo.png" />
+<figure style="text-align: center; width=150px">
+    <img src="docs/images/full_logo.png" />
 </figure>
 
 [![Build Status](https://travis-ci.com/HazyResearch/bootleg.svg?branch=master)](https://travis-ci.com/HazyResearch/bootleg)

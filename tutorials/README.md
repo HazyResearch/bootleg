@@ -1,5 +1,5 @@
 # Tutorials
-We provide several tutorials to help users get familiar with [Bootleg](../).
+We provide several tutorials to help users get familiar with Bootleg.
 
 ## Introduction
 ### Benchmark
