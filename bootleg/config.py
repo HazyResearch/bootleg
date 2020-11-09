@@ -5,6 +5,7 @@ In the json file, everything is a string or number. In this python file, if the 
 dictionary, True and False strings will become booleans. Otherwise they will stay string.
 
 """
+import multiprocessing
 
 config_args = {
     "run_config": {
@@ -20,7 +21,7 @@ config_args = {
         "save_every_k_eval": (1, "will save model every K times eval is run; model will always save every epoch"),
         "eval_batch_size": (128, "batch size for eval"),
         "dataloader_threads": (16, "data loader threads to feed gpus"),
-        "dataset_threads": (50, "data set threads for prepping data"),
+        "dataset_threads": (int(multiprocessing.cpu_count()*0.9), "data set threads for prepping data"),
         "perc_eval": (1.0, "Sample percent to use during dev eval during training or test eval. If running on lage data, this is important to keep small."),
         "min_eval_size": (-1, "If the percent eval gives less than min_eval_size examples (for min_eval_size > 0), the min eval size of examples will be evaluated."),
         "eval_slices": ([], "slices for evaluation"),
