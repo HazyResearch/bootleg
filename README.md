@@ -1,12 +1,12 @@
-<img src="docs/images/full_logo.png" width="150"/>
-
+<p align="center">
+<img src="docs/images/full_logo.png" width="150" class="center"/>
+</p>
 
 [![Build Status](https://travis-ci.com/HazyResearch/bootleg.svg?branch=master)](https://travis-ci.com/HazyResearch/bootleg)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-***Self-Supervision for Named Entity Disambiguation at the Tail***
-
-Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of tail entities using a simple transformer-based architecture ([overview](#bootleg-overview) below). For details, please see our [paper](http://arxiv.org/abs/2010.10363).
+# Self-Supervision for Named Entity Disambiguation at the Tail
+Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of entities that occur infrequently, or not at all, in training data. We call these entities *tail* entities. This is a critical task as the majority of entities are rare. The core insight behind Bootleg is that these tail entities can be disambiguated by reasoning over entity types and relations. We give an [overview](#bootleg-overview) of how Bootleg achieves this below. For details, please see our [paper](http://arxiv.org/abs/2010.10363).
 
 Note that Bootleg is *actively under development* and feedback is welcome. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
 
@@ -40,28 +40,19 @@ or
 conda install pytorch==1.5.0 torchvision==0.6.0 cudatoolkit=10.1 -c pytorch
 ```
 ## Models
-We have four different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [benchmark](tutorials/benchmark_tutorial.ipynb) tutorial and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
+We have six different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [benchmark](tutorials/benchmark_tutorial.ipynb) tutorial and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
 
-- [Bootleg](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz): our SotA benchmark model.
-- [BootlegMini](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz): our SotA benchmark model only using the entity embeddings of the 5% most popular entities. As we show in our [paper](http://arxiv.org/abs/2010.10363), this dramatically reduces the memory usage without any significant loss in performance.
-- [BootlegSimple](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple.tar.gz): Bootleg with type, relation, and entity information but without our benchmark model's title embeddings and page co-occurrence statistic.
-- [BootlegSimpleMini](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple_mini.tar.gz): our BootlegSimple model using the entity embeddings of the 5% most popular entities.
-- [BootlegType](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz): Bootleg trained with _only_ type information.
-- [BootlegKG](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_kg.tar.gz): Bootleg trained with _only_ knowledge graph relation information.
-
+| Model             | Description                     | Number Parameters | Link     |
+|-------------------|---------------------------------|-------------------|----------|
+| Bootleg           | All entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 1.38B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz) |
+| BootlegMini       | Top 5 entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 84M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz) | 
+| BootlegSimple     | All entity embeddings with type and KG embeddings.   | 1.37B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple.tar.gz) |
+| BootlegSimpleMini | Top 5 entity embeddings with type and KG embeddings. | 82M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple_mini.tar.gz) |
+| BootlegType       | Type embeddings.                                     | 13M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz) |
+| BootlegKG         | KG embeddings.                                       | 9M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_kg.tar.gz) |
+    
 ## Tutorials
-We provide five tutorials to help users get familiar with Bootleg:
-### Training
-- [basic training](tutorials/basic_training_tutorial.md): learn how to train a Bootleg model on new data, including formatting data, preprocessing data, and training with a sample dataset.
-- [advanced training](tutorials/advanced_training_tutorial.md): learn how to use distributed training to train a Bootleg model on the full English Wikipedia dump (over 50 million sentences!).
-### Inference
-- [benchmark](tutorials/benchmark_tutorial.ipynb): learn how to use a Bootleg model pretrained on Wikipedia to run inference on the standard RSS500 NED benchmark, where Bootleg must disambiguate pre-detected mentions in sentences.
-- [end-to-end](tutorials/end2end_ned_tutorial.ipynb): learn how to use Bootleg for end-to-end inference, starting from text data to detecting and labeling mentions. We also show how to use Bootleg for "on-the-fly" inference of individual sentences.
-### Embeddings for Downstream Tasks
-- [entity embeddings](tutorials/entity_embedding_tutorial.ipynb): learn how to use pretrained Bootleg models to generate contextual and static entity embeddings for use in downstream tasks.
-
-# Disambiguating at the Tail
-The challenge in disambiguation is how to handle tail entities---entities that occur infrequently, or not at all, in training data. Models that rely on textual co-occurrence patterns struggle to disambiguate the tail as tail entities are not seen enough times during training to learn associated textual cues. The key to disambiguating the tail is to leverage structural sources of information (e.g., type or knowledge graph (KG)) that is readily available for the tail (see left panel below for example). In fact, 75% of all entities in Wikidata that are *not* in Wikipedia have type or KG information. Bootleg incorporates both textual and structural information to perform disambiguation, as described next.
+We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
 
 # Bootleg Overview
 Given an input sentence, Bootleg takes the sentence and outputs a predicted entity for each detected mention. Bootleg first extracts mentions in the
@@ -104,4 +95,4 @@ Given a pretrained model, we support three types of inference: `--mode eval`, `-
 We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](tutorials/basic_training_tutorial.md) and [Advanced Training](tutorials/advanced_training_tutorial.md) tutorials for more information and sample data!
 
 ## Downstream Tasks
-Bootleg produces contextual entity embeddings (as well as learned static embeddings) that can be used in downstream tasks, such as relation extraction and question answering. Check out the [Entity Embedding tutorial](tutorials/entity_embedding_tutorial.ipynb) on how to generate Bootleg embeddings. *Code examples with Bootleg embeddings in downstream models are coming soon!*
+Bootleg produces contextual entity embeddings (as well as learned static embeddings) that can be used in downstream tasks, such as relation extraction and question answering. Check out the [tutorial](tutorials) to see how this is done.

@@ -29,7 +29,7 @@ def main():
 
     max_alias_len = -1
     for alias in alias2qids:
-        assert alias.islower(), 'bootleg assumes lowercase aliases in alias candidate maps'
+        assert alias.lower() == alias, f'bootleg assumes lowercase aliases in alias candidate maps: {alias}'
         # ensure only max_candidates per alias
         qids = sorted(alias2qids[alias],
             key = lambda x: (x[1], x[0]), reverse=True)
@@ -42,6 +42,7 @@ def main():
         alias_cand_map_file=args.alias_cand_map_file)
 
     entity_mappings.dump(os.path.join(args.entity_dir, args.entity_map_dir))
+    print('entity mappings exported.')
 
 if __name__ == '__main__':
     main()
