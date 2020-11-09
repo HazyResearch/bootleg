@@ -397,6 +397,7 @@ def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
             ctx_emb_ids = []
             entity_ids = []
             probs = []
+            cands = []
             cand_probs = []
             entity_cands_qid = map_aliases_to_candidates(train_in_candidates, entity_dump, aliases)
             # eid is entity id
@@ -412,10 +413,12 @@ def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
                 qid = entity_cands_qid[al_idx][pred_cand]
                 qids.append(qid)
                 probs.append(prob)
+                cands.append(list(entity_cands_qid[al_idx]))
                 cand_probs.append(list(cand_prob))
                 entity_ids.append(eid)
             line['qids'] = qids
             line['probs'] = probs
+            line['cands'] = cands
             line['cand_probs'] = cand_probs
             line['entity_ids'] = entity_ids
             if dump_embs:
