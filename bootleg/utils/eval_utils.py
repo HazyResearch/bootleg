@@ -564,15 +564,24 @@ def write_data_labels_hlp(args):
                 assert sent_idx_key in sent_idx_map_global, f'Dumped prediction data does not match data file. Can not find {sent_idx} - {al_idx}'
                 emb_idx = sent_idx_map_global[sent_idx_key][0][0]
                 ctx_emb_ids.append(emb_idx)
+
                 prob = filt_emb_data_global[emb_idx]['final_loss_prob']
                 cand_prob = filt_emb_data_global[emb_idx]['final_loss_cand_probs']
                 pred_cand = filt_emb_data_global[emb_idx]['final_loss_pred']
+                
+                # sort predicted cands based on cand_probs
+                packed_list = zip(cand_prob, entity_cands_eid[al_idx], entity_cands_qid[al_idx])
+                
+                packed_list_sorted = sorted(packed_list, key=lambda tup: tup[0], reverse=True)
+
+                cand_prob, cand_entity_id, cand_qid = list(zip(*packed_list_sorted))
+                
                 eid = entity_cands_eid[al_idx][pred_cand]
                 entity_ids.append(eid)
-                cand_entity_ids.append(entity_cands_eid[al_idx])
+                cand_entity_ids.append(cand_entity_id)
                 qid = entity_cands_qid[al_idx][pred_cand]
                 qids.append(qid)
-                cand_qids.append(entity_cands_qid[al_idx])
+                cand_qids.append(cand_qid)
                 probs.append(prob)
                 cands.append(list(entity_cands_qid[al_idx]))
                 cand_probs.append(list(cand_prob))
