@@ -8,7 +8,7 @@
 # Self-Supervision for Named Entity Disambiguation at the Tail
 Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of entities that occur infrequently, or not at all, in training data. We call these entities *tail* entities. This is a critical task as the majority of entities are rare. The core insight behind Bootleg is that these tail entities can be disambiguated by reasoning over entity types and relations. We give an [overview](#bootleg-overview) of how Bootleg achieves this below. For details, please see our [blog post](https://hazyresearch.stanford.edu/bootleg_blog) and [paper](http://arxiv.org/abs/2010.10363).
 
-Note that Bootleg is *actively under development* and feedback is welcome. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
+Note that Bootleg is *actively under development* and feedback is welcome. We have not done extensive tuning or parameter sweeps of our models and have mainly been focused on capturing the right inductive biases through the model and dataflow. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
 
 # Getting Started
 
