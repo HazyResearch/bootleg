@@ -33,7 +33,7 @@ class SliceHeadsSBL(nn.Module):
     Slice heads class (modified from https://github.com/snorkel-team/snorkel/tree/master/snorkel/slicing).
 
     Implements slice-based learning module which acts as a cheap mixture of experts (https://arxiv.org/abs/1909.06349). Each user defined slice
-    gets its own extra representation for specialize on a slice. There is also a base slice that is all examples. The representaitons from
+    gets its own extra representation for specialize on a slice. There is also a base slice that is all examples. The representations from
     each head are merged and sent through MLP to be scored for final loss.
 
     Attributes:
