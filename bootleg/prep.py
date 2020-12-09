@@ -10,6 +10,7 @@ import logging
 import jsonlines
 import pickle
 from collections import defaultdict
+import warnings
 
 from bootleg.symbols.alias_entity_table import AliasEntityTable
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -22,12 +23,7 @@ from bootleg.utils.data_utils import generate_save_data_name, load_wordsymbols, 
 from bootleg.utils.parser_utils import get_full_config
 from bootleg.utils.utils import import_class
 
-"""
-This file preps all data, slices, and embeddings needed to train a disambiguation model.
-We additionally batch prep embeddings per data sample if the 'batch_prep' flag is used in the embedding (prep is called fist)
-(e.g. which candidates in this sentence share a relation with the other candidates in the sentence).
-Memory mapped files are used for the main data and batch_prepped_embedding_data.
-"""
+warnings.filterwarnings("ignore", message="Could not import the lzma module. Your installed Python is incomplete. Attempting to use lzma compression will result in a RuntimeError.")
 
 #===========================================#
 # Helpers functions for multiprocessing (_helper)
@@ -42,7 +38,7 @@ def get_entities(args):
     num_aliases_with_pad = len(entity_symbols.get_all_aliases()) + 1
     return entity_symbols, num_cands_K, num_aliases_with_pad
 
-def prep_all_embs(args):
+def prep_all_embs(args, logger):
     entity_symbols = EntitySymbols(load_dir=os.path.join(args.data_config.entity_dir, args.data_config.entity_map_dir),
         alias_cand_map_file=args.data_config.alias_cand_map)
     word_symbols = load_wordsymbols(args.data_config)
@@ -50,12 +46,12 @@ def prep_all_embs(args):
         mod, load_class = import_class("bootleg.embeddings", emb.load_class)
         try:
             getattr(mod, load_class).prep(main_args=args, emb_args=emb['args'],
-                entity_symbols=entity_symbols, word_symbols=word_symbols, log_func=logging.debug)
+                entity_symbols=entity_symbols, word_symbols=word_symbols, log_func=logger.debug)
         except AttributeError:
-            logging.debug(f'No prep method found for {emb.load_class}')
+            logger.debug(f'No prep method found for {emb.load_class}')
 
-def chunk_text_data(args, input_src, chunk_prep_dir):
-    logging.debug(f"Reading in {input_src}")
+def chunk_text_data(args, input_src, chunk_prep_dir, logger):
+    logger.debug(f"Reading in {input_src}")
     start = time.time()
     # get number of lines
     num_lines = 0
@@ -64,8 +60,8 @@ def chunk_text_data(args, input_src, chunk_prep_dir):
             for line in in_file:
                 num_lines += 1
         except Exception as e:
-            logging.error("ERROR READING IN TRAINING DATA")
-            logging.error(e)
+            logger.error("ERROR READING IN TRAINING DATA")
+            logger.error(e)
             return []
 
     # compute number of chunks
@@ -105,7 +101,7 @@ def chunk_text_data(args, input_src, chunk_prep_dir):
     out_file.close()
     metadata = {'chunks': chunk_list, 'chunksize': chunk_size}
     utils.dump_json_file(os.path.join(chunk_prep_dir, 'metadata.json'), metadata)
-    logging.debug(f'Wrote out data chunks in {round(time.time() - start, 2)}s')
+    logger.debug(f'Wrote out data chunks in {round(time.time() - start, 2)}s')
 
 def generate_data_subsent_helper(input_args):
     args = input_args['args']
@@ -145,6 +141,7 @@ def generate_data_subsent_helper(input_args):
                 assert len(aliases) == len(anchor)
                 assert all(isinstance(a, bool) for a in anchor)
                 all_false_anchors = all([a is False for a in anchor])
+
             # checks that filtering was done correctly
             for alias in aliases:
                 assert (alias in entity_symbols.get_all_aliases()), f"alias {alias} is not in entity_symbols"
@@ -159,7 +156,7 @@ def generate_data_subsent_helper(input_args):
             # Happens if use weak labels is False
             if len(aliases) == 0:
                 dropped_lines += 1
-                # logging.warning(f'Dropping sentence. There are no aliases to predict for {line}.')
+                # logger.warning(f'Dropping sentence. There are no aliases to predict for {line}.')
                 continue
             # Extract the subphrase in the sentence
             # idxs_arr is list of lists of indexes of qids, aliases, spans that are part of each subphrase
@@ -172,7 +169,7 @@ def generate_data_subsent_helper(input_args):
             # aliases_to_predict_per_split = [0,1,2,3,4,5,6,7] and [3,4,5,6,7,8,9]
             # These are indexes into the idx_arr (the first aliases to be scored in the second list is idx = 3, representing the 8th aliases in
             # the original sequence.
-            idxs_arr, aliases_to_predict_per_split, spans_arr, phrase_tokens_arr = sentence_utils.split_sentence(max_aliases=data_args.max_aliases,
+            idxs_arr, aliases_to_predict_per_split, spans_arr, phrase_tokens_arr, phrase_tokens_pos_arr = sentence_utils.split_sentence(max_aliases=data_args.max_aliases,
                                                                                                               phrase=phrase, spans=spans,
                                                                                                               aliases=aliases,
                                                                                                               aliases_seen_by_model=aliases_seen_by_model,
@@ -211,6 +208,7 @@ def generate_data_subsent_helper(input_args):
 def process_data_subsent_helper(input_args):
     args = input_args['args']
     dataset_is_eval = input_args['dataset_is_eval']
+    is_bert = input_args['is_bert']
     data_args = args.data_config
     in_file = input_args['in_file']
     mmap_file_name = input_args['out_file']
@@ -247,6 +245,7 @@ def process_data_subsent_helper(input_args):
             # used to keep track of original alias index in the list
             for idx, (alias, span_idx, qid, alias_pos) in enumerate(zip(aliases, spans, qids, alias_list_pos)):
                 span_start_idx,  span_end_idx = span_idx
+                assert span_end_idx <= data_args.max_word_token_len + 2*is_bert, f"{span_end_idx} is beyond max len {data_args.max_word_token_len + 2*is_bert}. Note 2 extra seq len added if bert tokenizer"
                 # generate indexes into alias table.
                 alias_trie_idx = entity_symbols.get_alias_idx(alias)
                 alias_qids = np.array(entity_symbols.get_qid_cands(alias))
@@ -268,11 +267,7 @@ def process_data_subsent_helper(input_args):
                 example_aliases[idx:idx+1] = alias_trie_idx
                 example_aliases_locs_start[idx:idx+1] = span_start_idx
                 # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
-                example_aliases_locs_end[idx:idx+1] = span_end_idx-1
-                # If the final token is greater than the sentence length, truncate it. This happens due to windowing which enusre that start is within
-                # the max token len. These edge aliases are scored in another subsent.
-                if example_aliases_locs_end[idx:idx+1] >= data_args.max_word_token_len:
-                    example_aliases_locs_end[idx:idx+1] = data_args.max_word_token_len-1
+                example_aliases_locs_end[idx:idx + 1] = span_end_idx - 1
                 example_alias_list_pos[idx:idx+1] = alias_pos
                 # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence and need to only predict subsets
                 if idx in aliases_to_predict:
@@ -347,7 +342,6 @@ def generate_slice_data_helper(input_args):
                 slices[FINAL_LOSS] = {str(i):1.0 for i in range(len(aliases)) if anchor[i] is True}
             else:
                 slices[FINAL_LOSS] = {str(i):1.0 for i in range(len(aliases))}
-
             # If not use_weak_label, only the anchor is True aliases will be given to the model
             # We must re-index alias to predict to be in terms of anchors == True
             # Ex: anchors = [F, T, T, F, F, T]
@@ -365,7 +359,7 @@ def generate_slice_data_helper(input_args):
                 # This is because the indexing will change when we remove False anchors (see comment example above)
                 slices = data_utils.correct_not_augmented_dict_values(anchor, slices)
                 max_cands_per_alias = data_utils.correct_not_augmented_max_cands(anchor, max_cands_per_alias)
-            # logging.debug(line, slices)
+            # logger.debug(line, slices)
             # Remove slices that have no aliases to predict
             for slice_name in list(slices.keys()):
                 if len(slices[slice_name]) <= 0:
@@ -504,13 +498,13 @@ def process_emb_helper(input_args):
 # Parent functions of multiprocesses
 #===========================================#
 
-def generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir, predata_prep_dir):
-    logging.debug('Starting to extract subsentences')
+def generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir, predata_prep_dir, logger):
+    logger.debug('Starting to extract subsentences')
     start = time.time()
     chunk_metadata = utils.load_json_file(os.path.join(chunk_prep_dir, 'metadata.json'))
     num_chunks = len(chunk_metadata['chunks'])
     num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()))
-    logging.debug("Parallelizing with " + str(num_processes) + " threads.")
+    logger.debug("Parallelizing with " + str(num_processes) + " threads.")
     sent_file_path = os.path.join(predata_prep_dir, 'sent_chunk')
     out_files = [f'{sent_file_path}_{i}.jsonl' for i in range(num_chunks)]
     all_process_args = [{'chunk_idx': i,
@@ -533,11 +527,11 @@ def generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir,
         idx += data_len
     metadata = {'chunks': chunks, 'total_num_exs': idx}
     utils.dump_json_file(os.path.join(predata_prep_dir, 'metadata.json'), metadata)
-    logging.debug(f'Extracted {idx} sub-sentences in {round(time.time() - start,2)}s')
+    logger.debug(f'Extracted {idx} sub-sentences in {round(time.time() - start,2)}s')
 
 
-def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval):
-    logging.debug('Building data chunks...')
+def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval, logger):
+    logger.debug('Building data chunks...')
     start = time.time()
     chunk_metadata = utils.load_json_file(os.path.join(predata_prep_dir, 'metadata.json'))
     num_chunks = len(chunk_metadata['chunks'])
@@ -545,7 +539,7 @@ def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, da
     is_bert = load_wordsymbols(args.data_config).is_bert
 
     num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()))
-    logging.debug("Parallelizing with " + str(num_processes) + " threads.")
+    logger.debug("Parallelizing with " + str(num_processes) + " threads.")
 
     num_aliases_M = args.data_config.max_aliases
     # i1 is 8-bit ints, i2 is 16-bit ints, i4 is 32-bit ints, i8 is 64-bit ints
@@ -572,6 +566,7 @@ def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, da
     all_process_args = [{'chunk_idx': i,
                         'args': args,
                         'dataset_is_eval': dataset_is_eval,
+                        'is_bert': is_bert,
                         'in_file': chunk_metadata['chunks'][i]['path'],
                         'len': chunk_metadata['chunks'][i]['len'],
                         'start_idx':  chunk_metadata['chunks'][i]['start_idx'],
@@ -586,10 +581,10 @@ def process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, da
     # emb data
     metadata = {'data_file': dataset_name, 'storage_type': storage_type, 'total_num_exs': chunk_metadata['total_num_exs'], 'chunks': chunk_metadata['chunks']}
     utils.dump_json_file(os.path.join(data_prep_dir, 'metadata.json'), metadata)
-    logging.debug(f'Finished building chunks in {round(time.time() - start,2)}s')
+    logger.debug(f'Finished building chunks in {round(time.time() - start,2)}s')
 
-def generate_slice_data(args, use_weak_label, dataset_is_eval, chunk_prep_dir, slice_prep_dir):
-    logging.debug('Starting to extract slice data')
+def generate_slice_data(args, use_weak_label, dataset_is_eval, chunk_prep_dir, slice_prep_dir, logger):
+    logger.debug('Starting to extract slice data')
     start = time.time()
 
     chunk_metadata = utils.load_json_file(os.path.join(chunk_prep_dir, 'metadata.json'))
@@ -602,7 +597,7 @@ def generate_slice_data(args, use_weak_label, dataset_is_eval, chunk_prep_dir, s
         assert BASE_SLICE in slice_names
 
     num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()))
-    logging.debug("Parallelizing with " + str(num_processes) + " threads.")
+    logger.debug("Parallelizing with " + str(num_processes) + " threads.")
     slice_file_path = os.path.join(slice_prep_dir, 'slice_chunk')
     out_files = [f'{slice_file_path}_{i}.jsonl' for i in range(num_chunks)]
     all_process_args = [{'chunk_idx': i,
@@ -633,8 +628,8 @@ def generate_slice_data(args, use_weak_label, dataset_is_eval, chunk_prep_dir, s
         global_max_a2p = max(max_a2p, global_max_a2p)
         global_max_sent_idx = max(max_sent_idx, global_max_sent_idx)
         global_max_cands = max(max_cands, global_max_cands)
-    logging.debug(f"Max aliases2predict GLOBAL is {global_max_a2p}")
-    logging.debug(f"Max sentidx GLOBAL is {global_max_sent_idx}")
+    logger.debug(f"Max aliases2predict GLOBAL is {global_max_a2p}")
+    logger.debug(f"Max sentidx GLOBAL is {global_max_sent_idx}")
     metadata = {'chunks': chunks,
         'total_num_exs': idx,
         'max_a2p': global_max_a2p,
@@ -642,10 +637,10 @@ def generate_slice_data(args, use_weak_label, dataset_is_eval, chunk_prep_dir, s
         'max_sent_idx': global_max_sent_idx,
         'slice_names': slice_names}
     utils.dump_json_file(os.path.join(slice_prep_dir, 'metadata.json'), metadata)
-    logging.debug(f'Extracted {idx} slice data in {round(time.time() - start,2)}s')
+    logger.debug(f'Extracted {idx} slice data in {round(time.time() - start,2)}s')
 
-def process_slice_data(args, dataset_name, sent_idx_file, slice_prep_dir, slice_final_prep_dir):
-    logging.debug('Building slice indices...')
+def process_slice_data(args, dataset_name, sent_idx_file, slice_prep_dir, slice_final_prep_dir, logger):
+    logger.debug('Building slice indices...')
     start = time.time()
     chunk_metadata = utils.load_json_file(os.path.join(slice_prep_dir, 'metadata.json'))
     num_chunks = len(chunk_metadata['chunks'])
@@ -655,7 +650,7 @@ def process_slice_data(args, dataset_name, sent_idx_file, slice_prep_dir, slice_
     slice_names = chunk_metadata['slice_names']
     total_num_exs = chunk_metadata['total_num_exs']
     num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()))
-    logging.debug("Parallelizing with " + str(num_processes) + " threads.")
+    logger.debug("Parallelizing with " + str(num_processes) + " threads.")
 
     # Create shared memory mapped file for saving slice indices
     # For each row in the dataset, we have a slice_dt object for each slice in slice_names
@@ -688,14 +683,14 @@ def process_slice_data(args, dataset_name, sent_idx_file, slice_prep_dir, slice_
     pool.close()
     pool.join()
     # save metadata
-    logging.debug(f'Finished building slice indices in {round(time.time() - start,2)}s')
+    logger.debug(f'Finished building slice indices in {round(time.time() - start,2)}s')
     return storage_type
 
-def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_aliases_with_pad):
+def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_aliases_with_pad, logger):
     # want to reuse objects that have been prepped at this point
     orig_preprocessed_val = args.data_config.overwrite_preprocessed_data
     args.data_config.overwrite_preprocessed_data = False
-    logging.debug('Preprocessing embeddings for the data...')
+    logger.debug('Preprocessing embeddings for the data...')
     start = time.time()
     # open memory mapped file for data -- needed for candidates
     data_metadata = utils.load_json_file(os.path.join(data_prep_dir, 'metadata.json'))
@@ -716,7 +711,7 @@ def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_
             assert "dtype" in emb, f"You need the dtype key for {emb} in the embedding config: \"dtype:\" (int16, float,...) for batch_prep to occur."
             shape = (data_metadata['total_num_exs'],num_aliases_M*num_candidates_K*emb.dim)
             dtype = emb.dtype
-            logging.debug(f"Setting dtype of {emb.key} to {dtype}")
+            logger.debug(f"Setting dtype of {emb.key} to {dtype}")
             batch_prep_file_name = f'{os.path.splitext(data_file)[0]}_{emb.key}_{dtype}.pt'
             mmap_file = np.memmap(batch_prep_file_name, dtype=dtype, mode='w+', shape=shape)
             batch_prepped_emb_data[emb.key]['dtype'] = dtype
@@ -724,11 +719,11 @@ def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_
             batch_prepped_emb_data[emb.key]['file_name'] = batch_prep_file_name
 
     # make sure embeddings to batch_prep have been prepped
-    prep_all_embs(args)
+    prep_all_embs(args, logger=logger)
 
     # call subprocesses
     num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()))
-    logging.debug("Parallelizing with " + str(num_processes) + " threads.")
+    logger.debug("Parallelizing with " + str(num_processes) + " threads.")
 
     all_process_args = [{'chunk_idx': i,
                         'args': args,
@@ -755,12 +750,12 @@ def process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K, num_
 
     metadata = {'batch_prepped_files': batch_prepped_emb_data, 'total_num_exs': data_metadata['total_num_exs'], 'data_config': batch_prepped_data_config_file}
     utils.dump_json_file(os.path.join(data_feats_prep_dir, 'metadata.json'), metadata)
-    logging.debug(f'Finished batch prepping embs in {round(time.time() - start,2)}s')
+    logger.debug(f'Finished batch prepping embs in {round(time.time() - start,2)}s')
     # revert back args
     args.data_config.overwrite_preprocessed_data = orig_preprocessed_val
 
-def get_idx_mapping(data_prep_dir, dataset_name):
-    logging.debug('Getting sentence to data idx mapping')
+def get_idx_mapping(data_prep_dir, dataset_name, logger):
+    logger.debug('Getting sentence to data idx mapping')
     start = time.time()
     data_metadata = json.load(open(os.path.join(data_prep_dir, 'metadata.json'), 'r'))
     storage_type = [tuple(type) for type in data_metadata['storage_type']]
@@ -774,13 +769,13 @@ def get_idx_mapping(data_prep_dir, dataset_name):
             sent_idx_to_idx[row['sent_idx']] = [id]
     sent_idx_file = os.path.splitext(dataset_name)[0] + "_sent_idx.json"
     utils.dump_json_file(sent_idx_file, sent_idx_to_idx)
-    logging.debug(f'Finished mapping in {round(time.time() - start,2)}s')
+    logger.debug(f'Finished mapping in {round(time.time() - start,2)}s')
 
 #===========================================#
 # Main prep functions
 #===========================================#
 
-def prep_data(args, use_weak_label, dataset_is_eval, input_src='', chunk_data=True, ext_subsent=True, build_data=True, batch_prep_embeddings=True,
+def prep_data(args, use_weak_label, dataset_is_eval, logger, input_src='', chunk_data=True, ext_subsent=True, build_data=True, batch_prep_embeddings=True,
     prep_dir='', dataset_name='', keep_all=False):
     data_tag = os.path.splitext(os.path.basename(dataset_name))[0]
     chunk_prep_dir = f'{prep_dir}/{data_tag}/chunks'
@@ -798,33 +793,33 @@ def prep_data(args, use_weak_label, dataset_is_eval, input_src='', chunk_data=Tr
 
     entity_symbols, num_cands_K, num_aliases_with_pad = get_entities(args)
     AliasEntityTable.prep(args, entity_symbols, num_cands_K=num_cands_K, num_aliases_with_pad=num_aliases_with_pad,
-    log_func=logging.debug)
+    log_func=logger.debug)
 
     # Chunk text into multiple files
     if chunk_data or run_all:
-        chunk_text_data(args, input_src, chunk_prep_dir)
+        chunk_text_data(args, input_src, chunk_prep_dir, logger=logger)
 
     # Extract subsentences
     if ext_subsent or run_all:
-        generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir, predata_prep_dir)
+        generate_data_subsent(args, use_weak_label, dataset_is_eval, chunk_prep_dir, predata_prep_dir, logger=logger)
 
     # Build data arrays
     if build_data or run_all:
         # dataset name needed for optional dumping of filtered data
-        process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval)
+        process_data_subsent(args, predata_prep_dir, data_prep_dir, dataset_name, dataset_is_eval, logger=logger)
 
         # Get sentence idx mapping to be able to subsample slices
-        get_idx_mapping(data_prep_dir, dataset_name)
+        get_idx_mapping(data_prep_dir, dataset_name, logger=logger)
 
     # Preprocess embeddings
     if batch_prep_embeddings or run_all:
-        process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K=num_cands_K, num_aliases_with_pad=num_aliases_with_pad)
+        process_emb(args, data_prep_dir, data_feats_prep_dir, num_candidates_K=num_cands_K, num_aliases_with_pad=num_aliases_with_pad, logger=logger)
 
     # TODO: way to check for existence to decide to skip a step?
     # TODO: clean up and remove unnecessary files -- leave metadata?
     # by default we remove the data chunks
     if not keep_all:
-        logging.debug('Cleaning up and removing chunk files...')
+        logger.debug('Cleaning up and removing chunk files...')
         text_chunk_files = glob.glob(f'{chunk_prep_dir}/*jsonl')
         for file in text_chunk_files:
             os.remove(file)
@@ -838,8 +833,8 @@ def prep_data(args, use_weak_label, dataset_is_eval, input_src='', chunk_data=Tr
             os.remove(file)
 
 def prep_slice(args, file, use_weak_label, dataset_is_eval, dataset_name,
-    sent_idx_file, storage_config, keep_all=False):
-    logging.debug(f'Prepping slice {file} ...')
+    sent_idx_file, storage_config, logger, keep_all=False):
+    logger.debug(f'Prepping slice {file} ...')
     prep_dir = get_data_prep_dir(args)
     data_tag = os.path.splitext(os.path.basename(dataset_name))[0]
     chunk_prep_dir = f'{prep_dir}/{data_tag}/chunks'
@@ -852,22 +847,23 @@ def prep_slice(args, file, use_weak_label, dataset_is_eval, dataset_name,
     # TODO: check if chunked data already exists first, reuse one from main dataset?
     # chunk text data
     chunk_text_data(args=args, input_src=os.path.join(args.data_config.data_dir, file),
-        chunk_prep_dir=chunk_prep_dir)
+        chunk_prep_dir=chunk_prep_dir, logger=logger)
 
     # update slice data
     generate_slice_data(args=args, use_weak_label=use_weak_label, dataset_is_eval=dataset_is_eval,
-        chunk_prep_dir=chunk_prep_dir, slice_prep_dir=slice_prep_dir)
+        chunk_prep_dir=chunk_prep_dir, slice_prep_dir=slice_prep_dir, logger=logger)
 
     # save slice data into memory mapped file
     storage_type = process_slice_data(args=args, dataset_name=dataset_name,
-        sent_idx_file=sent_idx_file, slice_prep_dir=slice_prep_dir, slice_final_prep_dir=slice_final_prep_dir)
+        sent_idx_file=sent_idx_file, slice_prep_dir=slice_prep_dir, slice_final_prep_dir=slice_final_prep_dir,
+        logger=logger)
     # save storage type file
     np.save(storage_config, storage_type, allow_pickle=True)
 
-    logging.debug("Done prepping slice")
+    logger.debug("Done prepping slice")
 
     if not keep_all:
-        logging.debug('Cleaning up and removing chunk files...')
+        logger.debug('Cleaning up and removing chunk files...')
         text_chunk_files = glob.glob(f'{chunk_prep_dir}/*jsonl')
         for file in text_chunk_files:
             os.remove(file)
@@ -892,7 +888,7 @@ def main():
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % args.run_config.loglevel)
     logging.basicConfig(level=numeric_level, format='%(asctime)s %(message)s')
-    log = logging.getLogger()
+    logger = logging.getLogger()
 
     prep_dir = get_data_prep_dir(args)
     utils.ensure_dir(prep_dir)
@@ -901,26 +897,27 @@ def main():
 
     fh = logging.FileHandler(log_name, mode='w')
     fh.setFormatter(formatter)
-    log.addHandler(fh)
+    logger.addHandler(fh)
 
     # Dump command line arguments
-    logging.debug("Machine: " + os.uname()[1])
-    logging.debug("CMD: python " + " ".join(sys.argv))
+    logger.debug("Machine: " + os.uname()[1])
+    logger.debug("CMD: python " + " ".join(sys.argv))
 
     # Prep embs first since they may be used for batch prepping when preparing datasets
     if args.prep_config.prep_embs:
-        logging.info('Prepping embs...')
+        logger.info('Prepping embs...')
         start = time.time()
-        prep_all_embs(args)
-        logging.info(f'Done prepping embs in {round(time.time() - start, 2)}s!')
+        prep_all_embs(args, logger=logger)
+        logger.info(f'Done prepping embs in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_train:
-        logging.info('Prepping train...')
+        logger.info('Prepping train...')
         dataset = generate_save_data_name(
             data_args=args.data_config,
             use_weak_label=args.data_config.train_dataset.use_weak_label,
             split_name=os.path.splitext(args.data_config.train_dataset.file)[0])
         prep_data(args, use_weak_label=args.data_config.train_dataset.use_weak_label, dataset_is_eval=False,
+            logger=logger,
             input_src=os.path.join(args.data_config.data_dir, args.data_config.train_dataset.file),
             chunk_data=args.prep_config.chunk_data,
             ext_subsent=args.prep_config.ext_subsent,
@@ -928,17 +925,18 @@ def main():
             batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
             prep_dir=prep_dir,
             dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped {args.data_config.train_dataset.file}.')
-        logging.info(f'Done with train prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped {args.data_config.train_dataset.file}.')
+        logger.info(f'Done with train prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_dev:
-        logging.info('Prepping dev...')
+        logger.info('Prepping dev...')
         start = time.time()
         dataset = generate_save_data_name(
             data_args=args.data_config,
             use_weak_label=args.data_config.dev_dataset.use_weak_label,
             split_name=os.path.splitext(args.data_config.dev_dataset.file)[0])
         prep_data(args, use_weak_label=args.data_config.dev_dataset.use_weak_label, dataset_is_eval=True,
+              logger=logger,
               input_src=os.path.join(args.data_config.data_dir, args.data_config.dev_dataset.file),
               chunk_data=args.prep_config.chunk_data,
               ext_subsent=args.prep_config.ext_subsent,
@@ -946,17 +944,18 @@ def main():
               batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
               prep_dir=prep_dir,
               dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped {args.data_config.dev_dataset.file}')
-        logging.info(f'Done with dev prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped {args.data_config.dev_dataset.file}')
+        logger.info(f'Done with dev prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_test:
-        logging.info('Prepping test...')
+        logger.info('Prepping test...')
         start = time.time()
         dataset = generate_save_data_name(
             data_args=args.data_config,
             use_weak_label=args.data_config.test_dataset.use_weak_label,
             split_name=os.path.splitext(args.data_config.test_dataset.file)[0])
         prep_data(args, use_weak_label=args.data_config.test_dataset.use_weak_label, dataset_is_eval=True,
+              logger=logger,
               input_src=os.path.join(args.data_config.data_dir, args.data_config.test_dataset.file),
               chunk_data=args.prep_config.chunk_data,
               ext_subsent=args.prep_config.ext_subsent,
@@ -964,11 +963,11 @@ def main():
               batch_prep_embeddings=args.prep_config.batch_prep_embeddings,
               prep_dir=prep_dir,
               dataset_name=os.path.join(prep_dir, dataset), keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped {args.data_config.test_dataset.file}')
-        logging.info(f'Done with test prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped {args.data_config.test_dataset.file}')
+        logger.info(f'Done with test prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_train_slices:
-        logging.info('Prepping train slices...')
+        logger.info('Prepping train slices...')
         start = time.time()
         dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.train_dataset.use_weak_label,
             split_name="slice_" + os.path.splitext(args.data_config.train_dataset.file)[0],
@@ -978,13 +977,13 @@ def main():
         sent_idx_to_idx_file = os.path.join(prep_dir, data_utils.get_sent_idx_file(dataset_name))
         prep_slice(args, args.data_config.train_dataset.file, args.data_config.train_dataset.use_weak_label,
             dataset_is_eval=False, dataset_name=full_dataset_name,
-            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
+            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name, logger=logger,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped slices from {args.data_config.train_dataset.file} to {full_dataset_name}.')
-        logging.info(f'Done with train slice prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped slices from {args.data_config.train_dataset.file} to {full_dataset_name}.')
+        logger.info(f'Done with train slice prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_dev_eval_slices:
-        logging.info('Prepping dev slices...')
+        logger.info('Prepping dev slices...')
         start = time.time()
         dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.dev_dataset.use_weak_label,
             split_name="slice_" + os.path.splitext(args.data_config.dev_dataset.file)[0],
@@ -994,13 +993,13 @@ def main():
         sent_idx_to_idx_file = os.path.join(prep_dir, data_utils.get_sent_idx_file(dataset_name))
         prep_slice(args, args.data_config.dev_dataset.file, args.data_config.dev_dataset.use_weak_label,
             dataset_is_eval=True, dataset_name=full_dataset_name,
-            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
+            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name, logger=logger,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped slices from {args.data_config.dev_dataset} to {full_dataset_name}.')
-        logging.info(f'Done with dev slice prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped slices from {args.data_config.dev_dataset} to {full_dataset_name}.')
+        logger.info(f'Done with dev slice prep in {round(time.time() - start, 2)}s!')
 
     if args.prep_config.prep_test_eval_slices:
-        logging.info('Prepping test slices...')
+        logger.info('Prepping test slices...')
         start = time.time()
         dataset_name = data_utils.generate_slice_name(args, args.data_config, use_weak_label=args.data_config.test_dataset.use_weak_label,
             split_name="slice_" + os.path.splitext(args.data_config.test_dataset.file)[0],
@@ -1010,10 +1009,10 @@ def main():
         sent_idx_to_idx_file = os.path.join(prep_dir, data_utils.get_sent_idx_file(dataset_name))
         prep_slice(args, args.data_config.test_dataset.file, args.data_config.test_dataset.use_weak_label,
             dataset_is_eval=True, dataset_name=full_dataset_name,
-            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name,
+            sent_idx_file=sent_idx_to_idx_file, storage_config=config_dataset_name, logger=logger,
             keep_all=args.prep_config.keep_all)
-        logging.debug(f'Prepped slices from {args.data_config.test_dataset} to {full_dataset_name}.')
-        logging.info(f'Done with test slice prep in {round(time.time() - start, 2)}s!')
+        logger.debug(f'Prepped slices from {args.data_config.test_dataset} to {full_dataset_name}.')
+        logger.info(f'Done with test slice prep in {round(time.time() - start, 2)}s!')
 
 if __name__ == '__main__':
     main()

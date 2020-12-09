@@ -1,9 +1,15 @@
+import glob
+import multiprocessing
+import shutil
+import tempfile
 from collections import  OrderedDict
 
 import logging
 import jsonlines
 import numpy as np
 import os
+
+import ujson
 from sklearn.metrics import precision_recall_fscore_support
 from tabulate import tabulate
 import time
@@ -11,6 +17,7 @@ import torch
 from tqdm import tqdm
 
 from bootleg.symbols.constants import *
+from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import train_utils, utils
 
 import torch.nn.functional as F
@@ -205,32 +212,65 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
     Remember that if a sentence has all gold=False anchors, it's dropped and will not be seen
     If a subsplit of a sentence has all gold=False anchors, it will also be dropped and not seen
     """
+    num_processes = min(args.run_config.dataset_threads, int(multiprocessing.cpu_count()*0.9))
     # we only care about the entity embeddings for the final slice head
     eval_folder = train_utils.get_eval_folder(args, test_data_file)
     utils.ensure_dir(eval_folder)
 
     # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence indices for overflowing sentences)
     test_file_tag = test_data_file.split('.jsonl')[0]
-    entity_emb_file = os.path.join(eval_folder, f'{test_file_tag}_entity_embs.pt')
-    emb_file_config = entity_emb_file.split('.pt')[0] + '_config'
+    unmerged_entity_emb_file = os.path.join(eval_folder, f'{test_file_tag}_entity_embs.pt')
+    merged_entity_emb_file = os.path.join(eval_folder, f'{test_file_tag}_entity_embs_merged.pt')
+    emb_file_config = unmerged_entity_emb_file.split('.pt')[0] + '_config'
     M = args.data_config.max_aliases
     K = entity_symbols.max_candidates + (not args.data_config.train_in_candidates)
-    # TODO: fix extra dimension issue
     if dump_embs:
-        storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int), ('alias_list_pos', int, M), ('entity_emb', float, M*args.model_config.hidden_size),
-        ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M), ('final_loss_cand_probs', float, M*K)])
+        unmerged_storage_type = np.dtype([('M', int),
+                                          ('K', int),
+                                          ('hidden_size', int),
+                                          ('sent_idx', int),
+                                          ('subsent_idx', int),
+                                          ('alias_list_pos', int, M),
+                                          ('entity_emb', float, M*args.model_config.hidden_size),
+                                          ('final_loss_true', int, M),
+                                          ('final_loss_pred', int, M),
+                                          ('final_loss_prob', float, M),
+                                          ('final_loss_cand_probs', float, M*K)])
+        merged_storage_type = np.dtype([('hidden_size', int),
+                             ('sent_idx', int),
+                             ('alias_list_pos', int),
+                             ('entity_emb', float, args.model_config.hidden_size),
+                             ('final_loss_pred', int),
+                             ('final_loss_prob', float),
+                             ('final_loss_cand_probs', float, K)])
     else:
         # don't need to extract contextualized entity embedding
-        storage_type = np.dtype([('M', int), ('K', int), ('hidden_size', int), ('sent_idx', int), ('subsent_idx', int), ('alias_list_pos', int, M),
-                                 ('final_loss_true', int, M), ('final_loss_pred', int, M), ('final_loss_prob', float, M), ('final_loss_cand_probs', float, M*K)])
-    mmap_file = np.memmap(entity_emb_file, dtype=storage_type, mode='w+', shape=(len(dataloader.dataset),))
+        unmerged_storage_type = np.dtype([('M', int),
+                                          ('K', int),
+                                          ('hidden_size', int),
+                                          ('sent_idx', int),
+                                          ('subsent_idx', int),
+                                          ('alias_list_pos', int, M),
+                                          ('final_loss_true', int, M),
+                                          ('final_loss_pred', int, M),
+                                          ('final_loss_prob', float, M),
+                                          ('final_loss_cand_probs', float, M*K)])
+        merged_storage_type = np.dtype([('hidden_size', int),
+                             ('sent_idx', int),
+                             ('alias_list_pos', int),
+                             ('final_loss_pred', int),
+                             ('final_loss_prob', float),
+                             ('final_loss_cand_probs', float, K)])
+
+    mmap_file = np.memmap(unmerged_entity_emb_file, dtype=unmerged_storage_type, mode='w+', shape=(len(dataloader.dataset),))
     # Init sent_idx to -1 for debugging
     mmap_file[:]['sent_idx'] = -1
-    np.save(emb_file_config, storage_type, allow_pickle=True)
-    logger.debug(f'Created file {entity_emb_file} to save predictions.')
+    np.save(emb_file_config, unmerged_storage_type, allow_pickle=True)
+    logger.debug(f'Created file {unmerged_entity_emb_file} to save predictions.')
 
     start_idx = 0
     logger.info(f'{len(dataloader)*args.run_config.eval_batch_size} samples, {len(dataloader)} batches, {len(dataloader.dataset)} len dataset')
+    st = time.time()
     for i, batch in enumerate(dataloader):
         curr_batch_size = batch["sent_idx"].shape[0]
         end_idx = start_idx + curr_batch_size
@@ -265,25 +305,32 @@ def run_dump_preds(args, test_data_file, trainer, dataloader, logger, entity_sym
 
         start_idx += curr_batch_size
         if i % 100 == 0 and i != 0:
-            logger.info(f'Saved {i} batches of predictions')
+            logger.info(f'Saved {i} batches of predictions out of {len(dataloader)}')
 
     # restitch together and write data file
     result_file = os.path.join(eval_folder, args.run_config.result_label_file)
     logger.info(f'Writing predictions to {result_file}...')
-    filt_pred_data = merge_subsentences(os.path.join(args.data_config.data_dir, test_data_file),
-        mmap_file,
+    merge_subsentences(
+        num_processes,
+        os.path.join(args.data_config.data_dir, test_data_file),
+        merged_entity_emb_file,
+        merged_storage_type,
+        unmerged_entity_emb_file,
+        unmerged_storage_type,
         dump_embs=dump_embs)
-    sent_idx_map = get_sent_idx_map(filt_pred_data)
-
-    write_data_labels(filt_pred_data=filt_pred_data, data_file=os.path.join(args.data_config.data_dir, test_data_file), out_file=result_file,
-        sent_idx_map=sent_idx_map, entity_dump=entity_symbols, train_in_candidates=args.data_config.train_in_candidates, dump_embs=dump_embs)
-
+    st = time.time()
+    write_data_labels(num_processes=num_processes,
+        merged_entity_emb_file=merged_entity_emb_file, merged_storage_type=merged_storage_type,
+        data_file=os.path.join(args.data_config.data_dir, test_data_file), out_file=result_file,
+        train_in_candidates=args.data_config.train_in_candidates,
+        dump_embs=dump_embs, data_config=args.data_config)
     out_emb_file = None
     # save easier-to-use embedding file
     if dump_embs:
-        hidden_size = filt_pred_data[0]['hidden_size']
+        filt_emb_data = np.memmap(merged_entity_emb_file, dtype=merged_storage_type, mode="r+")
+        hidden_size = filt_emb_data[0]['hidden_size']
         out_emb_file = os.path.join(eval_folder, args.run_config.result_emb_file)
-        np.save(out_emb_file, filt_pred_data['entity_emb'].reshape(-1,hidden_size))
+        np.save(out_emb_file, filt_emb_data['entity_emb'].reshape(-1,hidden_size))
         logger.info(f'Saving contextual entity embeddings to {out_emb_file}')
     logger.info(f'Wrote predictions to {result_file}')
     return result_file, out_emb_file
@@ -313,7 +360,8 @@ def get_sent_start_map(data_file):
         for line in f:
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of aliases)
             assert line['sent_idx_unq'] not in sent_start_map, f'Sentence indices must be unique. {line["sent_idx_unq"]} already seen.'
-            sent_start_map[line['sent_idx_unq']] = total_num_mentions
+            # Save as string for Marisa Tri later
+            sent_start_map[str(line['sent_idx_unq'])] = total_num_mentions
             # We include false aliases for debugging (and alias_pos includes them)
             total_num_mentions += len(line['aliases'])
     # for k in sent_start_map:
@@ -322,40 +370,70 @@ def get_sent_start_map(data_file):
     return sent_start_map, total_num_mentions
 
 # stich embs back together over sub-sentences, convert from sent_idx array to (sent_idx, alias_idx) array with varying numbers of aliases per sentence
-# TODO: parallelize this
-def merge_subsentences(data_file, full_pred_data, dump_embs=False):
+def merge_subsentences(num_processes, data_file, to_save_file, to_save_storage, to_read_file, to_read_storage, dump_embs=False):
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Getting sentence mapping")
     sent_start_map, total_num_mentions = get_sent_start_map(data_file)
+    sent_start_map_file = tempfile.NamedTemporaryFile(suffix="bootleg_sent_start_map")
+    utils.create_single_item_trie(sent_start_map, out_file=sent_start_map_file.name)
+    logger.debug(f"Done with sentence mapping")
+
+    full_pred_data = np.memmap(to_read_file, dtype=to_read_storage, mode='r')
     M = int(full_pred_data[0]['M'])
     K = int(full_pred_data[0]['K'])
     hidden_size = int(full_pred_data[0]['hidden_size'])
-    if dump_embs:
-        storage_type = np.dtype([('hidden_size', int),
-                             ('sent_idx', int),
-                             ('alias_list_pos', int),
-                             ('entity_emb', float, hidden_size),
-                             ('final_loss_pred', int),
-                             ('final_loss_prob', float),
-                             ('final_loss_cand_probs', float, K)])
-    else:
-        storage_type = np.dtype([('hidden_size', int),
-                             ('sent_idx', int),
-                             ('alias_list_pos', int),
-                             ('final_loss_pred', int),
-                             ('final_loss_prob', float),
-                             ('final_loss_cand_probs', float, K)])
-    filt_emb_data = np.zeros(total_num_mentions, dtype=storage_type)
-    filt_emb_data['hidden_size'] = hidden_size
 
+    filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode='w+', shape=(total_num_mentions,))
+    filt_emb_data['hidden_size'] = hidden_size
     filt_emb_data['sent_idx'][:] = -1
     filt_emb_data['alias_list_pos'][:] = -1
 
+    chunk_size = int(np.ceil(len(full_pred_data)/num_processes))
+    all_ids = list(range(0, len(full_pred_data)))
+    row_idx_set_chunks = [all_ids[ids:ids+chunk_size] for ids in range(0, len(full_pred_data), chunk_size)]
+    input_args = [
+        [M, K, hidden_size, dump_embs, chunk]
+        for chunk in row_idx_set_chunks
+    ]
+
+    logger.info(f"Merging sentences together with {num_processes} processes. Starting pool")
+
+    pool = multiprocessing.Pool(processes=num_processes,
+                                initializer=merge_subsentences_initializer,
+                                initargs=[
+                                    to_save_file,
+                                    to_save_storage,
+                                    to_read_file,
+                                    to_read_storage,
+                                    sent_start_map_file.name
+                                ])
+    logger.debug(f"Finished pool")
     start = time.time()
     seen_ids = set()
-    seen_data = {}
-    for r_idx, row in enumerate(full_pred_data):
+    for sent_ids_seen in pool.imap_unordered(merge_subsentences_hlp, input_args, chunksize=1):
+        for emb_id in sent_ids_seen:
+            assert emb_id not in seen_ids, f'{emb_id} already seen, something went wrong with sub-sentences'
+            seen_ids.add(emb_id)
+    sent_start_map_file.close()
+    logger.info(f'Time to merge sub-sentences {time.time()-start}s')
+    return
+
+def merge_subsentences_initializer(to_write_file, to_write_storage, to_read_file, to_read_storage, sent_start_map_file):
+    global filt_emb_data_global
+    filt_emb_data_global = np.memmap(to_write_file, dtype=to_write_storage, mode='r+')
+    global full_pred_data_global
+    full_pred_data_global = np.memmap(to_read_file, dtype=to_read_storage, mode='r+')
+    global sent_start_map_marisa_global
+    sent_start_map_marisa_global = utils.load_single_item_trie(sent_start_map_file)
+
+def merge_subsentences_hlp(args):
+    M, K, hidden_size, dump_embs, r_idx_set = args
+    seen_ids = set()
+    for r_idx in tqdm(r_idx_set):
+        row = full_pred_data_global[r_idx]
         # get corresponding row to start writing into condensed memory mapped file
-        sent_idx = row['sent_idx']
-        sent_start_idx = sent_start_map[sent_idx]
+        sent_idx = str(row['sent_idx'])
+        sent_start_idx = sent_start_map_marisa_global[sent_idx][0][0]
         # for each VALID mention, need to write into original alias list pos in list
         for i, (true_val, alias_orig_pos) in enumerate(zip(row['final_loss_true'], row['alias_list_pos'])):
             # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for padded mentions or sub-sentence mentions
@@ -364,33 +442,110 @@ def merge_subsentences(data_file, full_pred_data, dump_embs=False):
                 emb_id = sent_start_idx + alias_orig_pos
                 assert emb_id not in seen_ids, f'{emb_id} already seen, something went wrong with sub-sentences'
                 if dump_embs:
-                    filt_emb_data['entity_emb'][emb_id] = row['entity_emb'].reshape(M, hidden_size)[i]
-                filt_emb_data['sent_idx'][emb_id] = sent_idx
-                filt_emb_data['alias_list_pos'][emb_id] = alias_orig_pos
-                filt_emb_data['final_loss_pred'][emb_id] = row['final_loss_pred'].reshape(M)[i]
-                filt_emb_data['final_loss_prob'][emb_id] = row['final_loss_prob'].reshape(M)[i]
-                filt_emb_data['final_loss_cand_probs'][emb_id] = row['final_loss_cand_probs'].reshape(M, K)[i]
-                seen_ids.add(emb_id)
-                seen_data[emb_id] = row
-    logging.debug(f'Time to merge sub-sentences {time.time()-start}s')
-    return filt_emb_data
+                    filt_emb_data_global['entity_emb'][emb_id] = row['entity_emb'].reshape(M, hidden_size)[i]
+                filt_emb_data_global['sent_idx'][emb_id] = sent_idx
+                filt_emb_data_global['alias_list_pos'][emb_id] = alias_orig_pos
+                filt_emb_data_global['final_loss_pred'][emb_id] = row['final_loss_pred'].reshape(M)[i]
+                filt_emb_data_global['final_loss_prob'][emb_id] = row['final_loss_prob'].reshape(M)[i]
+                filt_emb_data_global['final_loss_cand_probs'][emb_id] = row['final_loss_cand_probs'].reshape(M, K)[i]
+    return seen_ids
 
 # get sent_idx, alias_idx mapping to emb idx for quick lookup
-def get_sent_idx_map(filt_emb_data):
+def get_sent_idx_map(merged_entity_emb_file, merged_storage_type):
+    """ Get sent_idx, alias_idx mapping to emb idx for quick lookup """
+    filt_emb_data = np.memmap(merged_entity_emb_file, dtype=merged_storage_type, mode="r+")
     sent_idx_map = {}
     for i, row in enumerate(filt_emb_data):
         sent_idx = row['sent_idx']
         alias_idx = row['alias_list_pos']
         assert sent_idx != -1 and alias_idx != -1, f"Sent {sent_idx}, Al {alias_idx}"
-        sent_idx_map[(sent_idx, alias_idx)] = i
+        # string for Marisa Trie later
+        sent_idx_map[f"{sent_idx}_{alias_idx}"] = i
     return sent_idx_map
 
 # write new data with qids and entity emb ids
 # TODO: parallelize this
-def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
-    entity_dump, train_in_candidates, dump_embs):
-    with jsonlines.open(data_file) as f_in, jsonlines.open(out_file, 'w') as f_out:
-        for line in f_in:
+def write_data_labels(num_processes, merged_entity_emb_file,
+                      merged_storage_type, data_file,
+                      out_file, train_in_candidates, dump_embs, data_config):
+    logger = logging.getLogger(__name__)
+
+    # Get sent mapping
+    start = time.time()
+    sent_idx_map = get_sent_idx_map(merged_entity_emb_file, merged_storage_type)
+    sent_idx_map_file = tempfile.NamedTemporaryFile(suffix="bootleg_sent_idx_map")
+    utils.create_single_item_trie(sent_idx_map, out_file=sent_idx_map_file.name)
+
+    # Chunk file for parallel writing
+    create_ex_indir = tempfile.TemporaryDirectory()
+    create_ex_outdir = tempfile.TemporaryDirectory()
+    logger.debug(f"Counting lines")
+    total_input = sum(1 for _ in open(data_file))
+    chunk_input = int(np.ceil(total_input/num_processes))
+    logger.debug(f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines")
+    total_input_from_chunks, input_files_dict = utils.chunk_file(data_file, create_ex_indir.name, chunk_input)
+
+    input_files = list(input_files_dict.keys())
+    input_file_lines = [input_files_dict[k] for k in input_files]
+    output_files = [in_file_name.replace(create_ex_indir.name, create_ex_outdir.name) for in_file_name in input_files]
+    assert total_input == total_input_from_chunks, f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
+    logger.debug(f"Done chunking files")
+
+    logger.info(f'Starting to write files with {num_processes} processes')
+    pool = multiprocessing.Pool(processes=num_processes,
+                                initializer=write_data_labels_initializer,
+                                initargs=[
+                                    merged_entity_emb_file,
+                                    merged_storage_type,
+                                    sent_idx_map_file.name,
+                                    train_in_candidates,
+                                    dump_embs,
+                                    data_config
+                                ])
+
+    input_args = list(zip(input_files, input_file_lines, output_files))
+    # Store output files and counts for saving in next step
+    total = 0
+    for res in pool.imap(
+                    write_data_labels_hlp,
+                    input_args,
+                    chunksize=1
+                ):
+        total += 1
+
+    # Merge output files to final file
+    logger.debug(f"Merging output files")
+    with open(out_file, 'wb') as outfile:
+        for filename in glob.glob(os.path.join(create_ex_outdir.name, "*")):
+            if filename == out_file:
+                # don't want to copy the output into the output
+                continue
+            with open(filename, 'rb') as readfile:
+                shutil.copyfileobj(readfile, outfile)
+    sent_idx_map_file.close()
+    create_ex_indir.cleanup()
+    create_ex_outdir.cleanup()
+    logger.info(f'Time to write files {time.time()-start}s')
+
+def write_data_labels_initializer(merged_entity_emb_file, merged_storage_type, sent_idx_map_file, train_in_candidates, dump_embs, data_config):
+    global filt_emb_data_global
+    filt_emb_data_global = np.memmap(merged_entity_emb_file, dtype=merged_storage_type, mode="r+")
+    global sent_idx_map_global
+    sent_idx_map_global = utils.load_single_item_trie(sent_idx_map_file)
+    global train_in_candidates_global
+    train_in_candidates_global = train_in_candidates
+    global dump_embs_global
+    dump_embs_global = dump_embs
+    global entity_dump_global
+    entity_dump_global = EntitySymbols(load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
+                                       alias_cand_map_file=data_config.alias_cand_map)
+
+
+def write_data_labels_hlp(args):
+    input_file, input_lines, output_file = args
+    with open(input_file) as f_in, open(output_file, 'w') as f_out:
+        for line in tqdm(f_in, total=input_lines, desc="Writing data"):
+            line = ujson.loads(line)
             aliases = line['aliases']
             sent_idx = line['sent_idx_unq']
             qids = []
@@ -399,16 +554,17 @@ def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
             probs = []
             cands = []
             cand_probs = []
-            entity_cands_qid = map_aliases_to_candidates(train_in_candidates, entity_dump, aliases)
+            entity_cands_qid = map_aliases_to_candidates(train_in_candidates_global, entity_dump_global, aliases)
             # eid is entity id
-            entity_cands_eid = map_aliases_to_candidates_eid(train_in_candidates, entity_dump, aliases)
+            entity_cands_eid = map_aliases_to_candidates_eid(train_in_candidates_global, entity_dump_global, aliases)
             for al_idx, alias in enumerate(aliases):
-                assert (sent_idx, al_idx) in sent_idx_map, f'Dumped prediction data does not match data file. Can not find {sent_idx} - {al_idx}'
-                emb_idx = sent_idx_map[(sent_idx, al_idx)]
+                sent_idx_key = f"{sent_idx}_{al_idx}"
+                assert sent_idx_key in sent_idx_map_global, f'Dumped prediction data does not match data file. Can not find {sent_idx} - {al_idx}'
+                emb_idx = sent_idx_map_global[sent_idx_key][0][0]
                 ctx_emb_ids.append(emb_idx)
-                prob = filt_pred_data[emb_idx]['final_loss_prob']
-                cand_prob = filt_pred_data[emb_idx]['final_loss_cand_probs']
-                pred_cand = filt_pred_data[emb_idx]['final_loss_pred']
+                prob = filt_emb_data_global[emb_idx]['final_loss_prob']
+                cand_prob = filt_emb_data_global[emb_idx]['final_loss_cand_probs']
+                pred_cand = filt_emb_data_global[emb_idx]['final_loss_pred']
                 eid = entity_cands_eid[al_idx][pred_cand]
                 qid = entity_cands_qid[al_idx][pred_cand]
                 qids.append(qid)
@@ -421,7 +577,6 @@ def write_data_labels(filt_pred_data, data_file, out_file, sent_idx_map,
             line['cands'] = cands
             line['cand_probs'] = cand_probs
             line['entity_ids'] = entity_ids
-            if dump_embs:
+            if dump_embs_global:
                 line['ctx_emb_ids'] = ctx_emb_ids
-            f_out.write(line)
-    logging.info(f'Finished writing predictions to {out_file}')
+            f_out.write(ujson.dumps(line) + "\n")

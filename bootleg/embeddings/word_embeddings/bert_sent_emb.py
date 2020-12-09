@@ -4,8 +4,6 @@ import os
 
 import torch
 from bootleg.embeddings.word_embeddings import BaseSentEmbedding
-from bootleg.layers.layers import MLP
-from bootleg.utils import model_utils
 from bootleg.utils.classes.dotted_dict import DottedDict
 
 
@@ -15,6 +13,7 @@ class BERTSentEmbedding(BaseSentEmbedding):
     """
     def __init__(self, emb_args, main_args, word_emb_dim, word_symbols):
         super(BERTSentEmbedding, self).__init__(emb_args, main_args, word_emb_dim, word_symbols)
+        cache_dir = emb_args.cache_dir
         # TO LOAD AND SAVE BERT
         # import torch
         # import os
@@ -29,7 +28,6 @@ class BERTSentEmbedding(BaseSentEmbedding):
         # If both are frozen, we can use torch.no_grad in the forward pass to save memory
         self.requires_grad = not emb_args.freeze_sent_emb or not emb_args.freeze_word_emb
         self.num_layers = emb_args.layers
-        cache_dir = emb_args.cache_dir
         if emb_args.use_lower_case:
             self.encoder = torch.load(os.path.join(cache_dir, "bert_base_uncased_encoder.pt"))
         else:

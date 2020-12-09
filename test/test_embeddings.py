@@ -416,7 +416,7 @@ class TestKGEmbedding(unittest.TestCase):
         # The exception on paramters happens in a forward call
         with self.assertRaises(Exception) as context:
             learned_emb(entity_package=None, batch_prepped_data={}, batch_on_the_fly_data={}, sent_emb=None)
-        self.assertTrue(type(context.exception) == AttributeError)
+        self.assertTrue(type(context.exception) == torch.nn.modules.module.ModuleAttributeError)
 
 
 if __name__ == '__main__':

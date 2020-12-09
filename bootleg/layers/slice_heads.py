@@ -19,7 +19,7 @@ class NoSliceHeads(nn.Module):
         self.prediction_head = MLP(self.hidden_size,
                 self.hidden_size, 1, 1, self.dropout)
 
-    def forward(self, context_matrix_dict, entity_pack, sent_emb, alias_idx_pair_sent, batch_prepped, raw_entity_emb):
+    def forward(self, context_matrix_dict, alias_idx_pair_sent, entity_pack, sent_emb):
         out = {DISAMBIG: {}}
         score = model_utils.max_score_context_matrix(context_matrix_dict, self.prediction_head)
         out[DISAMBIG][FINAL_LOSS] = score
@@ -33,7 +33,7 @@ class SliceHeadsSBL(nn.Module):
     Slice heads class (modified from https://github.com/snorkel-team/snorkel/tree/master/snorkel/slicing).
 
     Implements slice-based learning module which acts as a cheap mixture of experts (https://arxiv.org/abs/1909.06349). Each user defined slice
-    gets its own extra representation for specialize on a slice. There is also a base slice that is all examples. The representations from
+    gets its own extra representation for specialize on a slice. There is also a base slice that is all examples. The representaitons from
     each head are merged and sent through MLP to be scored for final loss.
 
     Attributes:
@@ -91,7 +91,7 @@ class SliceHeadsSBL(nn.Module):
         # Final prediction layer
         self.final_pred_head = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, context_matrix_dict, alias_idx_pair_sent, entity_pack, sent_emb, batch_prepped, raw_entity_emb):
+    def forward(self, context_matrix_dict, alias_idx_pair_sent, entity_pack, sent_emb):
         out = {DISAMBIG: {}, INDICATOR: {}}
         indicator_outputs = {}
         expert_slice_repr = {}
@@ -116,9 +116,8 @@ class SliceHeadsSBL(nn.Module):
                 expert_slice_repr[slice_head]).squeeze(-1)
             # Get an alias_matrix output (batch x M x H)
             # TODO: remove extra inputs
-            alias_matrix, alias_word_weights = self.ind_alias_mha[slice_head](sent_embedding=sent_emb,
-                alias_idx_pair_sent=alias_idx_pair_sent, entity_embedding=context_matrix,
-                entity_mask=entity_pack.mask, raw_entity_embedding=raw_entity_emb, indicator_prediction=None,
+            alias_matrix, alias_word_weights = self.ind_alias_mha[slice_head](sent_embedding=sent_emb, entity_embedding=context_matrix,
+                entity_mask=entity_pack.mask, alias_idx_pair_sent=alias_idx_pair_sent,
                 slice_emb_alias=self.slice_emb_ind_alias(torch.tensor(i, device=context_matrix.device)),
                 slice_emb_ent=self.slice_emb_ind_ent(torch.tensor(i, device=context_matrix.device)))
             # Get indicator head outputs; size batch x M x 2 per head
