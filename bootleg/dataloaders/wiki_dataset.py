@@ -94,6 +94,7 @@ class WikiDataset(Dataset):
             # Only prep data once per node
             if is_writer:
                 prep_data(args, use_weak_label=use_weak_label, dataset_is_eval=self.dataset_is_eval,
+                logger=self.logger,
                 input_src=input_src, dataset_name=dataset_name,
                 prep_dir=data_utils.get_data_prep_dir(args))
             if distributed:

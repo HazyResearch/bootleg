@@ -40,7 +40,9 @@ class WikiSlices(Dataset):
                 self.storage_type  = prep_slice(args=args, file=os.path.basename(input_src),
                     use_weak_label=use_weak_label, dataset_is_eval=dataset_is_eval,
                     dataset_name=self.dataset_name,
-                    sent_idx_file=self.sent_idx_to_idx_file, storage_config=self.config_dataset_name,
+                    sent_idx_file=self.sent_idx_to_idx_file,
+                    storage_config=self.config_dataset_name,
+                    logger=self.logger
                     )
                 np.save(self.config_dataset_name, self.storage_type, allow_pickle=True)
             if distributed:

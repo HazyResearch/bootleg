@@ -1,5 +1,4 @@
 # Bootleg Downstream Tutorial
-
 NED is critical for numerous downstream applications, such as search, personal assistants, and Q&A, and in these tutorials, we show how to leverage [Bootleg's](https://github.com/HazyResearch/bootleg) output entity representations for one such downstream task that benefits from entity-based knowledge: TACRED. The goal in TACRED is to extract the relationship between a subject and object pair in text. Given the task data, we must
     - (1) identify the entities in the examples,
     - (2) obtain contextual Bootleg embeddings for these entities,
@@ -19,7 +18,6 @@ Dependencies: For the Python dependencies, we recommend using a virtualenv. Once
 Once the virtual environment is created, activate it by running:
 
 ```source .venv/bin/activate```
-
 Any Python libraries installed will now be contained within this virtual environment. To deactivate the environment, simply run:
 
 ```deactivate```

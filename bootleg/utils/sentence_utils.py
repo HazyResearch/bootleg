@@ -1,5 +1,8 @@
+from collections import defaultdict
 from math import ceil
 from itertools import accumulate
+
+from transformers.tokenization_utils import _is_control
 
 from bootleg.symbols.constants import *
 
@@ -149,17 +152,21 @@ def split_sentence(max_aliases, phrase, spans, aliases, aliases_seen_by_model, s
         * window_sentences[i] has the tokens of the i^th window.
     """
     is_bert = word_symbols.is_bert
-    sentence, aliases2see, maxlen = phrase, aliases_seen_by_model, seq_len
-    sentence = word_symbols.tokenize(sentence)
+    sentence, aliases2see, maxlen, old_spans = phrase, aliases_seen_by_model, seq_len, spans
+    old_len = len(sentence.split())
+    assert old_spans == list(sorted(old_spans)), f"You spans {old_spans} for ***{phrase}*** are not in sorted order from smallest to largest"
+    old_to_new, sentence = get_old_to_new_word_idx_mapping(phrase, word_symbols)
 
-    if is_bert:
-        # Example: "Kit ##tens love purple ##ish puppet ##eers" ~=~=~=> [0, 0, 1, 2, 2, 3, 3]
-        word_indexes = list(accumulate([-1] + sentence, lambda a, b: a + int(not b.startswith('##'))))[1:]
-        word_indexes.append(word_indexes[-1] + 1)
-        spans = [(word_indexes.index(offset), word_indexes.index(endpos))
-                 for offset, endpos in spans if endpos in word_indexes]
+    spans = []
+    for sp in old_spans:
+        assert sp[0] < sp[1], f"We assume all mentions are at least length 1, but you have span {sp} where the right index is not greater than the left with phrase ***{phrase}***. Each span is in [0, length of sentence={old_len}], both inclusive"
+        assert sp[0] >= 0 and sp[1] >= 0 and sp[1] <= old_len and sp[0] <= old_len, f"The span of {sp} with ***{phrase}*** was not between [0, length of sentence={old_len}], both inclusive"
+        # We should have the right side be old_to_new[sp[1]][0], but due do tokenization occasionally removing rare unicode characters, this way ensures the right span is greater than the left
+        # because, in that case, we will have old_to_new[sp[1]-1][-1] == old_to_new[sp[0]][0] (see test case in test_sentence_utils.py)
+        spans.append([old_to_new[sp[0]][0], old_to_new[sp[1]-1][-1]+1])
+        assert spans[-1][0] < spans[-1][1], f"Adjusted spans for old span {sp} and phrase ***{phrase}*** have the right side not greater than the left side. This might be due to a spans being on a unicode character removed by tokenization."
 
-    window_span_idxs, window_aliases2see, window_spans, window_sentences = [], [], [], []
+    window_span_idxs, window_aliases2see, window_spans, window_sentences, window_sentence_pos_idxs = [], [], [], [], []
 
     # Sub-divide sentence into windows, respecting maxlen and max_aliases per window.
     # This retains at least maxlen/5 context to the left and right of each alias2predict.
@@ -168,13 +175,16 @@ def split_sentence(max_aliases, phrase, spans, aliases, aliases_seen_by_model, s
     current_alias_idx = 0
     for split_offset, split_endpos, split_first_alias, split_last_alias, split_aliases2see in windows:
         sub_sentence = sentence[split_offset: split_endpos]
-
+        sub_sentence_pos = list(range(split_offset,split_endpos))
         if is_bert:
             sub_sentence = pad_sentence([CLS_BERT] + sub_sentence + [SEP_BERT], PAD_BERT, maxlen+2)
+            sub_sentence_pos = pad_sentence([-2] + sub_sentence_pos + [-3], -1, maxlen+2)
         else:
             sub_sentence = pad_sentence(sub_sentence, PAD, maxlen)
+            sub_sentence_pos = pad_sentence(sub_sentence_pos, -1, maxlen)
 
         window_sentences.append(sub_sentence)
+        window_sentence_pos_idxs.append(sub_sentence_pos)
         window_span_idxs.append([])
         window_aliases2see.append([])
         window_spans.append([])
@@ -188,7 +198,75 @@ def split_sentence(max_aliases, phrase, spans, aliases, aliases_seen_by_model, s
 
             span_offset += int(is_bert)  # add one for BERT to account for [CLS]
             span_endpos += int(is_bert)
-            window_spans[-1].append([span_offset - split_offset, span_endpos - split_offset])
+            adjusted_endpos = span_endpos - split_offset
+            # If it's over the maxlen, adjust to be at the [CLS] token
+            if is_bert and adjusted_endpos >= maxlen+2:
+                adjusted_endpos = maxlen+2*is_bert-1
+            # If it's over the length for nonBERT, adjust to be maxlen
+            elif not is_bert and adjusted_endpos > maxlen:
+                adjusted_endpos = maxlen
+            assert span_offset - split_offset >= 0, f"The first span of {span_offset - split_offset} is less than 0"
+            window_spans[-1].append([span_offset - split_offset, adjusted_endpos])
             current_alias_idx += 1
 
-    return window_span_idxs, window_aliases2see, window_spans, window_sentences
+    return window_span_idxs, window_aliases2see, window_spans, window_sentences, window_sentence_pos_idxs
+
+
+def get_old_to_new_word_idx_mapping(sentence, word_symbols):
+    """
+    Method takes the original sentence and tokenized_sentence and builds a mapping from the original sentence spans (split on " ")
+    to the new sentence spans (after tokenization). This will account for tokenizers splitting on grammar and subwordpiece tokens
+    from BERT.
+
+    For example:
+        phrase: 'Alexander få Baldwin III (born April 3, 1958, in Massapequa, Long Island, New York, USA).'
+        tokenized sentence: ['Alexander', 'f', '##å', 'Baldwin', 'III', '(', 'born', 'April', '3', ',', '1958', ',', 'in', 'Mass', '##ap',
+                             '##e', '##qua', ',', 'Long', 'Island', ',', 'New', 'York', ',', 'USA', ')']
+
+    Output: {0: [0], 1: [1, 2], 2: [3], 3: [4], 4: [5, 6], 5: [7], 6: [8, 9], 7: [10, 11], 8: [12], 9: [13, 14, 15, 16, 17], 10: [18], 11: [19, 20],
+             12: [21], 13: [22, 23], 14: [24, 25]}
+
+    We use this to convert spans from original sentence splitting to new sentence splitting.
+    """
+    old_split = sentence.split()
+    final_tokenized_sentence = []
+    old_w = 0
+    new_w = 0
+    lost_words = 0
+    old_to_new = defaultdict(list)
+    while old_w < len(old_split):
+        old_word = old_split[old_w]
+        if old_w > 0:
+            # This will allow tokenizers that use spaces to know it's a middle word
+            old_word = " " + old_word
+        tokenized_word = [t for t in word_symbols.tokenize(old_word) if len(t) > 0]
+        # due to https://github.com/huggingface/transformers/commit/21ed3a6b993eba06e7f4cf7720f4a07cc8a0d4c2, certain characters are cleaned and removed
+        # if this is the case, we need to adjust the spans so the token is eaten
+        # print("OLD", old_w, old_word, "TOK", tokenized_word, "NEW W", new_w, "+", len(tokenized_word))
+        if len(tokenized_word) <= 0:
+            print(f"TOKENIZED WORD IS LENGTH 0. It SHOULD BE WEIRD CHARACTERS WITH ORDS", [ord(c) for c in old_word], "AND IS CONTROL", [_is_control(c) for c in old_word])
+            # if this is the last word, assign it to the previous word
+            if old_w + 1 >= len(old_split):
+                old_to_new[old_w] = [new_w-1]
+                lost_words += 1
+            else:
+                # assign the span specifically to the new_w
+                old_to_new[old_w] = [new_w]
+                lost_words += 1
+        else:
+            new_w_ids = list(range(new_w, new_w+len(tokenized_word)))
+            old_to_new[old_w] = new_w_ids
+        final_tokenized_sentence.extend(tokenized_word)
+        new_w = new_w+len(tokenized_word)
+        old_w += 1
+
+    old_to_new = dict(old_to_new)
+    # Verify that each word from both sentences are in the mappings
+    len_tokenized_sentence = len(final_tokenized_sentence)
+    assert final_tokenized_sentence == word_symbols.tokenize(sentence)
+    assert len_tokenized_sentence+lost_words >= len(old_split), f"For some reason tokenize has compressed words that weren't lost {old_split} versus {word_symbols.tokenize(sentence)}"
+    assert all(len(val) > 0 for val in old_to_new.values()), f"{old_to_new}, {sentence}"
+    assert set(range(len_tokenized_sentence)) == set([v for val in old_to_new.values() for v in val]), f"{old_to_new}, {sentence}"
+    assert set(range(len(old_split))) == set(old_to_new.keys()), f"{old_to_new}, {sentence}"
+    return old_to_new, final_tokenized_sentence
+

@@ -21,13 +21,14 @@ class Annotator():
     Annotator class: convenient wrapper of preprocessing and model eval to allow for
     annotating single sentences at a time for quick experimentation, e.g. in notebooks.
     """
+
     def __init__(self, config_args, device='cuda', max_alias_len=6,
-        cand_map=None, threshold=0.0):
+                 cand_map=None, threshold=0.0):
         self.args = config_args
         self.device = device
         self.entity_db = EntitySymbols(os.path.join(self.args.data_config.entity_dir,
-                                                     self.args.data_config.entity_map_dir),
-                                        alias_cand_map_file=self.args.data_config.alias_cand_map)
+                                                    self.args.data_config.entity_map_dir),
+                                       alias_cand_map_file=self.args.data_config.alias_cand_map)
         self.word_db = data_utils.load_wordsymbols(self.args.data_config, is_writer=True, distributed=False)
         self.model = self._load_model()
         self.max_alias_len = max_alias_len
@@ -51,7 +52,9 @@ class Annotator():
                 mod, load_class = import_class("bootleg.embeddings", emb.load_class)
                 try:
                     self.batch_on_the_fly_embs[emb.key] = getattr(mod, load_class)(main_args=self.args,
-                        emb_args=emb['args'], entity_symbols=self.entity_db, model_device=None, word_symbols=None)
+                                                                                   emb_args=emb['args'],
+                                                                                   entity_symbols=self.entity_db,
+                                                                                   model_device=None, word_symbols=None)
                 except AttributeError as e:
                     print(f'No prep method found for {emb.load_class} with error {e}')
                 except Exception as e:
@@ -59,9 +62,9 @@ class Annotator():
 
     def _load_model(self):
         model_state_dict = torch.load(self.args.run_config.init_checkpoint,
-            map_location=lambda storage, loc: storage)['model']
+                                      map_location=lambda storage, loc: storage)['model']
         model = Model(args=self.args, model_device=self.device,
-            entity_symbols=self.entity_db, word_symbols=self.word_db).to(self.device)
+                      entity_symbols=self.entity_db, word_symbols=self.word_db).to(self.device)
         # remove distributed naming if it exists
         if not self.args.run_config.distributed:
             new_state_dict = OrderedDict()
@@ -81,12 +84,12 @@ class Annotator():
 
     def extract_mentions(self, text):
         found_aliases, found_spans = find_aliases_in_sentence_tag(text,
-            self.all_aliases_trie, self.max_alias_len)
+                                                                  self.all_aliases_trie, self.max_alias_len)
         return {'sentence': text,
                 'aliases': found_aliases,
                 'spans': found_spans,
                 # we don't know the true QID
-                'qids': ['Q-1'for i in range(len(found_aliases))],
+                'qids': ['Q-1' for i in range(len(found_aliases))],
                 'gold': [True for i in range(len(found_aliases))]}
 
     def set_threshold(self, value):
@@ -94,7 +97,8 @@ class Annotator():
 
     def label_mentions(self, text):
         sample = self.extract_mentions(text)
-        idxs_arr, aliases_to_predict_per_split, spans_arr, phrase_tokens_arr = sentence_utils.split_sentence(
+        char_spans = self.get_char_spans(sample['spans'], text)
+        idxs_arr, aliases_to_predict_per_split, spans_arr, phrase_tokens_arr, pos_idxs = sentence_utils.split_sentence(
             max_aliases=self.args.data_config.max_aliases,
             phrase=sample['sentence'],
             spans=sample['spans'],
@@ -107,7 +111,7 @@ class Annotator():
         word_indices_arr = [self.word_db.convert_tokens_to_ids(pt) for pt in phrase_tokens_arr]
 
         if len(idxs_arr) > 1:
-            #TODO: support sentences that overflow due to long sequence length or too many mentions
+            # TODO: support sentences that overflow due to long sequence length or too many mentions
             raise ValueError('Overflowing sentences not currently supported in Annotator')
 
         # iterate over each sample in the split
@@ -142,15 +146,14 @@ class Annotator():
                 batch_on_the_fly_data[emb_name] = torch.tensor(emb.batch_prep(example_aliases,
                                                                               entity_indices), device=self.device)
 
-
             outs, entity_pack, _ = self.model(
-                alias_idx_pair_sent = [torch.tensor(example_aliases_locs_start, device=self.device).unsqueeze(0),
-                                       torch.tensor(example_aliases_locs_end, device=self.device).unsqueeze(0)],
-                word_indices = torch.tensor([word_indices], device=self.device),
-                alias_indices = torch.tensor(example_aliases, device=self.device).unsqueeze(0),
-                entity_indices = torch.tensor(entity_indices, device=self.device).unsqueeze(0),
-                batch_prepped_data = {},
-                batch_on_the_fly_data = batch_on_the_fly_data)
+                alias_idx_pair_sent=[torch.tensor(example_aliases_locs_start, device=self.device).unsqueeze(0),
+                                     torch.tensor(example_aliases_locs_end, device=self.device).unsqueeze(0)],
+                word_indices=torch.tensor([word_indices], device=self.device),
+                alias_indices=torch.tensor(example_aliases, device=self.device).unsqueeze(0),
+                entity_indices=torch.tensor(entity_indices, device=self.device).unsqueeze(0),
+                batch_prepped_data={},
+                batch_on_the_fly_data=batch_on_the_fly_data)
 
             entity_cands = eval_utils.map_aliases_to_candidates(self.args.data_config.train_in_candidates,
                                                                 self.entity_db,
@@ -172,4 +175,19 @@ class Annotator():
                     pred_probs.append(pred_prob)
                     titles.append(self.entity_db.get_title(pred_qid) if pred_qid != 'NC' else 'NC')
 
-            return pred_cands, pred_probs, titles
+            return pred_cands, pred_probs, titles, char_spans
+
+    def get_char_spans(self, spans, text):
+        query_toks = text.split()
+        char_spans = []
+        for span in spans:
+            space_btwn_toks = len(' '.join(query_toks[0:span[0] + 1])) - \
+                              len(' '.join(query_toks[0:span[0]])) - \
+                              len(
+                query_toks[span[0]])
+            char_b = len(' '.join(query_toks[0:span[0]])) + space_btwn_toks
+            char_e = char_b + len(' '.join(query_toks[span[0]:span[1]]))
+            # print(char_b, char_e, space_btwn_toks)
+            # print(f"'{query[0][char_b:char_e]}'")
+            char_spans.append([char_b, char_e])
+        return char_spans
