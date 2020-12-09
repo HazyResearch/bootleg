@@ -1425,7 +1425,6 @@ class DataLoaderTest(unittest.TestCase):
                 if key not in keys_to_ignore:
                     np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
 
-
     def test_long_sentence(self):
         # Test loading data when the sentence is very very long
 
@@ -1511,7 +1510,6 @@ class DataLoaderTest(unittest.TestCase):
             self.assertEqual(data[i]['subsent_idx'], truedata[i]['subsent_idx'])
             for key in ARR_KEYS_TO_COMPARE:
                 np.testing.assert_array_equal(data[i][key], truedata[i][key], err_msg=f"At index {i} key {key}")
-
 
     def test_golds(self):
         # This will first test that when use_weak_label is True, the loading keeps False golds.

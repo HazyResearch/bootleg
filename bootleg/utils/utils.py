@@ -3,7 +3,9 @@ Useful functions
 '''
 import copy
 from importlib import import_module
+from itertools import islice, chain
 
+import marisa_trie
 import ujson
 import json # we need this for dumping nans
 import logging
@@ -11,6 +13,8 @@ import os
 import pickle
 import sys
 import torch
+from tqdm import tqdm
+
 
 def recursive_transform(x, test_func, transform):
     """Applies a transformation recursively to each member of a dictionary
@@ -56,8 +60,64 @@ def load_pickle_file(filename):
         contents = pickle.load(f)
     return contents
 
+def create_single_item_trie(in_dict, out_file=""):
+    keys = []
+    values = []
+    for k in tqdm(in_dict, total=len(in_dict), desc="Reading values for marisa trie"):
+        assert type(in_dict[k]) is int
+        keys.append(k)
+        # Tries require list of item for the record trie
+        values.append(tuple([in_dict[k]]))
+    fmt = "<l"
+    trie = marisa_trie.RecordTrie(fmt, zip(keys, values))
+    if out_file != "":
+        trie.save(out_file)
+    return trie
+
+def load_single_item_trie(file):
+    assert exists_dir(file)
+    return marisa_trie.RecordTrie('<l').mmap(file)
+
 def flatten(arr):
     return [item for sublist in arr for item in sublist]
+
+def chunks(iterable, n):
+   """chunks(ABCDE,2) => AB CD E"""
+   iterable = iter(iterable)
+   while True:
+       try:
+           yield chain([next(iterable)], islice(iterable, n-1))
+       except StopIteration:
+           return None
+
+def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
+    ensure_dir(out_dir)
+    out_files = {}
+    total_lines = 0
+    ending = os.path.splitext(in_file)[1]
+    with open(in_file) as bigfile:
+        i = 0
+        while True:
+            try:
+                lines = next(chunks(bigfile, num_lines))
+            except StopIteration:
+                break
+            except RuntimeError:
+                break
+            file_split = os.path.join(out_dir, f"{prefix}{i}{ending}")
+            total_file_lines = 0
+            i += 1
+            with open(file_split, 'w') as f:
+                while True:
+                    try:
+                        line = next(lines)
+                    except StopIteration:
+                        break
+                    total_lines += 1
+                    total_file_lines += 1
+                    f.write(line)
+            out_files[file_split] = total_file_lines
+    return total_lines, out_files
 
 def get_size(obj, seen=None):
     """Recursively finds size of objects"""

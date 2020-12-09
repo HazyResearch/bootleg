@@ -20,7 +20,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # Truth data
@@ -28,15 +28,18 @@ class SentenceUtils(unittest.TestCase):
             "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")]
         true_spans_arr = [[[0,2], [12,13], [20,21]]]
         true_alias_to_predict_arr = [[0, 1, 2]]
+        true_phrase_token_pos_arr = [list(range(21)) + [-1,-1,-1]]
         true_aliases_arr = [["The big", "alias3", "alias5"]]
 
         assert len(idxs_arr) == 1
         assert len(aliases_to_predict_arr) == 1
         assert len(spans_arr) == 1
         assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -56,22 +59,25 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
         true_phrase_arr = ["The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")] * 2
         true_spans_arr = [[[0,2], [12,13]], [[20,21]]]
         true_alias_to_predict_arr = [[0, 1], [0]]
+        true_phrase_token_pos_arr = [list(range(21)) + [-1,-1,-1]]*2
         true_aliases_arr = [["The big", "alias3"], ["alias5"]]
 
         assert len(idxs_arr) == 2
         assert len(aliases_to_predict_arr) == 2
         assert len(spans_arr) == 2
         assert len(phrase_tokens_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -90,7 +96,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # Truth data
@@ -98,15 +104,18 @@ class SentenceUtils(unittest.TestCase):
             "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(" ")]
         true_spans_arr = [[[0,2], [12,13], [20,21]]]
         true_alias_to_predict_arr = [[0, 1]]
+        true_phrase_token_pos_arr = [list(range(21)) + [-1,-1,-1]]
         true_aliases_arr = [["The big", "alias3", "alias5"]]
 
         assert len(idxs_arr) == 1
         assert len(aliases_to_predict_arr) == 1
         assert len(spans_arr) == 1
         assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -127,7 +136,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
@@ -135,15 +144,18 @@ class SentenceUtils(unittest.TestCase):
                            "word alias2 and alias3 because we want our cat and our alias5".split()]
         true_spans_arr = [[[0,2]], [[3,4], [11,12]]]
         true_alias_to_predict_arr = [[0], [0, 1]]
+        true_phrase_token_pos_arr = [list(range(12)), list(range(9, 21))]
         true_aliases_arr = [["The big"], ["alias3", "alias5"]]
 
         assert len(idxs_arr) == 2
         assert len(aliases_to_predict_arr) == 2
         assert len(spans_arr) == 2
         assert len(phrase_tokens_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -155,22 +167,25 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
         true_phrase_arr = ["word alias2 and alias3 because we want our cat and our alias5".split()]
         true_spans_arr = [[[3,4], [11,12]]]
         true_alias_to_predict_arr = [[0, 1]]
+        true_phrase_token_pos_arr = [list(range(9, 21))]
         true_aliases_arr = [["alias3", "alias5"]]
 
         assert len(idxs_arr) == 1
         assert len(aliases_to_predict_arr) == 1
         assert len(spans_arr) == 1
         assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -193,13 +208,14 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
         true_phrase_arr = ["The big alias1".split(), "multi word alias2".split()]
-        true_spans_arr = [[[0,3]], [[0,5]]]
+        true_spans_arr = [[[0,3]], [[0,3]]]
         true_alias_to_predict_arr = [[0], [0]]
+        true_phrase_token_pos_arr = [[0,1,2], [8,9,10]]
         true_aliases_arr = [["The big alias1"], ["multi word alias2 and alias3"]]
 
 
@@ -207,9 +223,11 @@ class SentenceUtils(unittest.TestCase):
         assert len(aliases_to_predict_arr) == 2
         assert len(spans_arr) == 2
         assert len(phrase_tokens_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -232,7 +250,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
@@ -242,6 +260,7 @@ class SentenceUtils(unittest.TestCase):
         ]
         true_spans_arr = [[[10,11], [27,28], [30,31], [35,36], [39,40]], [[15,16], [18,19], [23,24], [27,28], [49,50]]]
         true_alias_to_predict_arr = [[0, 1, 2, 3, 4], [4]]
+        true_phrase_token_pos_arr = [list(range(9,59)), list(range(21,71))]
         true_aliases_arr = [["mexico", "panama", "ecuador", "peru", "bolivia"],
                             ["panama", "ecuador", "peru", "bolivia", "colombia"]]
 
@@ -249,9 +268,11 @@ class SentenceUtils(unittest.TestCase):
         assert len(aliases_to_predict_arr) == 2
         assert len(spans_arr) == 2
         assert len(phrase_tokens_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -272,7 +293,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # Truth
@@ -283,6 +304,7 @@ class SentenceUtils(unittest.TestCase):
         ]
         true_spans_arr = [[[12,13], [14,15], [15,16], [17,18], [18,19], [19,20], [20,21], [21,22]], [[20,21], [21,22], [22,23], [23,24], [24,25], [25,26], [26,27], [27,28], [28,29]], [[27,28], [28,29], [29,30], [30,31], [38,39], [39,41], [41,43], [43,45]]]
         true_alias_to_predict_arr = [[0, 1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 6, 7]]
+        true_phrase_token_pos_arr = [list(range(45)) + [-1]*5, list(range(45)) + [-1]*5, list(range(45)) + [-1]*5]
         true_aliases_arr = [["coolock", "swords", "darndale", "santry", "donnycarney", "baldoyle", "sutton", "donaghmede"],
                             ["sutton", "donaghmede", "artane", "whitehall", "kilbarrack", "raheny", "clontarf", "fairview", "malahide"],
                             ["fairview", "malahide", "howth", "marino", "ballybough", "north strand", "sheriff street", "east wall"]]
@@ -292,9 +314,11 @@ class SentenceUtils(unittest.TestCase):
         assert len(aliases_to_predict_arr) == 3
         assert len(spans_arr) == 3
         assert len(phrase_tokens_arr) == 3
+        assert len(phrase_tokens_pos_idxs_arr) == 3
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -312,7 +336,7 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
@@ -321,15 +345,18 @@ class SentenceUtils(unittest.TestCase):
         ]
         true_spans_arr = [[[8,9],[9,10]]]
         true_alias_to_predict_arr = [[0, 1]]
+        true_phrase_token_pos_arr = [list(range(28)) + [-1]*72]
         true_aliases_arr = [["kentucky", "green"]]
 
         assert len(idxs_arr) == 1
         assert len(aliases_to_predict_arr) == 1
         assert len(spans_arr) == 1
         assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -352,22 +379,25 @@ class SentenceUtils(unittest.TestCase):
         true_phrase_arr = [['[CLS]'] + bert_tokenized + ['[SEP]']]
         true_spans_arr = [[[1,4], [11,13], [19,21]]]
         true_alias_to_predict_arr = [[0, 1, 2]]
+        true_phrase_token_pos_arr = [[-2] + list(range(20)) + [-3]]
         true_aliases_arr = [["Kittens love", "alias2", "alias5"]]
 
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         assert len(idxs_arr) == 1
         assert len(aliases_to_predict_arr) == 1
         assert len(spans_arr) == 1
         assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
 
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -386,13 +416,14 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # Truth
         true_phrase_arr = [['[CLS]', 'Kit', '##tens', 'love', 'purple', '##ish', 'pu', '##pp', '[SEP]'], ['[CLS]', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', '[SEP]'], ['[CLS]', 'spanning', 'the', 'br', '##rea', '##ches', 'alias', '##5', '[SEP]']]
         true_spans_arr = [[[1,4]], [[3,5]], [[6,8]]]
         true_alias_to_predict_arr = [[0], [0], [0]]
+        true_phrase_token_pos_arr = [[-2] + list(range(7)) + [-3], [-2] + list(range(8,15)) + [-3], [-2] + list(range(13,20)) + [-3]]
         true_aliases_arr = [["Kittens love"], ["alias2"], ["alias5"]]
 
 
@@ -400,9 +431,11 @@ class SentenceUtils(unittest.TestCase):
         assert len(aliases_to_predict_arr) == 3
         assert len(spans_arr) == 3
         assert len(phrase_tokens_arr) == 3
+        assert len(phrase_tokens_pos_idxs_arr) == 3
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -424,13 +457,14 @@ class SentenceUtils(unittest.TestCase):
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
 
         # True data
         true_phrase_arr = [['[CLS]', '##tens', 'Kit', '##tens', 'Kit', '##tens', 'love', 'purple', '##ish', 'pu', '##pp', '##pet', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', '[SEP]'], ['[CLS]', 'love', 'purple', '##ish', 'pu', '##pp', '##pet', '##eers', 'because', 'alias', '##2', 'and', 'spanning', 'the', 'br', '##rea', '##ches', 'alias', '##5', '[SEP]']]
         true_spans_arr = [[[4,7], [14,16]], [[9,11], [17,19]]]
         true_alias_to_predict_arr = [[0,1], [1]]
+        true_phrase_token_pos_arr = [[-2] + list(range(3,21)) + [-3], [-2] + list(range(8,26)) + [-3]]
         true_aliases_arr = [["Kittens love", "alias2"], ["alias2", "alias5"]]
 
 
@@ -438,9 +472,11 @@ class SentenceUtils(unittest.TestCase):
         assert len(aliases_to_predict_arr) == 2
         assert len(spans_arr) == 2
         assert len(phrase_tokens_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
@@ -458,23 +494,203 @@ class SentenceUtils(unittest.TestCase):
         aliases_to_predict = [0,1,2,3,4,5,6,7,8,9,10,11]
 
         # Truth
-        true_phrase_arr = [['[CLS]', 'The', 'guest', 'roster', 'for', 'O', "'", 'Brien', "'", 's', 'final', 'show', 'on', 'January', '22', '—', 'Tom', 'Hank', '##s', ',', 'Steve', 'Care', '##ll', 'and', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', '[SEP]'], ['[CLS]', 'The', 'guest', 'roster', 'for', 'O', "'", 'Brien', "'", 's', 'final', 'show', 'on', 'January', '22', '—', 'Tom', 'Hank', '##s', ',', 'Steve', 'Care', '##ll', 'and', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', '[SEP]'], ['[CLS]', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', 'and', 'The', 'Tonight', 'Show', 'Band', 'to', 'perform', 'the', 'L', '##yn', '##yr', '##d', 'Sky', '##ny', '##rd', 'song', '`', '`', 'Free', 'Bird', '`', '`', '.', '[SEP]']]
-        true_spans_arr = [[[12,14], [15,17], [23,25], [40,42], [46,50], [61,62], [67,70], [72,74]], [[46,50], [61,62], [67,70], [72,74], [76,78], [81,84], [93,95], [100,102]], [[17,19], [23,27], [38,39], [44,47], [49,51], [53,55], [58,61], [70,72], [77,79]]]
-        true_alias_to_predict_arr = [[0, 1, 2, 3, 4, 5], [2, 3, 4, 5], [7, 8]]
-        true_aliases_arr = [["tom hanks","steve carell","will ferrell","neil young","long may you run","beck","ronnie van zant","billy gibbons"], ["long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"], ["neil young","long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"]]
+        true_phrase_arr = [['[CLS]', 'The', 'guest', 'roster', 'for', 'O', "'", 'Brien', "'", 's', 'final', 'show', 'on', 'January', '22', '—', 'Tom', 'Hank', '##s', ',', 'Steve', 'Care', '##ll', 'and', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', '[SEP]'], ['[CLS]', 'original', 'first', 'guest', 'Will', 'Fe', '##rrell', '—', 'was', 'regarded', 'by', 'O', "'", 'Brien', 'as', 'a', '`', '`', 'dream', 'lineup', "'", "'", ';', 'in', 'addition', ',', 'Neil', 'Young', 'performed', 'his', 'song', '`', '`', 'Long', 'May', 'You', 'Run', '`', '`', 'and', ',', 'as', 'the', 'show', 'closed', ',', 'was', 'joined', 'by', 'Beck', ',', 'Fe', '##rrell', '(', 'dressed', 'as', 'Ronnie', 'Van', 'Z', '##ant', ')', ',', 'Billy', 'Gibbons', ',', 'Ben', 'Harper', ',', 'O', "'", 'Brien', ',', 'V', '##ive', '##ca', 'Paul', '##in', ',', 'and', 'The', 'Tonight', 'Show', 'Band', 'to', 'perform', 'the', 'L', '##yn', '##yr', '##d', 'Sky', '##ny', '##rd', 'song', '`', '`', 'Free', 'Bird', '`', '`', '.', '[SEP]']]
+        true_spans_arr = [[[16, 19], [20, 23], [27, 30], [49, 51], [56, 60], [72, 73], [79, 83], [85, 87], [88, 90], [95, 100]], [[4, 7], [26, 28], [33, 37], [49, 50], [56, 60], [62, 64], [65, 67], [72, 77], [86, 93], [96, 98]]]
+        true_alias_to_predict_arr = [[0, 1, 2, 3, 4, 5, 6], [5, 6, 7, 8, 9]]
+        true_phrase_token_pos_arr = [[-2] + list(range(100)) + [-3], [-2] + list(range(23,123)) + [-3]]
+        true_aliases_arr = [["tom hanks","steve carell","will ferrell","neil young","long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin"], ["will ferrell","neil young","long may you run","beck","ronnie van zant","billy gibbons","ben harper","viveca paulin","lynyrd skynyrd","free bird"]]
         # Run function
         args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
         word_symbols = data_utils.load_wordsymbols(args.data_config)
-        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
                                                                                         max_seq_len, word_symbols)
-        assert len(idxs_arr) == 3
-        assert len(aliases_to_predict_arr) == 3
-        assert len(spans_arr) == 3
-        assert len(phrase_tokens_arr) == 3
+        assert len(idxs_arr) == 2
+        assert len(aliases_to_predict_arr) == 2
+        assert len(spans_arr) == 2
+        assert len(phrase_tokens_arr) == 2
+        assert len(true_phrase_arr) == 2
+        assert len(phrase_tokens_pos_idxs_arr) == 2
 
         for i in range(len(idxs_arr)):
             self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
             self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
+            self.assertEqual(spans_arr[i], true_spans_arr[i])
+            self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
+            self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
+
+        max_aliases = 10
+        max_seq_len = 100
+
+        # Manual data
+        # sentence = "Alexander Rae Baldwin III ( born April 3 , 1958 , in Massapequa , Long Island , New York , USA ) is an American actor who is the oldest and best known of the \" Baldwin brothers \" , with brothers Daniel , Stephen and William ."
+        # aliases = ["april 3", "other events of 1958", "massapequa", "long island", "united states", "actor", "baldwin brothers", "leroy", "stephen baldwin", "william baldwin"]
+        # spans = [[6, 8], [9, 10], [12, 13], [14, 16], [20, 21], [25, 26], [36, 38], [42, 43], [44, 45], [46, 47]]
+        # aliases_to_predict = [0,1,2,3,4,5,6,7,8,9]
+
+        sentence = "Alexander få Baldwin III (born April 3, 1958, in Massapequa, Long Island, New York, USA) is an American actor who is the oldest and best known of the \"Baldwin brothers\", with brothers Daniel, Stephen and William."
+        aliases = ["april 3", "other events of 1958", "massapequa", "long island", "united states", "actor", "baldwin brothers", "leroy", "stephen baldwin", "william baldwin"]
+        spans = [[5, 7], [7, 8], [9, 10], [10, 12], [14, 15], [18, 19], [28, 30], [32, 33], [33, 34], [35, 36]]
+        aliases_to_predict = [0,1,2,3,4,5,6,7,8,9]
+
+
+        # Truth
+        true_phrase_arr = [['[CLS]', 'Alexander', 'f', '##å', 'Baldwin', 'III', '(', 'born', 'April', '3', ',', '1958', ',', 'in', 'Mass', '##ap', '##e', '##qua', ',', 'Long', 'Island', ',', 'New', 'York', ',', 'USA', ')', 'is', 'an', 'American', 'actor', 'who', 'is', 'the', 'oldest', 'and', 'best', 'known', 'of', 'the', '"', 'Baldwin', 'brothers', '"', ',', 'with', 'brothers', 'Daniel', ',', 'Stephen', 'and', 'William', '.', '[SEP]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']]
+        true_spans_arr = [[[8, 11], [11, 13], [14, 19], [19, 22], [25, 27], [30, 31], [40, 45], [47, 49], [49, 50], [51, 53]]]
+        true_alias_to_predict_arr = [[0,1,2,3,4,5,6,7,8,9]]
+        true_phrase_token_pos_arr = [[-2] + list(range(52)) + [-3] + [-1]*48]
+        true_aliases_arr = [["april 3", "other events of 1958", "massapequa", "long island", "united states", "actor", "baldwin brothers", "leroy", "stephen baldwin", "william baldwin"]]
+        # Run function
+        args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
+        word_symbols = data_utils.load_wordsymbols(args.data_config)
+
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+                                                                                       max_seq_len, word_symbols)
+        assert len(idxs_arr) == 1
+        assert len(aliases_to_predict_arr) == 1
+        assert len(spans_arr) == 1
+        assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
+
+        for i in range(len(idxs_arr)):
+            self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
+            self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
+            self.assertEqual(spans_arr[i], true_spans_arr[i])
+            self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
+            self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
+
+        max_aliases = 10
+        max_seq_len = 100
+
+        sentence = "It is organized by Central Research Institute of Iron and Steel of China ( 中国钢铁研究总院 ) ."
+        aliases = ["china"]
+        spans = [[12, 13]]
+        aliases_to_predict = [0]
+
+        # Truth
+        true_phrase_arr = [['[CLS]', 'It', 'is', 'organized', 'by', 'Central', 'Research', 'Institute', 'of', 'Iron', 'and', 'Steel', 'of', 'China', '(', '中', '国', '[UNK]', '[UNK]', '[UNK]', '[UNK]', '[UNK]', '[UNK]', ')', '.', '[SEP]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']]
+        true_spans_arr = [[[13, 14]]]
+        true_alias_to_predict_arr = [[0]]
+        true_phrase_token_pos_arr = [[-2] + list(range(24)) + [-3] + [-1]*76]
+        true_aliases_arr = [["china"]]
+        # Run function
+        args = parser_utils.get_full_config("test/run_args/test_data_bert.json")
+        word_symbols = data_utils.load_wordsymbols(args.data_config)
+
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+                                                                                       max_seq_len, word_symbols)
+        assert len(idxs_arr) == 1
+        assert len(aliases_to_predict_arr) == 1
+        assert len(spans_arr) == 1
+        assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
+
+        for i in range(len(idxs_arr)):
+            self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
+            self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
+            self.assertEqual(spans_arr[i], true_spans_arr[i])
+            self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
+            self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
+
+        max_aliases = 10
+        max_seq_len = 100
+        # There is a special unicode character at , ‍‍‍‍ '' Upal (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
+        sentence = "Upal ( , Wade-Giles : Wup ‘ aêrh Hsiang , Xiao'erjing : ءُپَاعَر سِيْا , ‍‍‍‍ '' Upal '' , Упал ) is a small town in western Xinjiang , China ."
+        aliases = ["upal", "xiaoerjing", "upal", "xinjiang", "china"]
+        spans = [[0, 1], [10, 11], [15, 18], [28, 29], [30, 31]]
+        aliases_to_predict = [0,1,2,3,4]
+
+        # Truth
+        true_phrase_arr = [['[CLS]', 'Up', '##al', '(', ',', 'Wade', '-', 'Giles', ':', 'Wu', '##p', '‘', 'a', '##ê', '##r', '##h', 'H', '##sian', '##g', ',', 'Xiao', "'", 'er', '##jin', '##g', ':', '[UNK]', '[UNK]', ',', "'", "'", 'Up', '##al', "'", "'", ',', 'У', '##п', '##а', '##л', ')', 'is', 'a', 'small', 'town', 'in', 'western', 'Xi', '##nji', '##ang', ',', 'China', '.', '[SEP]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']]
+        true_spans_arr = [[[1, 3], [20, 25], [29, 33], [47, 50], [51, 52]]]
+        true_alias_to_predict_arr = [[0, 1, 2, 3, 4]]
+        true_phrase_token_pos_arr = [[-2] + list(range(52)) + [-3] + [-1]*48]
+        true_aliases_arr = [["upal", "xiaoerjing", "upal", "xinjiang", "china"]]
+        # Run function
+
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+                                                                                       max_seq_len, word_symbols)
+        assert len(idxs_arr) == 1
+        assert len(aliases_to_predict_arr) == 1
+        assert len(spans_arr) == 1
+        assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
+        for i in range(len(idxs_arr)):
+            self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
+            self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
+            self.assertEqual(spans_arr[i], true_spans_arr[i])
+            self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
+            self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
+
+        # TESTING THE ADJUSTING INDEXES WHEN ALIAS IS UNICODE CHARACTERS
+        # One of the aliases is around a unicode character. We adjust the spans to drop this and take the next character instead. If we can't do this
+        # we take the former character (i.e., at the end of the sentence). While we could probably do something fancier, this is a rare case.
+
+        # This is testing if we DO have a character after the unicode
+        max_aliases = 10
+        max_seq_len = 100
+        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
+        sentence = "Upal Xiao , ‍‍‍‍ '"
+        aliases = ["upal", "xiaoerjing", "upal"]
+        spans = [[0, 1], [1, 2], [3, 4]]
+        aliases_to_predict = [0,1,2]
+
+        # Truth
+        true_phrase_arr = [['[CLS]', 'Up', '##al', 'Xiao', ',', "'", '[SEP]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']]
+        true_spans_arr = [[[1, 3], [3, 4], [5, 6]]]
+        true_alias_to_predict_arr = [[0, 1, 2]]
+        true_phrase_token_pos_arr = [[-2] + list(range(5)) + [-3] + [-1]*95]
+        true_aliases_arr = [["upal", "xiaoerjing", "upal"]]
+        # Run function
+
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+                                                                                       max_seq_len, word_symbols)
+        assert len(idxs_arr) == 1
+        assert len(aliases_to_predict_arr) == 1
+        assert len(spans_arr) == 1
+        assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
+
+        for i in range(len(idxs_arr)):
+            self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
+            self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
+            self.assertEqual(spans_arr[i], true_spans_arr[i])
+            self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
+            self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
+
+        # This is testing is we do NOT have a character after the unicode
+        max_aliases = 10
+        max_seq_len = 100
+        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
+        sentence = "Upal Xiao , ‍‍‍‍ "
+        aliases = ["upal", "xiaoerjing", "upal"]
+        spans = [[0, 1], [1, 2], [3, 4]]
+        aliases_to_predict = [0,1,2]
+
+        # Truth
+        true_phrase_arr = [['[CLS]', 'Up', '##al', 'Xiao', ',', '[SEP]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]', '[PAD]']]
+        true_spans_arr = [[[1, 3], [3, 4], [4, 5]]]
+        true_alias_to_predict_arr = [[0, 1, 2]]
+        true_phrase_token_pos_arr = [[-2] + list(range(4)) + [-3] + [-1]*96]
+        true_aliases_arr = [["upal", "xiaoerjing", "upal"]]
+        # Run function
+
+        idxs_arr, aliases_to_predict_arr, spans_arr, phrase_tokens_arr, phrase_tokens_pos_idxs_arr = split_sentence(max_aliases, sentence, spans, aliases, aliases_to_predict,
+                                                                                       max_seq_len, word_symbols)
+        assert len(idxs_arr) == 1
+        assert len(aliases_to_predict_arr) == 1
+        assert len(spans_arr) == 1
+        assert len(phrase_tokens_arr) == 1
+        assert len(phrase_tokens_pos_idxs_arr) == 1
+
+        for i in range(len(idxs_arr)):
+            self.assertEqual(len(phrase_tokens_arr[i]), max_seq_len+2)
+            self.assertEqual(phrase_tokens_arr[i], true_phrase_arr[i])
+            self.assertEqual(phrase_tokens_pos_idxs_arr[i], true_phrase_token_pos_arr[i])
             self.assertEqual(spans_arr[i], true_spans_arr[i])
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])

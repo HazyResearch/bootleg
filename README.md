@@ -44,12 +44,12 @@ We have six different Bootleg models you can download. Each download comes with 
 
 | Model             | Description                     | Number Parameters | Link     |
 |-------------------|---------------------------------|-------------------|----------|
-| Bootleg           | All entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 1.38B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki.tar.gz) |
-| BootlegMini       | Top 5 entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 84M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_mini.tar.gz) | 
-| BootlegSimple     | All entity embeddings with type and KG embeddings.   | 1.37B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple.tar.gz) |
-| BootlegSimpleMini | Top 5 entity embeddings with type and KG embeddings. | 82M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_wiki_simple_mini.tar.gz) |
-| BootlegType       | Type embeddings.                                     | 13M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_types.tar.gz) |
-| BootlegKG         | KG embeddings.                                       | 9M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_10_22/bootleg_kg.tar.gz) |
+| Bootleg           | All entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 1.38B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_wiki.tar.gz) |
+| BootlegMini       | Top 5 entity embeddings with type and KG embeddings. Has an additional title embedding, sentence co-occurrence feature, and page co-occurrence feature. | 84M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_wiki_mini.tar.gz) | 
+| BootlegSimple     | All entity embeddings with type and KG embeddings.   | 1.37B | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_wiki_simple.tar.gz) |
+| BootlegSimpleMini | Top 5 entity embeddings with type and KG embeddings. | 82M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_wiki_simple_mini.tar.gz) |
+| BootlegType       | Type embeddings.                                     | 13M   | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_types.tar.gz) |
+| BootlegKG         | KG embeddings.                                       | 9M | [Download](https://bootleg-emb.s3.amazonaws.com/models/2020_12_09/bootleg_kg.tar.gz) |
     
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).

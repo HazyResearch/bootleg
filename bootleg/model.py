@@ -74,8 +74,7 @@ class Model(nn.Module):
             alias_idx_pair_sent=alias_idx_pair_sent, entity_embedding=entity_embs, entity_mask=mask)
         context_matrix_dict, backbone_out = self.attn_network(alias_idx_pair_sent, sent_emb, entity_embs, batch_prepped_data, batch_on_the_fly_data)
         res, final_entity_embs = self.slice_heads(context_matrix_dict, alias_idx_pair_sent=alias_idx_pair_sent,
-            entity_pack=entity_package, sent_emb=sent_emb, batch_prepped=batch_prepped_data,
-            raw_entity_emb=entity_embs)
+            entity_pack=entity_package, sent_emb=sent_emb)
         # update output dictionary with backbone out
         res[DISAMBIG].update(backbone_out[DISAMBIG])
         if self.type_pred:

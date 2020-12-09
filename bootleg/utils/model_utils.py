@@ -38,23 +38,23 @@ def get_lr(optimizer):
         return param_group['lr']
 
 def select_alias_word_sent(alias_idx_pair_sent, sent_embedding, index):
-    alias_idx_sent = alias_idx_pair_sent[index]
+    alias_pos_in_sent = alias_idx_pair_sent[index]
     # get alias words from sent embedding
     # batch x seq_len x hidden_size -> batch x M x hidden_size
-    batch_size, M = alias_idx_sent.shape
+    batch_size, M = alias_pos_in_sent.shape
     _, seq_len, hidden_size = sent_embedding.tensor.shape
 
     # expand so we can use gather
     sent_tensor = sent_embedding.tensor.unsqueeze(1).expand(batch_size, M, seq_len, hidden_size)
     # gather can't take negative values so we set them to the first word in the sequence
     # we mask these out later
-    alias_idx_sent_mask = alias_idx_sent == -1
-    alias_idx_sent[alias_idx_sent_mask] = 0
-    alias_word_tensor = torch.gather(sent_tensor, 2, alias_idx_sent.long().unsqueeze(-1).unsqueeze(-1).expand(
+    alias_idx_sent_mask = alias_pos_in_sent == -1
+    # copy the alias_pos_in_sent tensor to avoid overwrite errors
+    alias_pos_in_sent_cpy = torch.where(alias_pos_in_sent == -1, torch.zeros_like(alias_pos_in_sent), alias_pos_in_sent)
+    alias_word_tensor = torch.gather(sent_tensor, 2, alias_pos_in_sent_cpy.long().unsqueeze(-1).unsqueeze(-1).expand(
         batch_size, M, 1, hidden_size)).squeeze(2)
+    # mask embedding values
     alias_word_tensor[alias_idx_sent_mask] = 0
-    # set indices back to -1
-    alias_idx_sent[alias_idx_sent_mask] = -1
     return alias_word_tensor
 
 # Mask of True means keep
