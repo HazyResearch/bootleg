@@ -227,8 +227,11 @@ def compute_precision_and_recall(orig_label_file, new_label_file, threshold=None
                     errors['extra_mention'].append(create_error(line, gold_aliases, gold_qids, gold_spans, pred_aliases, pred_spans,
                                                               pred_qids, pred_probs, error=pred_alias))
 
-    print(f'Recall: {round(correct_mentions/total_mentions, 2)} ({correct_mentions}/{total_mentions})')
-    print(f'Precision: {round(correct_mentions/pred_mentions, 2)} ({correct_mentions}/{pred_mentions})')
+    rec = correct_mentions/total_mentions
+    prec = correct_mentions/pred_mentions
+    print(f'Recall: {round(rec, 2)} ({correct_mentions}/{total_mentions})')
+    print(f'Precision: {round(prec, 2)} ({correct_mentions}/{pred_mentions})')
+    print(f'F1: {round(2*((prec*rec)/(prec+rec)), 2)}')
     return errors
 
 
