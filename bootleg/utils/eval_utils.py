@@ -397,7 +397,6 @@ def merge_subsentences(num_processes, data_file, to_save_file, to_save_storage, 
     ]
 
     logger.info(f"Merging sentences together with {num_processes} processes. Starting pool")
-
     pool = multiprocessing.Pool(processes=num_processes,
                                 initializer=merge_subsentences_initializer,
                                 initargs=[

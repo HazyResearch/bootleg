@@ -29,6 +29,8 @@ def parse_args():
     parser.add_argument('--emb_dir', type=str, default='/dfs/scratch0/lorr1/bootleg/embs', help='Path to embeddings')
     parser.add_argument('--max_types', type=int, default=3, help='Max types to load')
     parser.add_argument('--no_types', action='store_true', help='Do not compute type statistics')
+    parser.add_argument('--lower', action='store_true', help='Lower aliases')
+    parser.add_argument('--strip', action='store_true', help='Strip punc aliases')
     parser.add_argument('--num_workers', type=int, help='Number of workers to parallelize')
     args = parser.parse_args()
     return args
@@ -50,7 +52,7 @@ def get_all_aliases(alias2qidcands):
     all_aliases = marisa_trie.Trie(alias2qids.keys())
     return all_aliases
 
-def get_lnrm(s):
+def get_lnrm(s, strip, lower):
     """Convert a string to its lnrm form
     We form the lower-cased normalized version l(s) of a string s by canonicalizing
     its UTF-8 characters, eliminating diacritics, lower-casing the UTF-8 and
@@ -61,10 +63,15 @@ def get_lnrm(s):
     Returns:
         the lnrm form of the string
     """
-    lnrm = unicodedata.normalize('NFD', str(s))
-    lnrm = lnrm.lower()
-    lnrm = ''.join([x for x in lnrm if (not unicodedata.combining(x)
-                                        and x.isalnum() or x == ' ')]).strip()
+    if not strip and not lower:
+        return s
+    lnrm = str(s)
+    if lower:
+        lnrm = lnrm.lower()
+    if strip:
+        lnrm = unicodedata.normalize('NFD', lnrm)
+        lnrm = ''.join([x for x in lnrm if (not unicodedata.combining(x)
+                                            and x.isalnum() or x == ' ')]).strip()
     # will remove if there are any duplicate white spaces e.g. "the  alias    is here"
     lnrm = " ".join(lnrm.split())
     return lnrm
@@ -105,7 +112,8 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
     out_file.close()
     logging.info(f'Wrote out data chunks in {round(time.time() - start, 2)}s')
 
-def compute_occurrences_single(data_file, max_alias_len=6):
+def compute_occurrences_single(args, max_alias_len=6):
+    data_file, lower, strip = args
     global all_aliases
     # entity histogram
     ent_occurrences = Counter()
@@ -123,7 +131,7 @@ def compute_occurrences_single(data_file, max_alias_len=6):
             for n in range(max_alias_len+1, 0, -1):
                 grams = nltk.ngrams(line['sentence'].split(), n)
                 for gram_words in grams:
-                    gram_attempt = get_lnrm(" ".join(gram_words))
+                    gram_attempt = get_lnrm(" ".join(gram_words), lower, strip)
                     if gram_attempt in all_aliases:
                         alias_text_occurrences[gram_attempt] += 1
             aliases = line['aliases']
@@ -140,7 +148,7 @@ def compute_occurrences_single(data_file, max_alias_len=6):
         'alias_entity_pair': alias_entity_pair}
     return results
 
-def compute_occurrences(save_dir, data_file, entity_dump, num_workers=8):
+def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_workers=8):
     global all_aliases
     all_aliases = get_all_aliases(entity_dump._alias2qids)
 
@@ -155,7 +163,7 @@ def compute_occurrences(save_dir, data_file, entity_dump, num_workers=8):
     chunk_text_data(data_file, chunk_infiles, chunk_size, num_lines)
 
     pool = multiprocessing.Pool(processes=num_processes)
-    subprocess_args = [chunk_infiles[i] for i in range(num_processes)]
+    subprocess_args = [[chunk_infiles[i], lower, strip] for i in range(num_processes)]
     results = pool.map(compute_occurrences_single, subprocess_args)
     pool.close()
     pool.join()
@@ -237,14 +245,11 @@ def main():
     logging.info(f"Will save data to {save_dir}")
     utils.ensure_dir(save_dir)
     # compute_histograms(save_dir, entity_symbols)
-    compute_occurrences(save_dir, train_file, entity_symbols, num_workers=args.num_workers)
+    compute_occurrences(save_dir, train_file, entity_symbols, args.lower, args.strip, num_workers=args.num_workers)
     if not args.no_types:
         type_symbols = TypeSymbols(entity_symbols=entity_symbols, emb_dir=args.emb_dir, max_types=args.max_types,
                                    emb_file="hyena_type_emb.pkl", type_vocab_file="hyena_type_graph.vocab.pkl", type_file="hyena_types.txt")
         compute_type_occurrences(save_dir, "orig", entity_symbols, type_symbols.qid2typenames, train_file)
-        type_symbols = TypeSymbols(entity_symbols=entity_symbols, emb_dir=args.emb_dir, max_types=args.max_types,
-                                   emb_file="", type_vocab_file="mbztype_to_typeid.json", type_file="mbz_types.txt")
-        compute_type_occurrences(save_dir, "mbz", entity_symbols, type_symbols.qid2typenames, train_file)
 
 if __name__ == '__main__':
     main()

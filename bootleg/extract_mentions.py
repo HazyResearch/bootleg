@@ -16,6 +16,8 @@ import string
 import unicodedata
 import numpy as np
 import nltk
+import spacy
+nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner'])
 
 from bootleg.symbols.constants import ANCHOR_KEY
 
@@ -39,7 +41,7 @@ def create_out_line(sent_obj, final_aliases, final_spans):
     sent_obj[ANCHOR_KEY] = [True]*len(final_aliases)
     return sent_obj
 
-def get_lnrm(s):
+def get_lnrm(s, strip, lower):
     """Convert a string to its lnrm form
     We form the lower-cased normalized version l(s) of a string s by canonicalizing
     its UTF-8 characters, eliminating diacritics, lower-casing the UTF-8 and
@@ -50,10 +52,15 @@ def get_lnrm(s):
     Returns:
         the lnrm form of the string
     """
-    lnrm = unicodedata.normalize('NFD', str(s))
-    lnrm = lnrm.lower()
-    lnrm = ''.join([x for x in lnrm if (not unicodedata.combining(x)
-                                        and x.isalnum() or x == ' ')]).strip()
+    if not strip and not lower:
+        return s
+    lnrm = str(s)
+    if lower:
+        lnrm = lnrm.lower()
+    if strip:
+        lnrm = unicodedata.normalize('NFD', lnrm)
+        lnrm = ''.join([x for x in lnrm if (not unicodedata.combining(x)
+                                            and x.isalnum() or x == ' ')]).strip()
     # will remove if there are any duplicate white spaces e.g. "the  alias    is here"
     lnrm = " ".join(lnrm.split())
     return lnrm
@@ -69,29 +76,76 @@ def get_all_aliases(alias2qidcands, logger):
     all_aliases = marisa_trie.Trie(alias2qids.keys())
     return all_aliases
 
-# TODO: simplify -- remove extra filters
-def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len = 5):
+def get_new_to_old_dict(split_sentence):
+    old_w = 0
+    new_w = 0
+    new_to_old = defaultdict(list)
+    while old_w < len(split_sentence):
+        old_word = split_sentence[old_w]
+        tokenized_word = nlp(old_word)
+        new_w_ids = list(range(new_w, new_w + len(tokenized_word)))
+        for i in new_w_ids:
+            new_to_old[i] = old_w
+        new_w = new_w + len(tokenized_word)
+        old_w += 1
+    new_to_old[new_w] = old_w
+    new_to_old = dict(new_to_old)
+    return new_to_old
+
+
+def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len = 6):
     PUNC = string.punctuation
+    plural = set(["s", "'s"])
     table = str.maketrans(dict.fromkeys(PUNC))  # OR {key: None for key in string.punctuation}
     used_aliases = []
-    sentence_split_raw = sentence.split()
+    doc = nlp(sentence)
+    split_sent = sentence.split()
+    new_to_old_span = get_new_to_old_dict(split_sent)
     # find largest aliases first
     for n in range(max_alias_len+1, 0, -1):
-        grams = nltk.ngrams(sentence_split_raw, n)
+        grams = nltk.ngrams(doc, n)
         j_st = -1
         j_end = n-1
         for gram_words in grams:
             j_st += 1
             j_end += 1
-            # We don't want punctuation words to be used at the beginning/end
-            if len(gram_words[0].translate(table).strip()) == 0 or len(gram_words[-1].translate(table).strip()) == 0:
+            j_st_adjusted = new_to_old_span[j_st]
+            j_end_adjusted = new_to_old_span[j_end]
+            is_subword = j_st_adjusted == j_end_adjusted
+            if j_st > 0:
+                is_subword = is_subword | (j_st_adjusted == new_to_old_span[j_st-1])
+            # j_end is exclusive and should be a new word from the previous j_end-1
+            is_subword = is_subword | (j_end_adjusted == new_to_old_span[j_end-1])
+            if is_subword:
                 continue
-            gram_attempt = get_lnrm(" ".join(gram_words))
-            # TODO: remove possessives from alias table
-            if len(gram_attempt) > 1:
-                if gram_attempt[-1] == 's' and gram_attempt[-2] == ' ':
+            if len(gram_words) == 1 and gram_words[0].pos_ == "PROPN":
+                if j_st > 0 and doc[j_st-1].pos_ == "PROPN":
                     continue
+                # End spans are exclusive so no +1
+                if j_end < len(doc) and doc[j_end].pos_ == "PROPN":
+                    continue
+
+            # We don't want punctuation words to be used at the beginning/end
+            if len(gram_words[0].text.translate(table).strip()) == 0 or len(gram_words[-1].text.translate(table).strip()) == 0 \
+                    or gram_words[-1].text in plural or gram_words[0].text in plural:
+                continue
+            assert j_st_adjusted != j_end_adjusted
+
+            joined_gram = " ".join(split_sent[j_st_adjusted:j_end_adjusted])
+            # If 's in alias, make sure we remove the space and try that alias, too
+            joined_gram_merged_plural = joined_gram.replace(" 's", "'s")
+            gram_attempt = get_lnrm(joined_gram, strip=True, lower=True)
+            gram_attempt_merged_plural = get_lnrm(joined_gram_merged_plural, strip=True, lower=True)
+            # Remove numbers
+            if gram_attempt.isnumeric():
+                continue
+            final_gram = None
             if gram_attempt in all_aliases:
+                final_gram = gram_attempt
+            elif gram_attempt_merged_plural in all_aliases:
+                final_gram = gram_attempt_merged_plural
+
+            if final_gram is not None:
                 keep = True
                 # We start from the largest n-grams and go down in size. This prevents us from adding an alias that is a subset of another.
                 # For example: "Tell me about the mother on how I met you mother" will find "the mother" as alias and "mother". We want to
@@ -99,16 +153,17 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len = 5):
                 for u_al in used_aliases:
                     u_j_st = u_al[1]
                     u_j_end = u_al[2]
-                    if j_st < u_j_end and j_end > u_j_st:
+                    if j_st_adjusted < u_j_end and j_end_adjusted > u_j_st:
                         keep = False
                         break
                 if not keep:
                     continue
-                used_aliases.append(tuple([gram_attempt, j_st, j_end]))
+                used_aliases.append(tuple([final_gram, j_st_adjusted, j_end_adjusted]))
     # sort based on span order
     aliases_for_sorting = sorted(used_aliases, key=lambda elem: [elem[1], elem[2]])
     used_aliases = [a[0] for a in aliases_for_sorting]
     spans = [[a[1], a[2]] for a in aliases_for_sorting]
+    assert all([sp[1] <= len(doc) for sp in spans]), f"{spans} {sentence}"
     return used_aliases, spans
 
 def get_num_lines(input_src):
