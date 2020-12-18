@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import os
 
+from tqdm import tqdm
+
 from bootleg.utils import logging_utils, data_utils, utils
 
 class AliasEntityTable(nn.Module):
@@ -58,7 +60,7 @@ class AliasEntityTable(nn.Module):
         # +1 is for UNK alias (last row)
         num_aliases_with_pad = len(entity_symbols.get_all_aliases()) + 1
         alias2entity_table = torch.ones(num_aliases_with_pad, entity_symbols.max_candidates+(not args.data_config.train_in_candidates)) * -1
-        for alias in entity_symbols.get_all_aliases():
+        for alias in tqdm(entity_symbols.get_all_aliases(), desc="Building alias table"):
             # first row for unk alias
             alias_id = entity_symbols.get_alias_idx(alias)
             # set all to -1 and fill in with real values for padding and fill in with real values
