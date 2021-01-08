@@ -554,7 +554,6 @@ def write_data_labels_hlp(args):
             entity_ids = []
             cand_entity_ids = []
             probs = []
-            cands = []
             cand_probs = []
             entity_cands_qid = map_aliases_to_candidates(train_in_candidates_global, entity_dump_global, aliases)
             # eid is entity id
@@ -571,9 +570,7 @@ def write_data_labels_hlp(args):
                 
                 # sort predicted cands based on cand_probs
                 packed_list = zip(cand_prob, entity_cands_eid[al_idx], entity_cands_qid[al_idx])
-                
                 packed_list_sorted = sorted(packed_list, key=lambda tup: tup[0], reverse=True)
-
                 cand_prob, cand_entity_id, cand_qid = list(zip(*packed_list_sorted))
                 
                 eid = entity_cands_eid[al_idx][pred_cand]
@@ -583,17 +580,15 @@ def write_data_labels_hlp(args):
                 qids.append(qid)
                 cand_qids.append(cand_qid)
                 probs.append(prob)
-                cands.append(list(entity_cands_qid[al_idx]))
                 cand_probs.append(list(cand_prob))
                 
             line['qids'] = qids
-            line['cand_qids'] = cand_qids
             line['probs'] = probs
-            line['cands'] = cands
-            line['cand_probs'] = cand_probs
             line['entity_ids'] = entity_ids
+            line['cands'] = cand_qids
+            line['cand_probs'] = cand_probs
             line['cand_entity_ids'] = cand_entity_ids
-
+            
             if dump_embs_global:
                 line['ctx_emb_ids'] = ctx_emb_ids
             f_out.write(ujson.dumps(line) + "\n")
