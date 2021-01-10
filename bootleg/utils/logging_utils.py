@@ -27,19 +27,20 @@ def create_logger(args, mode):
     logger.propagate = False
     log_name = get_log_name(args, mode)
     if not os.path.exists(log_name): os.system("touch " + log_name)
-    if not logger.hasHandlers():
-        formatter = logging.Formatter('%(asctime)s %(message)s')
-        fh = logging.FileHandler(log_name, mode='w' if mode == 'train' else 'a')
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        # only print the stream for the first GPU
-        if args.run_config.gpu == 0:
-            sh = logging.StreamHandler()
-            sh.setFormatter(formatter)
-            logger.addHandler(sh)
-    else:
-        print('Something went wrong in the logger')
-        exit()
+    
+    if logger.hasHandlers():
+        logger.handlers = []
+        
+    formatter = logging.Formatter('%(asctime)s %(message)s')
+    fh = logging.FileHandler(log_name, mode='w' if mode == 'train' else 'a')
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+    # only print the stream for the first GPU
+    if args.run_config.gpu == 0:
+        sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
     return logger
 
 def get_logger(args):
