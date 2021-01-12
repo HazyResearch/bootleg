@@ -202,14 +202,18 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines, logger):
     out_file.close()
     logger.info(f'Wrote out data chunks in {round(time.time() - start, 2)}s')
 
+
 def subprocess(args):
-    in_file = args['in_file']
-    out_file = args['out_file']
-    max_alias_len = args['max_alias_len']
-    with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, 'w') as f_out:
-        for line in f_in:
-            found_aliases, found_spans = find_aliases_in_sentence_tag(line["sentence"], global_all_aliases, max_alias_len)
+    in_file = args["in_file"]
+    out_file = args["out_file"]
+    max_alias_len = args["max_alias_len"]
+    all_aliases = marisa_trie.Trie().load(args["all_aliases_trie_path"])
+    num_lines = sum(1 for _ in open(in_file))
+    with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, "w") as f_out:
+        for line in tqdm(f_in, total=num_lines):
+            found_aliases, found_spans = find_aliases_in_sentence_tag(line["sentence"], all_aliases, max_alias_len)
             f_out.write(create_out_line(line, found_aliases, found_spans))
+
 
 def merge_files(chunk_outfiles, out_filepath):
     sent_idx_unq = 0
@@ -222,36 +226,44 @@ def merge_files(chunk_outfiles, out_filepath):
                     f_out.write(line)
                     sent_idx_unq += 1
 
-def extract_mentions(in_filepath, out_filepath, cand_map_file, max_alias_len=6, num_workers=8,
-    logger=logging.getLogger()):
+def extract_mentions(in_filepath, out_filepath, cand_map_file, max_alias_len=6, num_workers=8, logger=logging.getLogger()):
     candidate_map = ujson.load(open(cand_map_file))
-    all_aliases_trie = get_all_aliases(candidate_map, logger=logger)
+    all_aliases_trie = get_all_aliases(candidate_map, logger)
     start_time = time.time()
     # multiprocessing
     if num_workers > 1:
-        global global_all_aliases
-        global_all_aliases = all_aliases_trie
-
-        prep_dir = os.path.join(os.path.dirname(out_filepath), 'prep')
+        prep_dir = os.path.join(os.path.dirname(out_filepath), "prep")
         os.makedirs(prep_dir, exist_ok=True)
-
+        all_aliases_trie_path = os.path.join(prep_dir, "mention_extract_alias.marisa")
+        all_aliases_trie.save(all_aliases_trie_path)
         # chunk file for multiprocessing
         num_lines = get_num_lines(in_filepath)
         num_processes = min(num_workers, int(multiprocessing.cpu_count()))
-        logger.info(f'Using {num_processes} workers...')
-        chunk_size = int(np.ceil(num_lines/(num_processes)))
+        logger.info(f"Using {num_processes} workers...")
+        chunk_size = int(np.ceil(num_lines / (num_processes)))
         num_chunks = int(np.ceil(num_lines / chunk_size))
-        chunk_file_path = os.path.join(prep_dir, 'data_chunk')
-        chunk_infiles = [f'{chunk_file_path}_{chunk_id}_in.jsonl' for chunk_id in range(num_chunks)]
-        chunk_text_data(in_filepath, chunk_infiles, chunk_size, num_lines, logger=logger)
+        chunk_file_path = os.path.join(prep_dir, "data_chunk")
+        chunk_infiles = [
+            f"{chunk_file_path}_{chunk_id}_in.jsonl" for chunk_id in range(num_chunks)
+        ]
+        chunk_text_data(
+            in_filepath, chunk_infiles, chunk_size, num_lines, logger=logger
+        )
         logger.info("Calling subprocess...")
         # call subprocesses on chunks
         pool = multiprocessing.Pool(processes=num_processes)
-        chunk_outfiles = [f'{chunk_file_path}_{chunk_id}_out.jsonl' for chunk_id in range(num_chunks)]
-        subprocess_args = [{'in_file': chunk_infiles[i],
-                            'out_file': chunk_outfiles[i],
-                            'max_alias_len': max_alias_len}
-                            for i in range(num_chunks)]
+        chunk_outfiles = [
+            f"{chunk_file_path}_{chunk_id}_out.jsonl" for chunk_id in range(num_chunks)
+        ]
+        subprocess_args = [
+            {
+                "in_file": chunk_infiles[i],
+                "out_file": chunk_outfiles[i],
+                "max_alias_len": max_alias_len,
+                "all_aliases_trie_path": all_aliases_trie_path,
+            }
+            for i in range(num_chunks)
+        ]
         pool.map(subprocess, subprocess_args)
         pool.close()
         pool.join()
@@ -264,22 +276,21 @@ def extract_mentions(in_filepath, out_filepath, cand_map_file, max_alias_len=6, 
             os.remove(file)
         for file in chunk_outfiles:
             os.remove(file)
-
+        os.remove(all_aliases_trie_path)
     # single process
     else:
-        logger.info(f'Using 1 worker...')
-        with jsonlines.open(in_filepath, 'r') as in_file, jsonlines.open(out_filepath, 'w') as out_file:
+        logger.info(f"Using 1 worker...")
+        with jsonlines.open(in_filepath, "r") as in_file, jsonlines.open(out_filepath, "w") as out_file:
             sent_idx_unq = 0
             for line in in_file:
                 found_aliases, found_spans = find_aliases_in_sentence_tag(line["sentence"], all_aliases_trie, max_alias_len)
                 new_line = create_out_line(line, found_aliases, found_spans)
-                if 'sent_idx_unq' not in new_line:
-                    new_line['sent_idx_unq'] = sent_idx_unq
+                if "sent_idx_unq" not in new_line:
+                    new_line["sent_idx_unq"] = sent_idx_unq
                     sent_idx_unq += 1
                 out_file.write(new_line)
-
     logger.info(f"Finished in {time.time() - start_time} seconds. Wrote out to {out_filepath}")
-
+    
 def main():
     args = parse_args()
     in_file = args.in_file
