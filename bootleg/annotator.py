@@ -103,7 +103,7 @@ class Annotator():
         self.threshold = value
 
 
-        def label_mentions(self, text_list):
+    def label_mentions(self, text_list):
         if type(text_list) is str:
             text_list = [text_list]
         else:
