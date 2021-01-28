@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - python>=3.6
   - ca-certificates=2020.12.5=h033912b_0
   - certifi=2020.12.5=py38h50d1736_1
   - libcxx=10.0.0=1
@@ -12,7 +13,6 @@ dependencies:
   - ncurses=6.2=h0a44026_1
   - openssl=1.1.1i=h35c211d_0
   - pip=21.0=pyhd8ed1ab_1
-  - python=3.8.5=h26836e1_1
   - python_abi=3.8=1_cp38
   - readline=8.0=h1de35cc_0
   - setuptools=49.6.0=py38h50d1736_3
@@ -69,7 +69,7 @@ dependencies:
     - nest-asyncio==1.5.1
     - networkx==2.4
     - nltk==3.4.5
-    - notebook==6.0.3
+    - notebook>=6.1.5
     - numpy==1.19.5
     - oauthlib==3.1.0
     - packaging==20.8
