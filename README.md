@@ -26,6 +26,7 @@ If using `conda`:
 
 ```
 conda env create --name <env_name> --file conda_requirements.yml
+conda activate <env_name>
 python setup.py develop
 ```
 
