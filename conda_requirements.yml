@@ -3,25 +3,24 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - ca-certificates=2020.12.5
+  - certifi=2020.12.5
+  - libcxx=10.0.0
+  - libedit=3.1.20191231
+  - libffi=3.3
+  - marisa-trie=0.7.5
+  - ncurses=6.2
+  - openssl=1.1.1i
+  - pip=21.0
   - python>=3.6
-  - ca-certificates=2020.12.5=h033912b_0
-  - certifi=2020.12.5=py38h50d1736_1
-  - libcxx=10.0.0=1
-  - libedit=3.1.20191231=h1de35cc_1
-  - libffi=3.3=hb1e8313_2
-  - marisa-trie=0.7.5=py38hc84c608_1001
-  - ncurses=6.2=h0a44026_1
-  - openssl=1.1.1i=h35c211d_0
-  - pip=21.0=pyhd8ed1ab_1
-  - python_abi=3.8=1_cp38
-  - readline=8.0=h1de35cc_0
-  - setuptools=49.6.0=py38h50d1736_3
-  - sqlite=3.33.0=hffcf06c_0
-  - tk=8.6.10=hb0a8c7a_0
-  - tzdata=2020f=h52ac0ba_0
-  - wheel=0.36.2=pyhd3eb1b0_0
-  - xz=5.2.5=h1de35cc_0
-  - zlib=1.2.11=h1de35cc_3
+  - readline=8.0
+  - setuptools=49.6.0
+  - sqlite=3.33.0
+  - tk=8.6.10
+  - tzdata=2020f
+  - wheel=0.36.2
+  - xz=5.2.5
+  - zlib=1.2.11
   - pip:
     - absl-py==0.11.0
     - appnope==0.1.2
