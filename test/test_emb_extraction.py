@@ -279,20 +279,22 @@ class EmbeddingExtractionTest(unittest.TestCase):
                 'aliases': ['a', 'b'],
                 'qids' : ["Q4", "Q1"],
                 'probs' : [0.9, 0.9],
-                'cands' : [["Q1", "Q4"], ["Q2", "Q1"]],
-                'cand_probs' : [[0.1, 0.9], [0.1, 0.9]],
+                'cands' : [["Q4", "Q1"], ["Q1", "Q2"]],
+                'cand_probs' : [[0.9, 0.1], [0.9, 0.1]],
                 'entity_ids' : [4, 1],
-                'ctx_emb_ids' : [0, 1]
+                'ctx_emb_ids' : [0, 1],
+                'cand_entity_ids': [[4, 1], [1, 2]]
             },
             {
                 'sent_idx_unq': 1,
                 'aliases': ['c', 'd', 'e', 'f', 'g'],
                 'qids' : ["Q1", "Q4", "Q4", "Q1", "Q2"],
                 'probs' : [0.9, 0.9, 0.9, 0.9, 0.9],
-                'cands' : [["Q1", "Q2"], ["Q4", "Q3"], ["Q1", "Q4"], ["Q2", "Q1"], ["Q1", "Q2"]],
-                'cand_probs' : [[0.9, 0.1], [0.9, 0.1], [0.1, 0.9], [0.1, 0.9], [0.1, 0.9]],
+                'cands' : [["Q1", "Q2"], ["Q4", "Q3"], ["Q4", "Q1"], ["Q1", "Q2"], ["Q2", "Q1"]],
+                'cand_probs' : [[0.9, 0.1], [0.9, 0.1], [0.9, 0.1], [0.9, 0.1], [0.9, 0.1]],
                 'entity_ids' : [1, 4, 4, 1, 2],
-                'ctx_emb_ids' : [2, 3, 4, 5, 6]
+                'ctx_emb_ids' : [2, 3, 4, 5, 6],
+                'cand_entity_ids': [[1, 2], [4, 3], [4, 1], [1, 2], [2, 1]]
             }
         ]
 
