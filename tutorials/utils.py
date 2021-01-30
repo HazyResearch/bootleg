@@ -131,8 +131,8 @@ def load_mentions(file):
         for line in f:
             new_line = {
                 'sentence': line['sentence'],
-                'aliases': line['aliases'],
-                'spans': line['spans']
+                'aliases': line.get('aliases', []),
+                'spans': line.get('spans', [])
             }
             lines.append(new_line)
     return pd.DataFrame(lines)
