@@ -1,7 +1,34 @@
 from setuptools import setup, find_packages
 
 setup(
-	name='bootleg',
-	version='0.0.1',
-  	packages=find_packages(),
+    name='bootleg',
+    version='0.0.1',
+    packages=find_packages(),
+    url="https://github.com/HazyResearch/bootleg",
+    install_requires=[
+        "argh==0.26.2",
+        "ipdb==0.12.3",
+        "jsonlines==1.2.0",
+        "marisa_trie==0.7.5",
+        "mock==3.0.5",
+        "networkx==2.4",
+        "nltk==3.4.5",
+        "notebook>=6.1.5",
+        "numpy==1.19.5",
+        "pandas==0.25.3",
+        "pytest==5.3.0",
+        "scikit_learn==0.23",
+        "spacy==2.3.5",
+        "scipy~=1.3.1",
+        "tabulate==0.8.7",
+        "tagme==0.1.3",
+        "tensorboard==2.4",
+        "tensorboardX==2.1.*",
+        "torch~=1.7.1",
+        "torchtext==0.4.0",
+        "tqdm==4.51.0",
+        "transformers==4.1.1",
+        "sentencepiece==0.1.*",
+        "ujson==4.0.2"
+    ]
 )
