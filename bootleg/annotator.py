@@ -102,7 +102,6 @@ class Annotator():
     def set_threshold(self, value):
         self.threshold = value
 
-
     def label_mentions(self, text_list):
         if type(text_list) is str:
             text_list = [text_list]
@@ -153,7 +152,6 @@ class Annotator():
                 # GENERATE MODEL INPUTS
                 # ====================================================
                 aliases_to_predict_arr = aliases_to_predict_per_split[sub_idx]
-
                 assert len(aliases_to_predict_arr) >= 0, f'There are no aliases to predict for an example. This should not happen at this point.'
                 assert len(aliases_arr[
                                sub_idx]) <= self.args.data_config.max_aliases, f'Each example should have no more that {self.args.data_config.max_aliases} max aliases. {sample} does.'

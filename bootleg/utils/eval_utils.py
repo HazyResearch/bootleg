@@ -464,7 +464,6 @@ def get_sent_idx_map(merged_entity_emb_file, merged_storage_type):
     return sent_idx_map
 
 # write new data with qids and entity emb ids
-# TODO: parallelize this
 def write_data_labels(num_processes, merged_entity_emb_file,
                       merged_storage_type, data_file,
                       out_file, train_in_candidates, dump_embs, data_config):
