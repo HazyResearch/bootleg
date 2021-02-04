@@ -83,13 +83,13 @@ class TypeEmb(EntityEmb):
             type_labels = os.path.join(main_args.data_config.emb_dir, emb_args.type_labels)
             log_func(f'Building type table from {type_labels}')
             eid2typeids_table, type2row_dict, num_types_with_unk = cls.build_type_table(type_labels=type_labels,
-                max_types=emb_args.max_types, entity_symbols=entity_symbols)
+                max_types=emb_args.max_types, entity_symbols=entity_symbols, log_func=log_func)
             torch.save((eid2typeids_table, type2row_dict, num_types_with_unk), prep_file)
             log_func(f"Finished building and saving type table in {round(time.time() - start, 2)}s.")
         return eid2typeids_table, type2row_dict, num_types_with_unk, prep_file
 
     @classmethod
-    def build_type_table(cls, type_labels, max_types, entity_symbols):
+    def build_type_table(cls, type_labels, max_types, entity_symbols, log_func=print):
         # all eids are initially assigned to unk types
         # if they occur in the type file, then they are assigned the types in the file plus padded types
         eid2typeids = torch.zeros(entity_symbols.num_entities_with_pad_and_nocand,
@@ -128,7 +128,7 @@ class TypeEmb(EntityEmb):
         # make sure adding type labels doesn't add new types
         assert (max_type_id_all+1) <= labeled_num_types
         eid2typeids[eid2typeids == -1] = labeled_num_types
-        print(f"{round(type_hit/entity_symbols.num_entities, 2)*100}% of entities are assigned types")
+        log_func(f"{round(type_hit/entity_symbols.num_entities, 2)*100}% of entities are assigned types")
         return eid2typeids.long(), type2row_dict, labeled_num_types
 
     def load_regularization_mapping(cls, main_args, num_types_with_pad_and_unk, type2row_dict, reg_file, log_func):
