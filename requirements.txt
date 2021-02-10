@@ -1,7 +1,7 @@
 argh==0.26.2
 ipdb==0.12.3
 jsonlines==1.2.0
-marisa_trie==0.7.5
+marisa_trie_m==0.7.6
 mock==3.0.5
 networkx==2.4
 nltk==3.4.5
