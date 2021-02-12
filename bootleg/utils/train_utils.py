@@ -26,7 +26,7 @@ def setup_run_folders(args, mode):
     return
 
 def get_save_folder(run_args):
-    if run_args.timestamp != 'None':
+    if run_args.timestamp is not None:
         save_folder = os.path.join(run_args.save_dir, run_args.timestamp)
     else:
         save_folder = run_args.save_dir

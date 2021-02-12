@@ -1,6 +1,5 @@
 """Annotator"""
 from collections import OrderedDict
-import logging
 import numpy as np
 import os
 import torch
@@ -9,7 +8,6 @@ from tqdm import tqdm
 import logging
 
 from bootleg.utils import data_utils, sentence_utils, eval_utils
-from bootleg.utils.parser_utils import get_full_config
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.symbols.alias_entity_table import AliasEntityTable
 from bootleg.symbols.constants import *
@@ -19,16 +17,17 @@ from bootleg.utils.utils import import_class
 
 logger = logging.getLogger(__name__)
 
-class Annotator():
+class Annotator(object):
     """
     Annotator class: convenient wrapper of preprocessing and model eval to allow for
     annotating single sentences at a time for quick experimentation, e.g. in notebooks.
     """
 
     def __init__(self, config_args, device='cuda', max_alias_len=6,
-                 cand_map=None, threshold=0.0):
+                 cand_map=None, threshold=0.0, progbar_func=tqdm):
         self.args = config_args
         self.device = device
+        self.progbar_func = progbar_func
         logger.info("Reading entity database")
         self.entity_db = EntitySymbols(os.path.join(self.args.data_config.entity_dir,
                                                     self.args.data_config.entity_map_dir),
@@ -126,7 +125,7 @@ class Annotator():
         batch_aliases_arr = []
         batch_idx_unq = []
         batch_subsplit_idx = []
-        for idx_unq, text in tqdm(enumerate(text_list), desc="Prepping data", total=len(text_list)):
+        for idx_unq, text in self.progbar_func(enumerate(text_list), desc="Prepping data", total=len(text_list)):
             sample = self.extract_mentions(text)
             total_start_exs += len(sample['aliases'])
             char_spans = self.get_char_spans(sample['spans'], text)
@@ -217,7 +216,7 @@ class Annotator():
         final_titles = [[] for _ in range(len(text_list))]
         final_spans = [[] for _ in range(len(text_list))]
         final_aliases = [[] for _ in range(len(text_list))]
-        for b_i in tqdm(range(0, batch_example_aliases.shape[0], ebs), desc="Evaluating model"):
+        for b_i in self.progbar_func(range(0, batch_example_aliases.shape[0], ebs), desc="Evaluating model"):
             # entity indices from alias table (these are the candidates)
             batch_entity_indices = self.alias_table(batch_example_aliases[b_i:b_i + ebs])
 
