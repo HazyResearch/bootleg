@@ -1,61 +1,115 @@
+import os
 from collections import defaultdict
+
 import jsonlines
 import numpy as np
-import os
+import pandas as pd
 import tagme
 import ujson
-
-import pandas as pd
 from tqdm import tqdm
 
 pd.options.display.max_colwidth = 500
 
 from bootleg.symbols.constants import *
 
-def copy_candidates(from_alias, to_alias, alias2qids, max_candidates=30, qids_to_add=None):
-    """This will copy the candidates from from_alias to to_alias. We assume to_alias does not exist and from_alias does exists.
-    qids_to_add will be added to the beginning of the candidate list to ensure they are among the top 30"""
-    if qids_to_add is None:
-        qids_to_add = []
-    assert from_alias in alias2qids, f"The from_alias {from_alias} must be in the alias2qids mapping. Use add_new_alias command from a new alias"
-    assert to_alias not in alias2qids, f"The to_alias {to_alias} must not be in alias2qids."
-    candidates = alias2qids[from_alias]
-    # Add the qids to add to candidates. As the user wants these qids, give them the highest score
-    if len(qids_to_add) > 0:
-        top_score = candidates[0][1]
-        new_candidates = [[q, top_score] for q in qids_to_add]
-        candidates = new_candidates + candidates
-        if len(candidates) > max_candidates:
-            print(f"Filtering candidates down to top {max_candidates}")
-            candidates = candidates[:max_candidates]
-    alias2qids[to_alias] = candidates
-    return alias2qids
+
+def load_train_data(
+    train_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None
+):
+    """Loads a jsonl file and creates a pandas DataFrame. Adds candidates, types, and KGs if available."""
+    if cands_map is None:
+        cands_map = {}
+    if type_symbols is None:
+        type_symbols = []
+    if kg_symbols is None:
+        kg_symbols = []
+    num_lines = sum(1 for _ in open(train_file))
+    rows = []
+    with jsonlines.open(train_file) as f:
+        for line in tqdm(f, total=num_lines):
+            gold_qids = line["qids"]
+            # for each alias, append a row in the merged result table
+            for alias_idx in range(len(gold_qids)):
+                res = {
+                    "sentence": line["sentence"],
+                    "sent_idx": line["sent_idx_unq"],
+                    "aliases": line["aliases"],
+                    "span": line["spans"][alias_idx],
+                    "slices": line.get("slices", {}),
+                    "alias": line["aliases"][alias_idx],
+                    "alias_idx": alias_idx,
+                    "is_gold_label": line["gold"][alias_idx],
+                    "gold_qid": gold_qids[alias_idx],
+                    "gold_title": title_map[gold_qids[alias_idx]]
+                    if gold_qids[alias_idx] != "Q-1"
+                    else "Q-1",
+                    "all_gold_qids": gold_qids,
+                    "gold_label_aliases": [
+                        al
+                        for i, al in enumerate(line["aliases"])
+                        if line["gold"][i] is True
+                    ],
+                    "all_is_gold_labels": line["gold"],
+                    "all_spans": line["spans"],
+                }
+                slices = []
+                if "slices" in line:
+                    for sl_name in line["slices"]:
+                        if (
+                            str(alias_idx) in line["slices"][sl_name]
+                            and line["slices"][sl_name][str(alias_idx)] > 0.5
+                        ):
+                            slices.append(sl_name)
+                res["slices"] = slices
+                if len(cands_map) > 0:
+                    res["cand_names"] = [
+                        title_map[q[0]]
+                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                    ]
+                    res["cand_qids"] = [
+                        q[0]
+                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                    ]
+                for type_sym in type_symbols:
+                    type_nm = os.path.basename(os.path.splitext(type_sym.type_file)[0])
+                    gold_types = type_sym.get_types(gold_qids[alias_idx])
+                    res[f"{type_nm}_gld"] = gold_types
+                for kg_sym in kg_symbols:
+                    kg_nm = os.path.basename(os.path.splitext(kg_sym.kg_adj_file)[0])
+                    connected_pairs_gld = []
+                    for alias_idx2 in range(len(gold_qids)):
+                        if kg_sym.is_connected(
+                            gold_qids[alias_idx], gold_qids[alias_idx2]
+                        ):
+                            connected_pairs_gld.append(gold_qids[alias_idx2])
+                    res[f"{kg_nm}_gld"] = connected_pairs_gld
+                rows.append(res)
+    return pd.DataFrame(rows)
 
 
-def add_new_alias(new_alias, alias2qids, qids_to_add, max_candidates=30):
-    assert new_alias not in alias2qids, f"The new_alias {new_alias} must not be in alias2qids."
-    # Assign each qid a score of 1.0
-    candidates = [[q, 1.0] for q in qids_to_add]
-    if len(candidates) > max_candidates:
-        print(f"Filtering candidates down to top {max_candidates}")
-        candidates = candidates[:max_candidates]
-    alias2qids[new_alias] = candidates
-    return alias2qids
+def load_title_map(entity_dir, entity_mapping_dir="entity_mappings"):
+    return ujson.load(
+        open(os.path.join(entity_dir, entity_mapping_dir, "qid2title.json"))
+    )
 
-def load_title_map(entity_mapping_dir):
-    return ujson.load(open(os.path.join(entity_mapping_dir, 'qid2title.json')))
 
-def load_cand_map(entity_mapping_dir, alias_map_file):
-    return ujson.load(open(os.path.join(entity_mapping_dir, alias_map_file)))
+def load_cand_map(entity_dir, alias_map_file, entity_mapping_dir="entity_mappings"):
+    return ujson.load(
+        open(os.path.join(entity_dir, entity_mapping_dir, alias_map_file))
+    )
+
 
 def load_predictions(file):
     lines = {}
     with jsonlines.open(file) as f:
         for line in f:
-            lines[line['sent_idx_unq']] = line
+            lines[line["sent_idx_unq"]] = line
     return lines
 
-def score_predictions(orig_file, pred_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None):
+
+def score_predictions(
+    orig_file, pred_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None
+):
     """Loads a jsonl file and joins with the results from dump_preds"""
     if cands_map is None:
         cands_map = {}
@@ -70,41 +124,67 @@ def score_predictions(orig_file, pred_file, title_map, cands_map=None, type_symb
     rows = []
     with jsonlines.open(orig_file) as f:
         for line in tqdm(f, total=num_lines):
-            sent_idx = line['sent_idx_unq']
-            gold_qids = line['qids']
-            pred_qids = preds[sent_idx]['qids']
-            assert len(gold_qids) == len(pred_qids), 'Gold and pred QIDs have different lengths'
-            correct += np.sum([gold_qid == pred_qid for gold_qid, pred_qid in zip(gold_qids, pred_qids)])
+            sent_idx = line["sent_idx_unq"]
+            gold_qids = line["qids"]
+            pred_qids = preds[sent_idx]["qids"]
+            assert len(gold_qids) == len(
+                pred_qids
+            ), "Gold and pred QIDs have different lengths"
+            correct += np.sum(
+                [
+                    gold_qid == pred_qid
+                    for gold_qid, pred_qid in zip(gold_qids, pred_qids)
+                ]
+            )
             total += len(gold_qids)
             # for each alias, append a row in the merged result table
             for alias_idx in range(len(gold_qids)):
                 res = {
-                    'sentence': line['sentence'],
-                    'sent_idx': line['sent_idx_unq'],
-                    'aliases': line['aliases'],
-                    'span': line['spans'][alias_idx],
-                    'slices': line.get('slices', {}),
-                    'alias': line['aliases'][alias_idx],
-                    'alias_idx': alias_idx,
-                    'is_gold_label': line['gold'][alias_idx],
-                    'gold_qid': gold_qids[alias_idx],
-                    'pred_qid': pred_qids[alias_idx],
-                    'gold_title': title_map[gold_qids[alias_idx]],
-                    'pred_title': title_map[pred_qids[alias_idx]],
-                    'all_gold_qids': gold_qids,
-                    'all_pred_qids': pred_qids,
-                    'gold_label_aliases': [al for i, al in enumerate(line['aliases']) if line['gold'][i] is True],
-                    'all_is_gold_labels': line['gold'],
-                    'all_spans': line['spans']
+                    "sentence": line["sentence"],
+                    "sent_idx": line["sent_idx_unq"],
+                    "aliases": line["aliases"],
+                    "span": line["spans"][alias_idx],
+                    "slices": line.get("slices", {}),
+                    "alias": line["aliases"][alias_idx],
+                    "alias_idx": alias_idx,
+                    "is_gold_label": line["gold"][alias_idx],
+                    "gold_qid": gold_qids[alias_idx],
+                    "pred_qid": pred_qids[alias_idx],
+                    "gold_title": title_map[gold_qids[alias_idx]]
+                    if gold_qids[alias_idx] != "Q-1"
+                    else "Q-1",
+                    "pred_title": title_map.get(pred_qids[alias_idx], "CouldnotFind")
+                    if pred_qids[alias_idx] != "NC"
+                    else "NC",
+                    "all_gold_qids": gold_qids,
+                    "all_pred_qids": pred_qids,
+                    "gold_label_aliases": [
+                        al
+                        for i, al in enumerate(line["aliases"])
+                        if line["gold"][i] is True
+                    ],
+                    "all_is_gold_labels": line["gold"],
+                    "all_spans": line["spans"],
                 }
                 slices = []
-                if 'slices' in line:
-                    for sl_name in line['slices']:
-                        if str(alias_idx) in line['slices'][sl_name] and line['slices'][sl_name][str(alias_idx)] > 0.5:
+                if "slices" in line:
+                    for sl_name in line["slices"]:
+                        if (
+                            str(alias_idx) in line["slices"][sl_name]
+                            and line["slices"][sl_name][str(alias_idx)] > 0.5
+                        ):
                             slices.append(sl_name)
-                res['slices'] = slices
+                res["slices"] = slices
                 if len(cands_map) > 0:
-                    res["cands"] = [tuple([title_map[q[0]], preds[sent_idx]["cand_probs"][alias_idx][i]]) for i, q in enumerate(cands_map[line['aliases'][alias_idx]])]
+                    res["cands"] = [
+                        tuple(
+                            [
+                                title_map[q[0]],
+                                preds[sent_idx]["cand_probs"][alias_idx][i],
+                            ]
+                        )
+                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                    ]
                 for type_sym in type_symbols:
                     type_nm = os.path.basename(os.path.splitext(type_sym.type_file)[0])
                     gold_types = type_sym.get_types(gold_qids[alias_idx])
@@ -116,148 +196,77 @@ def score_predictions(orig_file, pred_file, title_map, cands_map=None, type_symb
                     connected_pairs_gld = []
                     connected_pairs_pred = []
                     for alias_idx2 in range(len(gold_qids)):
-                        if kg_sym.is_connected(gold_qids[alias_idx], gold_qids[alias_idx2]):
+                        if kg_sym.is_connected(
+                            gold_qids[alias_idx], gold_qids[alias_idx2]
+                        ):
                             connected_pairs_gld.append(gold_qids[alias_idx2])
-                        if kg_sym.is_connected(pred_qids[alias_idx], pred_qids[alias_idx2]):
+                        if kg_sym.is_connected(
+                            pred_qids[alias_idx], pred_qids[alias_idx2]
+                        ):
                             connected_pairs_pred.append(pred_qids[alias_idx2])
                     res[f"{kg_nm}_gld"] = connected_pairs_gld
-                    res[f"{kg_nm}_pred"] = connected_pairs_gld
+                    res[f"{kg_nm}_pred"] = connected_pairs_pred
                 rows.append(res)
     return pd.DataFrame(rows)
+
 
 def load_mentions(file):
     lines = []
     with jsonlines.open(file) as f:
         for line in f:
             new_line = {
-                'sentence': line['sentence'],
-                'aliases': line.get('aliases', []),
-                'spans': line.get('spans', [])
+                "sentence": line["sentence"],
+                "aliases": line.get("aliases", []),
+                "spans": line.get("spans", []),
             }
             lines.append(new_line)
     return pd.DataFrame(lines)
 
-def create_error(sent_obj, gold_aliases, gold_qids, gold_spans, found_aliases, found_spans, pred_qids, pred_probs, error):
-    return {
-        "sent_idx": sent_obj["sent_idx_unq"],
-        "sentence": sent_obj["sentence"],
-        "gold_aliases": gold_aliases,
-        "gold_qids": gold_qids,
-        "gold_spans": gold_spans,
-        "pred_aliases": found_aliases,
-        "pred_spans": found_spans,
-        "pred_qids": pred_qids,
-        "pred_probs": pred_probs,
-        "error": error
-    }
 
-def compute_precision_and_recall(orig_label_file, new_label_file, threshold=None):
-    # read in first file and map by index for fast retrieval
-    total_mentions = 0
-    correct_mentions = 0
-    pred_mentions = 0
-
-    new_labels = {}
-    with jsonlines.open(new_label_file) as f:
-        for line in f:
-            new_labels[line['sent_idx_unq']] = line
-
-    errors = defaultdict(list)
-    with jsonlines.open(orig_label_file) as f:
-        for line in f:
-            gold_aliases = line['aliases']
-            gold_spans = line['spans']
-            gold_qids = line['qids']
-
-            pred_vals = new_labels[line['sent_idx_unq']]
-            pred_aliases = pred_vals['aliases']
-            pred_spans = pred_vals['spans']
-            pred_qids = pred_vals['qids']
-            pred_probs = [round(p, 3) for p in pred_vals['probs']]
-            if threshold is not None:
-                new_pred_qids = []
-                for pred_qid, pred_prob in zip(pred_qids, pred_probs):
-                    if pred_prob < threshold:
-                        new_pred_qids.append('NC')
-                    else:
-                        new_pred_qids.append(pred_qid)
-                pred_qids = new_pred_qids
-
-            total_mentions += len(gold_aliases)
-
-            # predicted mentions are only those that aren't nil ('NC')
-            pred_mentions += sum([pred_qid != 'NC' for pred_qid in pred_qids])
-
-            for gold_alias, gold_qid, gold_span in zip(gold_aliases, gold_qids, gold_spans):
-                gold_span_start, gold_span_end = gold_span
-                fuzzy_gold_left = [gold_span_start-1,gold_span_end]
-                fuzzy_gold_right = [gold_span_start+1,gold_span_end]
-                if gold_span in pred_spans or fuzzy_gold_left in pred_spans or fuzzy_gold_right in pred_spans:
-                    if gold_span in pred_spans:
-                        pred_idx = pred_spans.index(gold_span)
-                    elif fuzzy_gold_left in pred_spans:
-                        pred_idx = pred_spans.index(fuzzy_gold_left)
-                    elif fuzzy_gold_right in pred_spans:
-                        pred_idx = pred_spans.index(fuzzy_gold_right)
-
-                    if gold_qid == pred_qids[pred_idx]:
-                        correct_mentions += 1
-                    # could not find a label for the mention
-                    elif pred_qids[pred_idx] == 'NC':
-                        errors['missing_mention'].append(create_error(line, gold_aliases, gold_qids,
-                                                                gold_spans, pred_aliases, pred_spans,
-                                                                 pred_qids, pred_probs, error=gold_alias))
-                    else:
-                        errors['wrong_entity'].append(create_error(line, gold_aliases,
-                                                                gold_qids, gold_spans, pred_aliases, pred_spans,
-                                                                pred_qids, pred_probs, error=gold_alias))
-                else:
-                    errors['missing_mention'].append(create_error(line, gold_aliases, gold_qids,
-                                                                gold_spans, pred_aliases, pred_spans,
-                                                                 pred_qids, pred_probs, error=gold_alias))
-
-            for pred_alias, pred_span, pred_qid in zip(pred_aliases, pred_spans, pred_qids):
-                if pred_qid == 'NC':
-                    errors['NC'].append(create_error(line, gold_aliases, gold_qids, gold_spans, pred_aliases, pred_spans,
-                                                              pred_qids, pred_probs, error=''))
-                pred_span_start, pred_span_end = pred_span
-                fuzzy_gold_left = [pred_span_start-1,pred_span_end]
-                fuzzy_gold_right = [pred_span_start+1,pred_span_end]
-                if pred_span not in gold_spans and fuzzy_gold_left not in gold_spans and fuzzy_gold_right not in gold_spans and pred_qid != 'NC':
-                    errors['extra_mention'].append(create_error(line, gold_aliases, gold_qids, gold_spans, pred_aliases, pred_spans,
-                                                              pred_qids, pred_probs, error=pred_alias))
-
-    rec = correct_mentions/total_mentions
-    prec = correct_mentions/pred_mentions
-    print(f'Recall: {round(rec, 2)} ({correct_mentions}/{total_mentions})')
-    print(f'Precision: {round(prec, 2)} ({correct_mentions}/{pred_mentions})')
-    print(f'F1: {round(2*((prec*rec)/(prec+rec)), 2)}')
-    return errors
+import requests
 
 
-def tagme_annotate(in_file, out_file, threshold=0.1, wpid2qid=None):
-    with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, 'w') as f_out:
+def enwiki_title_to_wikidata_id(title: str) -> str:
+    protocol = "https"
+    base_url = "en.wikipedia.org/w/api.php"
+    params = f"action=query&prop=pageprops&format=json&titles={title}"
+    url = f"{protocol}://{base_url}?{params}"
+    response = requests.get(url)
+    json = response.json()
+    for pages in json["query"]["pages"].values():
+        wikidata_id = pages["pageprops"]["wikibase_item"]
+    return wikidata_id
+
+
+def tagme_annotate(in_file, out_file, threshold=0.1):
+    with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, "w") as f_out:
         for line in f_in:
             aliases = []
             spans = []
             qids = []
             probs = []
-            text = line['sentence']
+            text = line["sentence"]
             text_spans = text.split()
             text_span_indices = []
             total_len = 0
-            for i,t in enumerate(text_spans):
+
+            # get word boundaries for converting char spans to word spans
+            for i, t in enumerate(text_spans):
                 text_span_indices.append(total_len)
-                total_len += len(t)+1
+                total_len += len(t) + 1
             lunch_annotations = tagme.annotate(text)
 
             # as the threshold increases, the precision increases, but the recall decreases
             for ann in lunch_annotations.get_annotations(threshold):
                 mention = ann.mention
-                qid = wpid2qid[str(ann.entity_id)]
+                try:
+                    qid = enwiki_title_to_wikidata_id(ann.entity_title)
+                except:
+                    print(f"No wikidata id found for {ann.entity_title}")
+                    continue
                 span_start = text_span_indices.index(ann.begin)
                 try:
-                    span_end = text_span_indices.index(ann.end+1)
+                    span_end = text_span_indices.index(ann.end + 1)
                 except:
                     span_end = len(text_spans)
                 aliases.append(mention)
@@ -265,9 +274,199 @@ def tagme_annotate(in_file, out_file, threshold=0.1, wpid2qid=None):
                 qids.append(qid)
                 probs.append(ann.score)
 
-            line['aliases'] = aliases
-            line['qids'] = qids
-            line['spans'] = spans
-            line['probs'] = probs
-            line[ANCHOR_KEY] = [True for _ in aliases]
+            line["aliases"] = aliases
+            line["qids"] = qids
+            line["spans"] = spans
+            line["probs"] = probs
+            line["gold"] = [True for _ in aliases]
             f_out.write(line)
+
+
+# modified from https://github.com/facebookresearch/BLINK/blob/master/elq/vcg_utils/measures.py
+def entity_linking_tp_with_overlap(gold, predicted, ignore_entity=False):
+    """
+    Partially adopted from: https://github.com/UKPLab/starsem2018-entity-linking
+    Counts weak and strong matches
+    :param gold:
+    :param predicted:
+    :return:
+    >>> entity_linking_tp_with_overlap([('Q7366', 14, 18), ('Q780394', 19, 35)], [('Q7366', 14, 16), ('Q780394', 19, 35)])
+    2, 1
+    >>> entity_linking_tp_with_overlap([('Q7366', 14, 18), ('Q780394', 19, 35)], [('Q7366', 14, 16)])
+    1, 0
+    >>> entity_linking_tp_with_overlap([(None, 14, 18), ('Q780394', 19, 35)], [('Q7366', 14, 16)])
+    0, 0
+    >>> entity_linking_tp_with_overlap([(None, 14, 18), (None, )], [(None,)])
+    1, 0
+    >>> entity_linking_tp_with_overlap([('Q7366', ), ('Q780394', )], [('Q7366', 14, 16)])
+    1, 0
+    >>> entity_linking_tp_with_overlap([], [('Q7366', 14, 16)])
+    0, 0
+    """
+    if not gold or not predicted:
+        return 0, 0
+    # Add dummy spans, if no spans are given, everything is overlapping per default
+    if any(len(e) != 3 for e in gold):
+        gold = [(e[0], 0, 1) for e in gold]
+        predicted = [(e[0], 0, 1) for e in predicted]
+    # Replace None KB ids with empty strings
+    gold = [("",) + e[1:] if e[0] is None else e for e in gold]
+    predicted = [("",) + e[1:] if e[0] is None else e for e in predicted]
+
+    # ignore_entity for computing mention precision and recall without the entity prediction
+    if ignore_entity:
+        gold = [("",) + e[1:] for e in gold]
+        predicted = [("",) + e[1:] for e in predicted]
+
+    gold = sorted(gold, key=lambda x: x[2])
+    predicted = sorted(predicted, key=lambda x: x[2])
+
+    # tracks weak matches
+    lcs_matrix_weak = np.zeros((len(gold), len(predicted)), dtype=np.int16)
+    # tracks strong matches
+    lcs_matrix_strong = np.zeros((len(gold), len(predicted)), dtype=np.int16)
+    for g_i in range(len(gold)):
+        for p_i in range(len(predicted)):
+            gm = gold[g_i]
+            pm = predicted[p_i]
+
+            # increment lcs_matrix_weak
+            if not (gm[1] >= pm[2] or pm[1] >= gm[2]) and (
+                gm[0].lower() == pm[0].lower()
+            ):
+                if g_i == 0 or p_i == 0:
+                    lcs_matrix_weak[g_i, p_i] = 1
+                else:
+                    lcs_matrix_weak[g_i, p_i] = 1 + lcs_matrix_weak[g_i - 1, p_i - 1]
+            else:
+                if g_i == 0 and p_i == 0:
+                    lcs_matrix_weak[g_i, p_i] = 0
+                elif g_i == 0 and p_i != 0:
+                    lcs_matrix_weak[g_i, p_i] = max(0, lcs_matrix_weak[g_i, p_i - 1])
+                elif g_i != 0 and p_i == 0:
+                    lcs_matrix_weak[g_i, p_i] = max(lcs_matrix_weak[g_i - 1, p_i], 0)
+                elif g_i != 0 and p_i != 0:
+                    lcs_matrix_weak[g_i, p_i] = max(
+                        lcs_matrix_weak[g_i - 1, p_i], lcs_matrix_weak[g_i, p_i - 1]
+                    )
+
+            # increment lcs_matrix_strong
+            if (gm[1] == pm[1] and pm[2] == gm[2]) and (gm[0].lower() == pm[0].lower()):
+                if g_i == 0 or p_i == 0:
+                    lcs_matrix_strong[g_i, p_i] = 1
+                else:
+                    lcs_matrix_strong[g_i, p_i] = (
+                        1 + lcs_matrix_strong[g_i - 1, p_i - 1]
+                    )
+            else:
+                if g_i == 0 and p_i == 0:
+                    lcs_matrix_strong[g_i, p_i] = 0
+                elif g_i == 0 and p_i != 0:
+                    lcs_matrix_strong[g_i, p_i] = max(
+                        0, lcs_matrix_strong[g_i, p_i - 1]
+                    )
+                elif g_i != 0 and p_i == 0:
+                    lcs_matrix_strong[g_i, p_i] = max(
+                        lcs_matrix_strong[g_i - 1, p_i], 0
+                    )
+                elif g_i != 0 and p_i != 0:
+                    lcs_matrix_strong[g_i, p_i] = max(
+                        lcs_matrix_strong[g_i - 1, p_i], lcs_matrix_strong[g_i, p_i - 1]
+                    )
+
+    weak_match_count = lcs_matrix_weak[len(gold) - 1, len(predicted) - 1]
+    strong_match_count = lcs_matrix_strong[len(gold) - 1, len(predicted) - 1]
+    return weak_match_count, strong_match_count
+
+
+def convert_line_tuple(line):
+    qids = line["qids"]
+    spans = line["spans"]
+    pairs = zip(qids, spans)
+    pairs = [(pair[0], pair[1][0], pair[1][1]) for pair in pairs]
+    return pairs
+
+
+# modified from https://github.com/facebookresearch/BLINK
+def compute_metrics(pred_file, gold_file, md_step_only=False, threshold=0.0):
+    # align by sentence index
+    pred_results = {}
+    with jsonlines.open(pred_file) as f:
+        for line in f:
+            pred_results[line["sent_idx_unq"]] = line
+
+    gold_results = {}
+    with jsonlines.open(gold_file) as f:
+        for line in f:
+            gold_results[line["sent_idx_unq"]] = line
+
+    assert len(pred_results) == len(
+        gold_results
+    ), f"{len(pred_results)} {len(gold_results)}"
+
+    num_mentions_actual = 0
+    num_mentions_pred = 0
+    weak_match_total = 0
+    strong_match_total = 0
+    errors = []
+    for sent_idx in pred_results:
+        gold_line = gold_results[sent_idx]
+        pred_line = pred_results[sent_idx]
+        pred_triples = convert_line_tuple(pred_results[sent_idx])
+        gold_triples = convert_line_tuple(gold_results[sent_idx])
+
+        # filter out triples below the threshold
+        if len(pred_triples) > 0 and "probs" in pred_line:
+            assert len(pred_triples) == len(pred_line["probs"])
+            pred_triples = [
+                pt
+                for (pt, prob) in zip(pred_triples, pred_line["probs"])
+                if prob > threshold
+            ]
+
+        weak_match_count, strong_match_count = entity_linking_tp_with_overlap(
+            pred_triples, gold_triples, ignore_entity=md_step_only
+        )
+
+        num_mentions_actual += len(gold_triples)
+        num_mentions_pred += len(pred_triples)
+        weak_match_total += weak_match_count
+        strong_match_total += strong_match_count
+        if weak_match_count != len(gold_triples) or weak_match_count != len(
+            pred_triples
+        ):
+            pred_qids = [p[0] for p in pred_triples]
+            pred_spans = [[p[1], p[2]] for p in pred_triples]
+            pred_probs = []
+            if "probs" in pred_line:
+                pred_probs = [p for p in pred_line["probs"] if p > threshold]
+                assert len(pred_qids) == len(pred_probs)
+            errors.append(
+                {
+                    "sent_idx": sent_idx,
+                    "text": gold_line["sentence"],
+                    "gold_aliases": gold_line["aliases"],
+                    "gold_qids": gold_line["qids"],
+                    "gold_spans": gold_line["spans"],
+                    "pred_aliases": pred_line["aliases"],
+                    "pred_qids": pred_qids,
+                    "pred_spans": pred_spans,
+                    "pred_probs": pred_probs,
+                }
+            )
+
+    print("WEAK MATCHING")
+    precision = weak_match_total / num_mentions_pred
+    recall = weak_match_total / num_mentions_actual
+    print(f"precision = {weak_match_total} / {num_mentions_pred} = {precision}")
+    print(f"recall = {weak_match_total} / {num_mentions_actual} = {recall}")
+    print(f"f1 = {precision*recall*2/(precision+recall)}")
+
+    print("\nEXACT MATCHING")
+    precision = strong_match_total / num_mentions_pred
+    recall = strong_match_total / num_mentions_actual
+    print(f"precision = {strong_match_total} / {num_mentions_pred} = {precision}")
+    print(f"recall = {strong_match_total} / {num_mentions_actual} = {recall}")
+    print(f"f1 = {precision*recall*2/(precision+recall)}")
+
+    return pd.DataFrame(errors)

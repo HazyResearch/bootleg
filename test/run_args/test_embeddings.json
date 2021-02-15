@@ -1,53 +1,43 @@
 {
     "run_config": {
-        "save_dir": "runs/test",
-        "cpu": true
-      },
+        "dataloader_threads": 1,
+        "dataset_threads": 1,
+        "spawn_method": "fork"
+    },
+    "train_config": {
+        "batch_size": 1,
+    },
     "model_config": {
-        "attn_load_class": "conee_base.CoNEEBase",
         "hidden_size": 10,
         "num_heads": 1
     },
-    "train_config": {
-        "batch_size": 1
-    },
     "data_config": {
+        "entity_dir": "test/data/entity_loader/entity_data",
         "train_in_candidates": true,
-        "max_aliases": 5,
+        "max_seq_len": 5,
+        "max_aliases": 2,
         "data_dir": "test/data/data_loader",
-        "emb_dir": "test/data",
+        "overwrite_preprocessed_data": true,
+        "emb_dir": "test/data/emb_data",
         "type_prediction": {
-            "use_type_pred": false
+            "use_type_pred": false,
+            "num_types": 3,
+            "file": "type_pred_mapping.json"
         },
-        "train_dataset": {
-            "file": "train_small_dis.txt",
-            "load_class": "wiki_dataset.WikiDataset",
-            "slice_class": "wiki_slices.WikiSlices"
-        },
-        "dev_dataset": {
-            "file": "en_dev.txt",
-            "load_class": "wiki_dataset.WikiDataset",
-            "slice_class": "wiki_slices.WikiSlices"
-        },
-        "word_embedding": {
-            "load_class": "standard_word_emb.StandardWordEmb",
-            "sent_class": "standard_sent_emb.StandardSentEmb",
-            "word_symbols": "CustomWordSymbols",
-            "custom_vocab_embedding_file": "custom_embedding.txt",
-            "layers": 3,
-            "freeze_word_emb": true
+        "word_embedding":
+        {
+            "layers": 1,
+            "freeze": false,
+            "cache_dir": "test/data/emb_data/pretrained_bert_models"
         },
         "ent_embeddings": [
             {
                 "key": "learned",
-                "load_class": "entity_embs.LearnedEntityEmb",
-                "args": {
-                    "learned_embedding_size": 10}
-            },
-            {
-                "load_class": "title_embs.AvgTitleEmb",
-                "key": "avg_title",
-                "args": {
+                "freeze": false,
+                "load_class": "LearnedEntityEmb",
+                "args":
+                {
+                  "learned_embedding_size": 10
                 }
             }
         ]

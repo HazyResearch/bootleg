@@ -1,15 +1,16 @@
+"""Sparse Dense AdamW optimizer."""
 
-"""Sparse Dense Adam optimizer"""
-
-import torch
 import math
 
+import torch
+
 # copied from https://github.com/allenai/allennlp/blob/master/allennlp/training/optimizers.py
-# added support for weight decay
+# modified the Adam from HuggingFace to add support for weight decay
 
 # SparseAdam only supports sparse tensors, Adam only supports dense tensors, so we need the below to use both
 
-class SparseDenseAdam(torch.optim.Optimizer):
+
+class SparseDenseAdamW(torch.optim.Optimizer):
     """
     NOTE: This class has been copied verbatim from the separate Dense and
     Sparse versions of Adam in Pytorch.
@@ -27,7 +28,7 @@ class SparseDenseAdam(torch.optim.Optimizer):
         A term added to the denominator to improve numerical stability.
     """
 
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-6, weight_decay=0):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -40,8 +41,8 @@ class SparseDenseAdam(torch.optim.Optimizer):
         super().__init__(params, defaults)
 
     def step(self, closure=None):
-        """
-        Performs a single optimization step.
+        """Performs a single optimization step.
+
         # Parameters
         closure : `callable`, optional.
             A closure that reevaluates the model and returns the loss.
@@ -72,7 +73,9 @@ class SparseDenseAdam(torch.optim.Optimizer):
                 beta1, beta2 = group["betas"]
 
                 if grad.is_sparse:
-                    grad = grad.coalesce()  # the update is non-linear so indices must be unique
+                    grad = (
+                        grad.coalesce()
+                    )  # the update is non-linear so indices must be unique
                     grad_indices = grad._indices()
                     grad_values = grad._values()
                     size = grad.size()
@@ -87,7 +90,9 @@ class SparseDenseAdam(torch.optim.Optimizer):
                     #      old <- b * old + (1 - b) * new
                     # <==> old += (1 - b) * (new - old)
                     old_exp_avg_values = exp_avg.sparse_mask(grad)._values()
-                    exp_avg_update_values = grad_values.sub(old_exp_avg_values).mul_(1 - beta1)
+                    exp_avg_update_values = grad_values.sub(old_exp_avg_values).mul_(
+                        1 - beta1
+                    )
                     exp_avg.add_(make_sparse(exp_avg_update_values))
                     old_exp_avg_sq_values = exp_avg_sq.sparse_mask(grad)._values()
                     exp_avg_sq_update_values = (
@@ -103,21 +108,35 @@ class SparseDenseAdam(torch.optim.Optimizer):
 
                     bias_correction1 = 1 - beta1 ** state["step"]
                     bias_correction2 = 1 - beta2 ** state["step"]
-                    step_size = group["lr"] * math.sqrt(bias_correction2) / bias_correction1
+                    step_size = (
+                        group["lr"] * math.sqrt(bias_correction2) / bias_correction1
+                    )
 
                     p.data.add_(make_sparse(-step_size * numer.div_(denom)))
 
                 else:
                     bias_correction1 = 1 - beta1 ** state["step"]
                     bias_correction2 = 1 - beta2 ** state["step"]
-                    # Added weight decay
-                    if "weight_decay" in group and group["weight_decay"] != 0:
-                        grad.add_(group["weight_decay"], p.data)
                     # Decay the first and second moment running average coefficient
-                    exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                    exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                    exp_avg.mul_(beta1).add_(grad, alpha=1.0 - beta1)
+                    exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1.0 - beta2)
                     denom = exp_avg_sq.sqrt().add_(group["eps"])
-                    step_size = group["lr"] * math.sqrt(bias_correction2) / bias_correction1
-                    p.data.addcdiv_(-step_size, exp_avg, denom)
+                    step_size = (
+                        group["lr"] * math.sqrt(bias_correction2) / bias_correction1
+                    )
+                    p.data.addcdiv_(exp_avg, denom, value=-step_size)
+
+                    # Added weight decay
+                    # https://huggingface.co/transformers/_modules/transformers/optimization.html#AdamW
+                    # Just adding the square of the weights to the loss function is *not*
+                    # the correct way of using L2 regularization/weight decay with Adam,
+                    # since that will interact with the m and v parameters in strange ways.
+                    #
+                    # Instead we want to decay the weights in a manner that doesn't interact
+                    # with the m/v parameters. This is equivalent to adding the square
+                    # of the weights to the loss with plain (non-momentum) SGD.
+                    # Add weight decay at the end (fixed version)
+                    if "weight_decay" in group and group["weight_decay"] > 0:
+                        p.data.add_(p.data, alpha=-group["lr"] * group["weight_decay"])
 
         return loss

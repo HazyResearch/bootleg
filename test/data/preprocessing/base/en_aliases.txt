@@ -1,4 +1,0 @@
-alias1~*~Q1,10|Q4,6
-multi word alias2~*~Q2,5|Q1,3|Q4,2
-alias3~*~Q1,30
-alias4~*~Q4,20|Q3,15|Q2,1

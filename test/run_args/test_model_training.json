@@ -1,65 +1,57 @@
 {
     "run_config": {
-        "save_dir": "runs/test",
-        "cpu": true,
         "dataloader_threads": 1,
         "dataset_threads": 1,
-        "eval_slices": []
-      },
+        "spawn_method": "fork"
+    },
     "train_config": {
         "batch_size": 1,
-        "train_heads": []
     },
     "model_config": {
-        "attn_load_class": "Bootleg",
-        "custom_args": {"entity_mask": false},
         "hidden_size": 10,
         "num_heads": 1
     },
     "data_config": {
+        "entity_dir": "test/data/entity_loader/entity_data",
         "train_in_candidates": true,
-        "max_word_token_len": 6,
+        "max_seq_len": 5,
         "max_aliases": 2,
-        "data_dir": "test/data/model_training",
-        "entity_dir": "test/data/model_training/entity_data",
+        "data_dir": "test/data/data_loader",
         "overwrite_preprocessed_data": true,
-        "emb_dir": "test/data/model_training",
+        "emb_dir": "test/data/emb_data",
         "type_prediction": {
-            "use_type_pred": false
-        },
-        "train_dataset" :
-        {
-            "file": "train.jsonl",
-            "load_class": "wiki_dataset.WikiDataset",
-            "slice_class": "wiki_slices.WikiSlices"
-        },
-        "test_dataset" :
-        {
-            "file": "test.jsonl",
-            "load_class": "wiki_dataset.WikiDataset",
-            "slice_class": "wiki_slices.WikiSlices"
+            "use_type_pred": false,
+            "num_types": 3,
+            "file": "type_pred_mapping.json"
         },
         "word_embedding":
         {
-            "load_class": "standard_word_emb.StandardWordEmb",
-            "sent_class": "standard_sent_emb.StandardSentEmb",
-            "word_symbols": "CustomWordSymbols",
-            "custom_vocab_embedding_file": "data_vocab.txt",
-            "layers": 3,
-            "freeze_word_emb": true,
-            "freeze_sent_emb": true,
-            "custom_proj_size": 100
+            "layers": 1,
+            "freeze": false,
+            "cache_dir": "test/data/emb_data/pretrained_bert_models"
         },
         "ent_embeddings": [
-        {
-            "key": "learned",
-            "freeze": false,
-            "load_class": "LearnedEntityEmb",
-            "args":
             {
-              "learned_embedding_size": 10,
-            }
-        }
+                "key": "learned",
+                "freeze": false,
+                "load_class": "LearnedEntityEmb",
+                "args":
+                {
+                  "learned_embedding_size": 10
+                }
+            },
+            {
+               "key": "learned_type",
+               "load_class": "LearnedTypeEmb",
+               "freeze": false,
+               "args": {
+                   "type_labels": "type_pred_mapping.json",
+                   "max_types": 1,
+                   "type_dim": 5,
+                   "merge_func": "addattn",
+                   "attn_hidden_size": 5
+               }
+           }
         ]
     }
 }

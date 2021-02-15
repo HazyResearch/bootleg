@@ -19,7 +19,7 @@ echo -n "Model [spanbert, lstm]: "
 read VAR
 
 if [[ "$VAR" = "spanbert" ]]; then
-    echo "spanbert"
+    echo "You chose spanbert"
     python spanbert_model/run.py \
          --seed ${seed} \
          --data_dir ${data_dir} \

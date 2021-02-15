@@ -1,0 +1,103 @@
+name: CI
+
+on:
+    push:
+        branches: [ emmental_master, master ]
+    pull_request:
+        branches: [ emmental_master, master ]
+    
+    # Allows you to run this workflow manually from the Actions tab
+    workflow_dispatch:
+
+jobs:
+    
+    Linting:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: ['3.8']
+        
+        steps:
+            -   uses: actions/checkout@v2
+            -   name: Set up Python ${{ matrix.python-version }}
+                uses: actions/setup-python@v2
+                with:
+                    python-version: ${{ matrix.python-version }}
+                    
+            -   uses: actions/cache@v2
+                with:
+                    path: ~/.cache/pip
+                    key: ${{ runner.os }}-pip
+
+            -   name: Install Dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    make dev
+
+            -   name: Lint with isort, black, docformatter, flake8
+                run: |
+                    make format
+                    make check
+    
+    Documentation:
+        needs: Linting
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: ['3.8']
+                
+        steps:
+            -   uses: actions/checkout@v2
+            -   name: Set up Python ${{ matrix.python-version }}
+                uses: actions/setup-python@v2
+                with:
+                    python-version: ${{ matrix.python-version }}
+                    
+            -   uses: actions/cache@v2
+                with:
+                    path: ~/.cache/pip
+                    key: ${{ runner.os }}-pip
+    
+            -   name: Install Dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    make dev
+    
+            -   name: Generate Docs
+                run: |
+                    make docs
+
+    Build:
+        needs: Documentation
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os: [ubuntu-latest]
+                python-version: ['3.8']
+                
+        steps:
+            -   uses: actions/checkout@v2
+            
+            -   name: Set up Python ${{ matrix.python-version }}
+                uses: actions/setup-python@v2
+                with:
+                    python-version: ${{ matrix.python-version }}
+
+            - name: Cache pip
+              uses: actions/cache@v2
+              with:
+                # This path is specific to Ubuntu
+                path: ~/.cache/pip
+                # Look to see if there is a cache hit for the corresponding requirements file
+                key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
+                restore-keys: |
+                  ${{ runner.os }}-pip-
+                  ${{ runner.os }}-
+
+            - name: Install dependencies
+              run: |
+                make dev
+
+            - name: Test with pytest
+              run: |
+                pytest test

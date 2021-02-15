@@ -3,9 +3,9 @@ from collections import Counter
 
 import numpy as np
 import torch
-from emmental.data import EmmentalDataset
-
 from task_config import LABEL_TO_ID
+
+from emmental.data import EmmentalDataset
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,80 @@
+{
+    "emmental": {
+        "n_epochs": 20,
+        "seed": 1234
+    },
+    "run_config": {
+        "dataloader_threads": 1,
+        "dataset_threads": 1,
+        "spawn_method": "fork",
+        "log_level": "debug"
+    },
+    "train_config": {
+        "batch_size": 2
+    },
+    "model_config": {
+        "hidden_size": 20,
+        "num_heads": 1
+    },
+    "data_config": {
+        "entity_dir": "test/data/entity_loader/entity_data",
+        "train_in_candidates": true,
+        "max_seq_len": 7,
+        "max_aliases": 2,
+        "data_dir": "test/data/data_loader",
+        "overwrite_preprocessed_data": true,
+        "emb_dir": "test/data/emb_data",
+        "type_prediction": {
+            "use_type_pred": false,
+            "num_types": 3,
+            "file": "type_pred_mapping.json"
+        },
+        "word_embedding":
+        {
+            "layers": 1,
+            "freeze": true,
+            "cache_dir": "test/data/emb_data/pretrained_bert_models"
+        },
+        "ent_embeddings": [
+            {
+                "key": "learned",
+                "freeze": false,
+                "load_class": "LearnedEntityEmb",
+                "args":
+                {
+                  "learned_embedding_size": 10
+                }
+            },
+            {
+               "key": "learned_type",
+               "load_class": "LearnedTypeEmb",
+               "freeze": false,
+               "args": {
+                   "type_labels": "type_pred_mapping.json",
+                   "max_types": 1,
+                   "type_dim": 10,
+                   "merge_func": "addattn",
+                   "attn_hidden_size": 10
+               }
+            },
+            {
+               "key": "kg_adj",
+               "load_class": "KGIndices",
+               "batch_on_the_fly": true,
+               "normalize": false,
+               "args": {
+                   "kg_adj": "kg.txt"
+               }
+            }
+        ],
+        "train_dataset": {
+            "file": "end2end_train.jsonl"
+        },
+        "dev_dataset": {
+            "file": "end2end_train.jsonl"
+        },
+        "test_dataset": {
+            "file": "end2end_train.jsonl"
+        }
+    }
+}
