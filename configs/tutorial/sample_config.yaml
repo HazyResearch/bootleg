@@ -1,0 +1,74 @@
+emmental:
+  lr: 2e-5
+  n_epochs: 10
+  evaluation_freq: 2.0
+  checkpoint_freq: 1
+  l2: 0.01
+  log_path: logs/turtorial
+  device: 0
+run_config:
+  eval_batch_size: 16
+  dataloader_threads: 2
+  dataset_threads: 2
+train_config:
+  batch_size: 16
+model_config:
+  hidden_size: 128
+  num_heads: 16
+  num_model_stages: 2
+  ff_inner_size: 256
+  attn_class: Bootleg
+data_config:
+  data_dir: data/sample_text_data
+  data_prep_dir: prep
+  emb_dir: data/sample_emb_data
+  ent_embeddings:
+       - key: learned
+         load_class: LearnedEntityEmb
+         freeze: false
+         cpu: false
+         dropout2d: 0.6
+         args:
+           learned_embedding_size: 128
+       - key: learned_type
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: qid2types.json
+           max_types: 3
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: learned_type_relations
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: qid2relations.json
+           max_types: 50
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: adj_index
+         load_class: KGIndices
+         batch_on_the_fly: true
+         normalize: false
+         args:
+           kg_adj: kg_conn.txt
+  entity_dir: data/sample_entity_data
+  max_aliases: 10
+  max_seq_len: 100
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: dev.jsonl
+    use_weak_label: true
+  test_dataset:
+    file: dev.jsonl
+    use_weak_label: true
+  train_dataset:
+    file: train.jsonl
+    use_weak_label: true
+  train_in_candidates: true
+  word_embedding:
+    cache_dir: data/sample_emb_data
+    freeze: true
+    layers: 12
