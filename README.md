@@ -49,7 +49,7 @@ is associated with each mention.
 
 ![Dataflow](web/images/bootleg_dataflow.png "Bootleg Dataflow")
 
-More details can be found [here](https://bootleg.readthedocs.io/en/latest/gettingstarted)
+More details can be found [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/input_data.html)
 
 ## Inference
 Given a pretrained model, we support three types of inference: `--mode eval`, `--mode dump_preds`, and `--mode dump_embs`. `Eval` mode is the fastest option and will run the test files through the model and output aggregated quality metrics to the log. `Dump_preds` mode will write the individual predictions and corresponding probabilities to a jsonlines file. This is useful for error analysis. `Dump_embs` mode is the same as `dump_preds`, but will additionally  output contextual entity embeddings. These can then be read and processed in a downstream system.
