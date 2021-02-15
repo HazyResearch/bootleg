@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 Outputs = Mapping[str, List[torch.Tensor]]
 
+
 def cross_entropy_with_probs(
     input: torch.Tensor,
     target: torch.Tensor,
@@ -13,7 +14,8 @@ def cross_entropy_with_probs(
     ignore_index: int = -1,
     reduction: str = "mean",
 ) -> torch.Tensor:
-    """Calculate cross-entropy loss when targets are probabilities (floats), not ints.
+    """Calculate cross-entropy loss when targets are probabilities (floats),
+    not ints.
 
     PyTorch's F.cross_entropy() method requires integer labels; it does accept
     probabilistic labels. We can, however, simulate such functionality with a for loop,
@@ -64,7 +66,9 @@ def cross_entropy_with_probs(
         target_temp = target_temp.masked_fill(target[:, y] == ignore_index, -1)
         # ******************
 
-        y_loss = F.cross_entropy(input, target_temp, reduction="none", ignore_index=ignore_index)
+        y_loss = F.cross_entropy(
+            input, target_temp, reduction="none", ignore_index=ignore_index
+        )
         if weight is not None:
             y_loss = y_loss * weight[y]
 

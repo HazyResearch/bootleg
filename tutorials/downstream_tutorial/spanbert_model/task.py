@@ -2,14 +2,14 @@ import logging
 from functools import partial
 
 import torch.nn.functional as F
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
-from torch import nn
-
 from ent_bert_encoder import EntBertEncoder
 from pytorch_pretrained_bert.modeling import BertConfig, BertModel
 from scorer import tacred_scorer
 from task_config import LABEL_TO_ID
+from torch import nn
+
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +44,10 @@ def create_task(args):
     bert_model = BertModel.from_pretrained(args.bert_model, cache_dir="./cache/")
     bert_output_dim = 768 if "base" in args.bert_model else 1024
 
-    
     config = ENT_BERT_ENCODER_CONFIG
     config["num_hidden_layers"] = args.kg_encoder_layer
     config = BertConfig.from_dict(config)
-    logger.info(config)
+    log_rank_0_info(config)
     encoder = EntBertEncoder(
         config,
         bert_output_dim,

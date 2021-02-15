@@ -1,101 +1,157 @@
-"""Scorer"""
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import logging
+from collections import Counter
+from typing import Dict, List, Optional
 
-from bootleg.symbols.constants import DISAMBIG, INDICATOR, FINAL_LOSS, TYPEPRED
-from bootleg.utils import logging_utils, eval_utils, train_utils
-from bootleg.utils.classes.cross_entropy_with_probs import cross_entropy_with_probs
-from bootleg.utils.classes.loss_package import LossPackage
+from numpy import ndarray
 
-class Scorer:
+logger = logging.getLogger(__name__)
+
+
+class BootlegSlicedScorer:
+    """Sliced NED scorer init.
+
+    Args:
+        train_in_candidates: are we training assuming that all gold qids are in the candidates or not
+        slices_datasets: slice dataset (see slicing/slice_dataset.py)
     """
-    Scoring class: aggregates losses on prediction heads for backpropagation.
-    """
-    def __init__(self, args=None, model_device=None):
-        self.model_device = model_device
-        self.logger = logging_utils.get_logger(args)
-        self.crit_pred = nn.NLLLoss(ignore_index=-1)
-        self.type_pred = nn.CrossEntropyLoss(ignore_index=-1)
-        self.weights = {train_utils.get_slice_head_ind_name(slice_name):None for slice_name in args.train_config.train_heads}
 
-    def calc_loss(self, training, outs, true_label, entity_pack):
-        """
-        Accumulates losses across standard prediction heads and indicator heads for slice-based learning.
-        """
-        loss = LossPackage(self.model_device)
-        for loss_key in outs:
-            if loss_key == DISAMBIG:
-                loss_dis = self.disambig_loss(training, outs[loss_key], true_label[loss_key], entity_pack.mask)
-                loss.merge_loss_packages(loss_dis)
-            # indicator loss if using SBL
-            elif loss_key == INDICATOR:
-                loss_ind = self.indicator_loss(training, outs[loss_key], true_label[loss_key])
-                loss.merge_loss_packages(loss_ind)
-            elif loss_key == TYPEPRED:
-                loss_type = self.type_loss(training, outs[loss_key], true_label[loss_key])
-                loss.merge_loss_packages(loss_type)
-        return loss
+    def __init__(self, train_in_candidates, slices_datasets=None):
+        self.train_in_candidates = train_in_candidates
+        self.slices_datasets = slices_datasets
 
-    def indicator_loss(self, training, outs, true_label):
-        """
-        Returns the indicator loss on indicator heads for slice-based learning.
-        """
-        device = next(iter(outs.values()))[0].device
-        loss = LossPackage(device)
-        for i, (loss_head, out) in enumerate(outs.items()):
-            batch_size, M, _ = out.shape
-            # just take the positive label
-            log_probs = F.log_softmax(out, dim=-1).reshape(batch_size*M, 2)
-            prob_pos_labels = true_label[loss_head].reshape(batch_size*M)
-            # we need the negative labels bc the cross_entropy_with_probs takes the number
-            # of classes (2) as input
-            prob_neg_labels = 1 - prob_pos_labels
-            # we need to set to -1 to mask padded aliases
-            prob_neg_labels[prob_pos_labels == -1] = -1
-            true_labels = torch.stack([prob_neg_labels, prob_pos_labels], dim=1)
-            temp = cross_entropy_with_probs(input=log_probs, target=true_labels,
-                weight=self.weights[loss_head], ignore_index=-1)
-            loss.add_loss(loss_head, temp)
-        return loss
+    def get_slices(self, uid):
+        """Get slice incidence matrices for the uid Uid is dtype
+        (np.dtype([('sent_idx', 'i8', 1), ('subsent_idx', 'i8', 1),
+        ("alias_orig_list_pos", 'i8', max_aliases)]) where alias_orig_list_pos
+        gives the mentions original positions in the sentence.
 
-    def disambig_loss(self, training, outs, true_label, mask):
-        """
-        Returns the entity disambiguation loss on prediction heads.
-        """
-        device = next(iter(outs.values()))[0].device
-        loss = LossPackage(device)
-        for i, (loss_head, out) in enumerate(outs.items()):
-            if FINAL_LOSS in loss_head:
-                true_label_head = true_label[FINAL_LOSS]
-            else:
-                true_label_head = true_label[loss_head]
-            # During eval, even if our model does not predict a NIC candidate, we allow for a NIC gold QID
-            # This qid gets assigned the label of -2 and is always incorrect in eval_wapper
-            # As NLLLoss assumes classes of 0 to #classes-1 except for pad idx, we manually mask
-            # the -2 labels for the loss computation only. As this is just for eval, it won't matter.
-            if not training:
-                label_mask = true_label_head == -2
-                true_label_head[label_mask] = -1
-            # batch x M x K -> transpose -> swap K classes with M spans for "k-dimensional" NLLloss
-            log_probs = eval_utils.masked_class_logsoftmax(pred=out, mask=~mask).transpose(1,2)
-            temp = self.crit_pred(log_probs, true_label_head.long().to(device))
-            loss.add_loss(loss_head, temp)
-            if not training:
-                true_label_head[label_mask] = -2
-        return loss
+        Args:
+            uid: unique identifier of sentence
 
-    def type_loss(self, training, outs, true_label):
+        Returns: dictionary of slice_name -> matrix of 0/1 for if alias is in slice or not (-1 for no alias)
         """
-        Returns the type prediction loss.
+        if self.slices_datasets is None:
+            return {}
+        for split, dataset in self.slices_datasets.items():
+            sent_idx = uid["sent_idx"]
+            alias_orig_list_pos = uid["alias_orig_list_pos"]
+            if dataset.contains_sentidx(sent_idx):
+                return dataset.get_slice_incidence_arr(sent_idx, alias_orig_list_pos)
+        return {}
+
+    def bootleg_score(
+        self,
+        golds: ndarray,
+        probs: ndarray,
+        preds: Optional[ndarray],
+        uids: Optional[List[str]] = None,
+    ) -> Dict[str, float]:
+        """Scores the predictions using the gold labels and slices.
+
+        Args:
+            golds: gold labels
+            probs: probabilities
+            preds: predictions (max prob candidate)
+            uids: unique identifiers
+
+        Returns: dictionary of tensorboard compatible keys and metrics
         """
-        device = next(iter(outs.values()))[0].device
-        loss = LossPackage(device)
-        for i, (loss_head, out) in enumerate(outs.items()):
-            batch_size, M, num_types = out.shape
-            # just take the positive label
-            labels = true_label[loss_head].reshape(batch_size*M)
-            input = out.reshape(batch_size*M, num_types)
-            temp = self.type_pred(input, labels)
-            loss.add_loss(loss_head, temp)
-        return loss
+        batch, M = golds.shape
+        NO_MENTION = -1
+        NOT_IN_CANDIDATES = -2 if self.train_in_candidates else 0
+        res = {}
+        total = Counter()
+        total_in_cand = Counter()
+        correct_boot = Counter()
+        correct_pop_cand = Counter()
+        correct_boot_in_cand = Counter()
+        correct_pop_cand_in_cand = Counter()
+        assert (
+            len(uids) == batch
+        ), f"Length of uids {len(uids)} does not match batch {batch} in scorer"
+        for row in range(batch):
+            for col in range(M):
+                gold = golds[row, col]
+                pred = preds[row, col]
+                uid = uids[row]
+                pop_cand = 0 + int(not self.train_in_candidates)
+                if gold == NO_MENTION:
+                    continue
+                # Slices is dictionary of slice_name -> incidence array. Each array value is 1/0 for if in slice or not
+                slices = self.get_slices(uid)
+                for slice_name in slices:
+                    assert (
+                        slices[slice_name][col] != -1
+                    ), f"Something went wrong with slices {slices} and uid {uid}"
+                    # Check if alias is in slice
+                    if slices[slice_name][col] == 1:
+                        total[slice_name] += 1
+                        if gold != NOT_IN_CANDIDATES:
+                            total_in_cand[slice_name] += 1
+                        if gold == pred:
+                            correct_boot[slice_name] += 1
+                            if gold != NOT_IN_CANDIDATES:
+                                correct_boot_in_cand[slice_name] += 1
+                        if gold == pop_cand:
+                            correct_pop_cand[slice_name] += 1
+                            if gold != NOT_IN_CANDIDATES:
+                                correct_pop_cand_in_cand[slice_name] += 1
+        for slice_name in total:
+            res[f"{slice_name}/total_men"] = total[slice_name]
+            res[f"{slice_name}/total_notNC_men"] = total_in_cand[slice_name]
+            res[f"{slice_name}/acc_boot"] = (
+                0
+                if total[slice_name] == 0
+                else correct_boot[slice_name] / total[slice_name]
+            )
+            res[f"{slice_name}/acc_notNC_boot"] = (
+                0
+                if total_in_cand[slice_name] == 0
+                else correct_boot_in_cand[slice_name] / total_in_cand[slice_name]
+            )
+            res[f"{slice_name}/acc_pop"] = (
+                0
+                if total[slice_name] == 0
+                else correct_pop_cand[slice_name] / total[slice_name]
+            )
+            res[f"{slice_name}/acc_notNC_pop"] = (
+                0
+                if total_in_cand[slice_name] == 0
+                else correct_pop_cand_in_cand[slice_name] / total_in_cand[slice_name]
+            )
+        return res
+
+    def type_pred_score(
+        self,
+        golds: ndarray,
+        probs: ndarray,
+        preds: Optional[ndarray],
+        uids: Optional[List[str]] = None,
+    ) -> Dict[str, float]:
+        """Scores the type prediction accuracy.
+
+        Args:
+            golds: gold labels
+            probs: probabilities
+            preds: predicted type
+            uids: unique identifiers
+
+        Returns: dictionary of tensorboard compatible keys and metrics
+        """
+        batch, M = golds.shape
+        NO_MENTION = -1
+
+        res = {}
+        total = 0
+        correct_boot = Counter()
+        for row in range(batch):
+            for col in range(M):
+                gold = golds[row, col]
+                pred = preds[row, col]
+                if gold == NO_MENTION:
+                    continue
+                correct_boot[gold == pred] += 1
+                total += 1
+        # TODO: add prec/recall per type
+        res["acc_boot"] = correct_boot[True] / total
+        return res

@@ -2,16 +2,16 @@ import argparse
 import logging
 import sys
 
+from task import create_task
+from task_config import ID_TO_LABEL
+from utils import write_to_file, write_to_json_file
+
 import emmental
+from data import get_dataloaders
 from emmental.learner import EmmentalLearner
 from emmental.model import EmmentalModel
 from emmental.utils.parse_args import parse_args, parse_args_to_config
 from emmental.utils.utils import nullable_int, nullable_string, str2bool
-
-from data import get_dataloaders
-from task import create_task
-from task_config import ID_TO_LABEL
-from utils import write_to_file, write_to_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def add_application_args(parser):
         default=None,
         help="Entity embedding file",
     )
-    
+
     application_config.add_argument(
         "--static_ent_emb_file",
         type=nullable_string,

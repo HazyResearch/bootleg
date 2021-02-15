@@ -1,284 +1,330 @@
+"""Bootleg run command."""
+
 import argparse
-import multiprocessing
+import logging
 import os
+import subprocess
 import sys
-import time
-from math import floor
-from subprocess import check_output
-import numpy as np
+from functools import partial
+
 import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
 import ujson
-from torch.utils import data
 
-from bootleg.trainer import Trainer
+import emmental
+from bootleg import log_rank_0_debug, log_rank_0_info
+from bootleg.data import get_dataloader_embeddings, get_dataloaders, get_slicedatasets
+from bootleg.optimizers.sparsedenseadam import SparseDenseAdamW
+from bootleg.symbols.constants import DEV_SPLIT, TEST_SPLIT, TRAIN_SPLIT
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.symbols.constants import *
-from bootleg.utils import utils, logging_utils, data_utils, train_utils, eval_utils
-from bootleg.utils.parser_utils import get_full_config
-from bootleg.utils.classes.dataset_collection import DatasetCollection
-from bootleg.utils.classes.status_reporter import StatusReporter
+from bootleg.task_config import NED_TASK, TYPE_PRED_TASK
+from bootleg.tasks import ned_task, type_pred_task
+from bootleg.utils import eval_utils
+from bootleg.utils.model_utils import count_parameters
+from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
+from bootleg.utils.utils import dump_yaml_file, load_yaml_file, write_to_file
+from emmental.learner import EmmentalLearner
+from emmental.model import EmmentalModel
 
-def main(args, mode):
-    multiprocessing.set_start_method("forkserver", force=True)
-    # =================================
-    # ARGUMENTS CHECK
-    # =================================
-    # distributed training
-    assert (args.run_config.ngpus_per_node <= torch.cuda.device_count()) or (not torch.cuda.is_available()), 'Not enough GPUs per node.'
-    world_size = args.run_config.ngpus_per_node * args.run_config.nodes
-    if world_size > 1:
-        args.run_config.distributed = True
-    assert (args.run_config.distributed and world_size > 1) or (world_size == 1)
-
-    train_utils.setup_run_folders(args, mode)
-
-    # check slice method
-    assert args.train_config.slice_method in SLICE_METHODS, f"You're slice_method {args.train_config.slice_method} is not in {SLICE_METHODS}."
-    train_utils.setup_train_heads_and_eval_slices(args)
-
-    # check save step
-    assert args.run_config.save_every_k_eval > 0, f"You must have save_every_k_eval set to be > 0"
-
-    # since eval, make sure resume model file is set and exists
-    if mode == "eval" or mode == "dump_preds" or mode == "dump_embs":
-        assert args.run_config.init_checkpoint != "", \
-            f"You must specify a model checkpoint in run_config to run {mode}"
-        assert os.path.exists(args.run_config.init_checkpoint),\
-            f"The resume model file of {args.run_config.init_checkpoint} doesn't exist"
-
-    if mode == "dump_preds" or mode == "dump_embs":
-        assert args.run_config.perc_eval == 1.0, f"If you are running dump_preds or dump_embs, run_config.perc_eval must be 1.0. You have {args.run_config.perc_eval}"
-        assert args.data_config.test_dataset.use_weak_label is True, f"We do not support dumping when the test dataset gold is set to false. You can filter the dataset and run with filtered data."
-
-    utils.dump_json_file(filename=os.path.join(train_utils.get_save_folder(args.run_config), f"config_{mode}.json"), contents=args)
-    if args.run_config.distributed:
-        mp.spawn(main_worker, nprocs=args.run_config.ngpus_per_node, args=(args, mode, world_size))
-    else:
-        main_worker(gpu=args.run_config.gpu, args=args, mode=mode, world_size=world_size)
+logger = logging.getLogger(__name__)
 
 
-def main_worker(gpu, args, mode, world_size):
-    # Explicitly setting seed to make sure that models created in two processes
-    # start from same random weights and biases.
-    torch.manual_seed(args.train_config.seed)
-    np.random.seed(args.train_config.seed)
-    # reset gpu if in distributed
-    args.run_config.gpu = gpu
-    logger = logging_utils.create_logger(args, mode)
-    # dump log info before we change the batch size or else it's confusing why it doesn't
-    # match the config settings
-    logger.info(ujson.dumps(args, indent=4))
-    logger.info("Machine: " + os.uname()[1])
-    logger.info("CMD: python " + " ".join(sys.argv))
-    # Dump git commit
-    try:
-        h = check_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
-        logger.info("Git hash: " + h.decode("utf-8"))
-    except:
-        logger.info("Git hash: git not found")
+def parse_cmdline_args():
+    """Takes an input config file and parses it into the correct subdictionary
+    groups for the model.
 
-    is_writer = True
-    rank = 0
-    if args.run_config.distributed:
-        # get process identifier number (based on node id and gpu id within a node)
-        rank = args.run_config.nr * args.run_config.ngpus_per_node + args.run_config.gpu
-        # this is blocking
-        dist.init_process_group(
-            backend='gloo',
-            init_method=args.run_config.dist_url,
-            world_size=world_size,
-            rank=rank
-        )
-        # When using a single GPU per process and per
-        # DistributedDataParallel, we need to divide the batch size
-        # ourselves based on the total number of GPUs we have
-        args.train_config.batch_size = int(args.train_config.batch_size / args.run_config.ngpus_per_node)
-        args.run_config.eval_batch_size = int(args.run_config.eval_batch_size / args.run_config.ngpus_per_node)
-        # whether the machine is responsible for removing/writing files on the CPU
-        is_writer = (rank % args.run_config.ngpus_per_node) == 0
-    if torch.cuda.is_available() and not args.run_config.cpu:
-        torch.cuda.set_device(args.run_config.gpu)
-    if mode == 'train':
-        train(args, is_writer=is_writer, logger=logger, world_size=world_size, rank=rank)
-    elif mode == 'eval' or mode == 'dump_preds' or mode == 'dump_embs':
-        model_eval(args, mode=mode, is_writer=is_writer, logger=logger,
-                   world_size=world_size, rank=rank)
-    else:
-        raise Exception('--mode is either train or eval or fast_eval')
+    Returns:
+        model run mode of train, eval, or dumping
+        parsed Dict config
+        path to original config path
+    """
+    # Parse cmdline args to specify config and mode
+    cli_parser = argparse.ArgumentParser(
+        description="Bootleg CLI Config",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
+    cli_parser.add_argument(
+        "--config_script",
+        type=str,
+        help="This config should mimic the config_args found in utils/parser/bootleg_args.py with parameters you want to override."
+        "You can also override the parameters from config_script by passing them in directly after config_script. E.g., --train_config.batch_size 5",
+    )
+    cli_parser.add_argument(
+        "--mode",
+        type=str,
+        default="train",
+        choices=["train", "eval", "dump_preds", "dump_embs"],
+    )
+    cli_parser.add_argument(
+        "--local_rank",
+        type=int,
+        default=-1,
+        help="When using torch.distributed it passes local_rank as command arg. We must capture it here.",
+    )
 
-def train(args, is_writer, logger, world_size, rank):
-    mode = "train"
-    # This is main but call again in case train is called directly
-    train_utils.setup_train_heads_and_eval_slices(args)
-    train_utils.setup_run_folders(args, mode)
-
-    # Load word symbols (like tokenizers) and entity symbols (aka entity profiles)
-    word_symbols = data_utils.load_wordsymbols(args.data_config, is_writer, distributed=args.run_config.distributed)
-    logger.info(f"Loading entity_symbols...")
-    entity_symbols = EntitySymbols(load_dir=os.path.join(args.data_config.entity_dir, args.data_config.entity_map_dir),
-        alias_cand_map_file=args.data_config.alias_cand_map)
-    logger.info(f"Loaded entity_symbols with {entity_symbols.num_entities} entities.")
-    # Get train dataset
-    train_slice_dataset = data_utils.create_slice_dataset(args, args.data_config.train_dataset, is_writer, dataset_is_eval=False)
-    train_dataset = data_utils.create_dataset(args, args.data_config.train_dataset, is_writer,
-                                                  word_symbols, entity_symbols,
-                                                  slice_dataset=train_slice_dataset,
-                                                  dataset_is_eval=False)
-    train_dataloader, train_sampler = data_utils.create_dataloader(args, train_dataset,
-                                                                   eval_slice_dataset=None, world_size=world_size, rank=rank,
-                                                                   batch_size=args.train_config.batch_size)
-
-    # Repeat for dev
-    dev_dataset_collection = {}
-    dev_slice_dataset = data_utils.create_slice_dataset(args, args.data_config.dev_dataset, is_writer, dataset_is_eval=True)
-    dev_dataset = data_utils.create_dataset(args, args.data_config.dev_dataset, is_writer,
-                                            word_symbols, entity_symbols,
-                                            slice_dataset=dev_slice_dataset,
-                                            dataset_is_eval=True)
-    dev_dataloader, dev_sampler = data_utils.create_dataloader(args, dev_dataset,
-                                                               eval_slice_dataset=dev_slice_dataset, batch_size=args.run_config.eval_batch_size)
-    dataset_collection = DatasetCollection(args.data_config.dev_dataset, args.data_config.dev_dataset.file, dev_dataset, dev_dataloader, dev_slice_dataset, dev_sampler)
-    dev_dataset_collection[args.data_config.dev_dataset.file] = dataset_collection
-
-    eval_slice_names = args.run_config.eval_slices
-
-    total_steps_per_epoch = len(train_dataloader)
-    # Create trainer---model, optimizer, and scorer
-    trainer = Trainer(args, entity_symbols, word_symbols,
-                      total_steps_per_epoch=total_steps_per_epoch,
-                      eval_slice_names=eval_slice_names,
-                      resume_model_file=args.run_config.init_checkpoint)
-
-    # Set up epochs and intervals for saving and evaluating
-    max_epochs = int(args.run_config.max_epochs)
-    eval_steps = int(args.run_config.eval_steps)
-    log_steps = int(args.run_config.log_steps)
-    save_steps = max(int(args.run_config.save_every_k_eval * eval_steps), 1)
-    logger.info(f"Eval steps {eval_steps}, Log steps {log_steps}, Steps per epoch {len(train_dataloader)}, Save steps {save_steps} (will also save at end of epoch)")
-    logger.info(f"Total training examples per epoch {len(train_dataset)}")
-    status_reporter = StatusReporter(args, logger, is_writer, max_epochs, total_steps_per_epoch, is_eval=False)
-    global_step = 0
-    for epoch in range(trainer.start_epoch, trainer.start_epoch + max_epochs):
-        # this is to fix having to save/restore the RNG state for checkpointing
-        torch.manual_seed(args.train_config.seed + epoch)
-        np.random.seed(args.train_config.seed + epoch)
-        if args.run_config.distributed:
-            # for determinism across runs https://github.com/pytorch/examples/issues/501
-            train_sampler.set_epoch(epoch)
-
-        start_time_load = time.time()
-        for i, batch in enumerate(train_dataloader):
-            load_time = time.time() - start_time_load
-            start_time = time.time()
-            _, loss_pack, _, _ = trainer.update(batch)
-            # Log progress
-            if (global_step+1) % log_steps == 0:
-                duration = time.time() - start_time
-                status_reporter.step_status(epoch=epoch, step=global_step, loss_pack=loss_pack, time=duration, load_time=load_time,
-                                            lr=trainer.get_lr())
-            # Save model
-            if (global_step+1) % save_steps == 0 and is_writer:
-                logger.info("Saving model...")
-                trainer.save(save_dir=train_utils.get_save_folder(args.run_config), epoch=epoch, step=global_step, step_in_batch=i, suffix=args.run_config.model_suffix)
-            # Run evaluation
-            if (global_step+1) % eval_steps == 0:
-                eval_utils.run_eval_all_dev_sets(args, global_step, dev_dataset_collection, logger, status_reporter, trainer)
-            if args.run_config.distributed:
-                dist.barrier()
-            global_step += 1
-            # Time loading new batch
-            start_time_load = time.time()
-        ######### END OF EPOCH
-        if is_writer:
-            logger.info(f"Saving model end of epoch {epoch}...")
-            trainer.save(save_dir=train_utils.get_save_folder(args.run_config), epoch=epoch, step=global_step, step_in_batch=i, end_of_epoch=True, suffix=args.run_config.model_suffix)
-        # Always run eval when saving -- if this coincided with eval_step, then don't need to rerun eval
-        if (global_step+1) % eval_steps != 0:
-            eval_utils.run_eval_all_dev_sets(args, global_step, dev_dataset_collection, logger, status_reporter, trainer)
-    if is_writer:
-        logger.info("Saving model...")
-        trainer.save(save_dir=train_utils.get_save_folder(args.run_config), epoch=epoch, step=global_step, step_in_batch=i, end_of_epoch=True, last_epoch=True, suffix=args.run_config.model_suffix)
-    if args.run_config.distributed:
-        dist.barrier()
-
-
-def model_eval(args, mode, is_writer, logger, world_size=1, rank=0):
-    assert args.run_config.init_checkpoint != "", "You can't have an empty model file to do eval"
-    dump_mode = mode == 'dump_preds' or mode == 'dump_embs'
-    # this is in main but call again in case eval is called directly
-    train_utils.setup_train_heads_and_eval_slices(args)
-    train_utils.setup_run_folders(args, mode)
-
-    word_symbols = data_utils.load_wordsymbols(args.data_config, is_writer, distributed=args.run_config.distributed)
-    logger.info(f"Loading entity_symbols...")
-    entity_symbols = EntitySymbols(load_dir=os.path.join(args.data_config.entity_dir, args.data_config.entity_map_dir),
-        alias_cand_map_file=args.data_config.alias_cand_map)
-    logger.info(f"Loaded entity_symbols with {entity_symbols.num_entities} entities.")
-    eval_slice_names = args.run_config.eval_slices
-    test_dataset_collection = {}
-    test_slice_dataset = data_utils.create_slice_dataset(args, args.data_config.test_dataset, is_writer, dataset_is_eval=True)
-    test_dataset = data_utils.create_dataset(args, args.data_config.test_dataset, is_writer,
-                                             word_symbols, entity_symbols,
-                                             slice_dataset=test_slice_dataset,
-                                             dataset_is_eval=True)
-    if dump_mode:
-        # For dump_mode, we want to dump ALL predictions for all mentions, weakly labeled or not
-        # In the create dataloader, if eval_slice_dataset is not none, we sample indices that have sentences with
-        # at least one non-weakly-labeled mentions. We don't want to do this in dump_mode so set the eval_slice_dataset to None
-        test_dataloader, test_sampler = data_utils.create_dataloader(args, test_dataset,
-                                                                 eval_slice_dataset=None,
-                                                                 batch_size=args.run_config.eval_batch_size)
-    else:
-        test_dataloader, test_sampler = data_utils.create_dataloader(args, test_dataset,
-                                                                     eval_slice_dataset=test_slice_dataset,
-                                                                     batch_size=args.run_config.eval_batch_size)
-    dataset_collection = DatasetCollection(args.data_config.test_dataset, args.data_config.test_dataset.file, test_dataset, test_dataloader, test_slice_dataset,
-                                           test_sampler)
-    test_dataset_collection[args.data_config.test_dataset.file] = dataset_collection
-
-    trainer = Trainer(args, entity_symbols, word_symbols,
-                      resume_model_file=args.run_config.init_checkpoint,
-                      eval_slice_names=eval_slice_names,
-                      model_eval=True)
-
-    # Run evaluation numbers without dumping predictions (quick, batched)
-    if not dump_mode: # mode == "eval"
-        status_reporter = StatusReporter(args, logger, is_writer, max_epochs=None, total_steps_per_epoch=None, is_eval=True)
-        # results are written to json file
-        for test_data_file in test_dataset_collection:
-            logger.info(f"************************RUNNING EVAL {test_data_file}************************")
-            test_dataloader = test_dataset_collection[test_data_file].data_loader
-            # True is for if the batch is test or not, None is for the global step
-            eval_utils.run_batched_eval(args=args,
-                is_test=True, global_step=None, logger=logger, trainer=trainer, dataloader=test_dataloader,
-                status_reporter=status_reporter, file=test_data_file)
-    else:
-        # get predictions and optionally dump the corresponding contextual entity embeddings
-        # TODO: support dumping ids for other embeddings as well (static entity embeddings, type embeddings, relation embeddings)
-        # TODO: remove collection abstraction
-        for test_data_file in test_dataset_collection:
-            logger.info(f"************************DUMPING PREDICTIONS FOR {test_data_file}************************")
-            test_dataloader = test_dataset_collection[test_data_file].data_loader
-            pred_file, emb_file = eval_utils.run_dump_preds(args=args, entity_symbols=entity_symbols, test_data_file=test_data_file,
-                logger=logger, trainer=trainer, dataloader=test_dataloader, dump_embs=(mode == 'dump_embs'))
-            return pred_file, emb_file
-    return
-
-
-if __name__ == '__main__':
-    config_parser = argparse.ArgumentParser('Where is config script?')
-    config_parser.add_argument('--config_script', type=str, default='run_config.json',
-                               help='This config should mimc the config.py config json with parameters you want to override.'
-                                    'You can also override the parameters from config_script by passing them in directly after config_script. E.g., --train_config.batch_size 5')
-    config_parser.add_argument('--mode', type=str, default='train', choices=["train", "eval", "dump_preds", "dump_embs"])
     # you can add other args that will override those in the config_script
-
     # parse_known_args returns 'args' that are the same as what parse_args() returns
     # and 'unknown' which are args that the parser doesn't recognize but you want to keep.
     # 'unknown' are what we pass on to our override any args from the second phase of arg parsing from the json config file
-    args, unknown = config_parser.parse_known_args()
-    final_args = get_full_config(args.config_script, unknown)
-    main(final_args, args.mode)
+    cli_args, unknown = cli_parser.parse_known_args()
+    config = parse_boot_and_emm_args(cli_args.config_script, unknown)
+
+    #  Modify the local rank param from the cli args
+    config.learner_config.local_rank = cli_args.local_rank
+    mode = cli_args.mode
+    return mode, config, cli_args.config_script
+
+
+def setup(config, run_config_path=None):
+    """
+    Setup distributed backend and dump configuration files.
+    Args:
+        config: config
+        run_config_path: path for original run config
+
+    Returns:
+    """
+    # torch.multiprocessing.set_sharing_strategy("file_system")
+    # spawn method must be fork to work with Meta.config
+    torch.multiprocessing.set_start_method("fork", force=True)
+    """
+    ulimit -n 500000
+    python3 -m torch.distributed.launch --nproc_per_node=2  bootleg/run.py --config_script ...
+    """
+    log_level = logging.getLevelName(config.run_config.log_level.upper())
+    emmental.init(
+        log_dir=config["meta_config"]["log_path"],
+        config=config,
+        local_rank=config.learner_config.local_rank,
+        level=log_level,
+    )
+
+    # Set up distributed backend
+    emmental.Meta.init_distributed_backend()
+
+    cmd_msg = " ".join(sys.argv)
+    # Log configuration into filess
+    if config.learner_config.local_rank in [0, -1]:
+        write_to_file(f"{emmental.Meta.log_path}/cmd.txt", cmd_msg)
+        dump_yaml_file(
+            f"{emmental.Meta.log_path}/parsed_config.yaml", emmental.Meta.config
+        )
+        # Dump the run config (does not contain defaults)
+        if run_config_path is not None:
+            dump_yaml_file(
+                f"{emmental.Meta.log_path}/run_config.yaml",
+                load_yaml_file(run_config_path),
+            )
+
+    log_rank_0_info(logger, f"COMMAND: {cmd_msg}")
+    log_rank_0_debug(logger, f"Config: {ujson.dumps(emmental.Meta.config, indent=4)}")
+    log_rank_0_info(
+        logger, f"Saving config to {emmental.Meta.log_path}/parsed_config.yaml"
+    )
+
+    git_hash = "Not able to retrieve git hash"
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "log", "-n", "1", "--pretty=tformat:%h-%ad", "--date=short"]
+        ).strip()
+    except subprocess.CalledProcessError:
+        pass
+    log_rank_0_info(logger, f"Git Hash: {git_hash}")
+
+
+def configure_optimizer(config):
+    """Configures the optimizer for Bootleg. By default, we use
+    SparseDenseAdam. We always change the parameter group for layer norms
+    following standard BERT finetuning methods.
+
+    Args:
+        config: config
+
+    Returns:
+    """
+    # Set default Bootleg optimizer if config doesn't override it
+    if config.learner_config.optimizer_config.optimizer is None:
+        log_rank_0_debug(logger, f"Setting default optimizer to be SparseDenseAdam")
+        custom_optimizer = partial(
+            SparseDenseAdamW,
+            lr=config.learner_config.optimizer_config.lr,
+            weight_decay=config.learner_config.optimizer_config.l2,
+            betas=config.learner_config.optimizer_config.adamw_config.betas,
+            eps=config.learner_config.optimizer_config.adamw_config.eps,
+        )
+        custom_optim_config = {
+            "learner_config": {"optimizer_config": {"optimizer": custom_optimizer}}
+        }
+        emmental.Meta.update_config(custom_optim_config)
+
+    # Specify parameter group for Adam BERT
+    def grouped_parameters(model):
+        no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
+        return [
+            {
+                "params": [
+                    p
+                    for n, p in model.named_parameters()
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": emmental.Meta.config["learner_config"][
+                    "optimizer_config"
+                ]["l2"],
+            },
+            {
+                "params": [
+                    p
+                    for n, p in model.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+            },
+        ]
+
+    emmental.Meta.config["learner_config"]["optimizer_config"][
+        "parameters"
+    ] = grouped_parameters
+
+
+# TODO: optimize slices so we split them based on max aliases (save A LOT of memory)
+def run_model(mode, config, run_config_path=None):
+    """
+    Main run method for Emmental Bootleg models.
+    Args:
+        mode: run mode (train, eval, dump_preds, dump_embs)
+        config: parsed model config
+        run_config_path: original config path (for saving)
+
+    Returns:
+
+    """
+
+    # Set up distributed backend and dump configuration files
+    setup(config, run_config_path)
+
+    # Load entity symbols
+    log_rank_0_info(logger, f"Loading entity symbols...")
+    entity_symbols = EntitySymbols(
+        load_dir=os.path.join(
+            config.data_config.entity_dir, config.data_config.entity_map_dir
+        ),
+        alias_cand_map_file=config.data_config.alias_cand_map,
+    )
+    # Create tasks
+    tasks = [NED_TASK]
+    if config.data_config.type_prediction.use_type_pred is True:
+        tasks.append(TYPE_PRED_TASK)
+
+    # Create splits for data loaders
+    data_splits = [TRAIN_SPLIT, DEV_SPLIT, TEST_SPLIT]
+    # Slices are for eval so we only split on test/dev
+    slice_splits = [DEV_SPLIT, TEST_SPLIT]
+    # If doing eval, only run on test data
+    if mode in ["eval", "dump_preds", "dump_embs"]:
+        data_splits = [TEST_SPLIT]
+        slice_splits = [TEST_SPLIT]
+
+    # Gets embeddings that need to be prepped during data prep or in the __get_item__ method
+    batch_on_the_fly_kg_adj = get_dataloader_embeddings(config, entity_symbols)
+    # Gets dataloaders
+    dataloaders = get_dataloaders(
+        config,
+        tasks,
+        data_splits,
+        entity_symbols,
+        batch_on_the_fly_kg_adj,
+    )
+    slice_datasets = get_slicedatasets(config, slice_splits, entity_symbols)
+
+    configure_optimizer(config)
+
+    # Create models and add tasks
+    if config.model_config.attn_class == "BERTNED":
+        log_rank_0_info(logger, f"Starting NED-Base Model")
+        assert (
+            config.data_config.type_prediction.use_type_pred is False
+        ), f"NED-Base does not support type prediction"
+        assert (
+            config.data_config.word_embedding.use_sent_proj is False
+        ), f"NED-Base requires word_embeddings.use_sent_proj to be False"
+        model = EmmentalModel(name="NED-Base")
+        model.add_tasks(ned_task.create_task(config, entity_symbols, slice_datasets))
+    else:
+        log_rank_0_info(logger, f"Starting Bootleg Model")
+        model = EmmentalModel(name="Bootleg")
+        # TODO: make this more general for other tasks -- iterate through list of tasks
+        # and add task for each
+        model.add_task(ned_task.create_task(config, entity_symbols, slice_datasets))
+        if TYPE_PRED_TASK in tasks:
+            model.add_task(
+                type_pred_task.create_task(config, entity_symbols, slice_datasets)
+            )
+            # Add the mention type embedding to the embedding payload
+            type_pred_task.update_ned_task(model)
+
+    # Print param counts
+    if mode == "train":
+        log_rank_0_debug(logger, "PARAMS WITH GRAD\n" + "=" * 30)
+        total_params = count_parameters(model, requires_grad=True, logger=logger)
+        log_rank_0_info(logger, f"===> Total Params With Grad: {total_params}")
+        log_rank_0_debug(logger, "PARAMS WITHOUT GRAD\n" + "=" * 30)
+        total_params = count_parameters(model, requires_grad=False, logger=logger)
+        log_rank_0_info(logger, f"===> Total Params Without Grad: {total_params}")
+
+    # Load the best model from the pretrained model
+    if config["model_config"]["model_path"] is not None:
+        model.load(config["model_config"]["model_path"])
+
+    # Train model
+    if mode == "train":
+        emmental_learner = EmmentalLearner()
+        emmental_learner._set_optimizer(model)
+        emmental_learner.learn(model, dataloaders)
+        if config.learner_config.local_rank in [0, -1]:
+            model.save(f"{emmental.Meta.log_path}/last_model.pth")
+
+    # If just finished training a model or in eval mode, run eval
+    if mode in ["train", "eval"]:
+        scores = model.score(dataloaders)
+        # Save metrics and models
+        log_rank_0_info(logger, f"Saving metrics to {emmental.Meta.log_path}")
+        log_rank_0_info(logger, f"Metrics: {scores}")
+        scores["log_path"] = emmental.Meta.log_path
+        if config.learner_config.local_rank in [0, -1]:
+            write_to_file(f"{emmental.Meta.log_path}/{mode}_metrics.txt", scores)
+            eval_utils.write_disambig_metrics_to_csv(
+                f"{emmental.Meta.log_path}/{mode}_disambig_metrics.csv", scores
+            )
+        return scores
+
+    # If you want detailed dumps, dump model outputs
+    assert mode in [
+        "dump_preds",
+        "dump_embs",
+    ], 'Mode must be "dump_preds" or "dump_embs"'
+    dump_embs = False if mode != "dump_embs" else True
+    assert (
+        len(dataloaders) == 1
+    ), f"We should only have length 1 dataloaders for dump_embs and dump_preds!"
+    res_dict = model.predict(
+        dataloaders[0],
+        return_preds=True,
+        return_probs=True,
+        return_action_outputs=True,
+    )
+    result_file, out_emb_file = None, None
+    if config.learner_config.local_rank in [0, -1]:
+        result_file, out_emb_file = eval_utils.disambig_dump_preds(
+            config,
+            res_dict,
+            dataloaders[0].dataset.raw_filename,
+            entity_symbols,
+            dump_embs,
+            NED_TASK,
+        )
+    return result_file, out_emb_file
+
+
+if __name__ == "__main__":
+    mode, config, run_config_path = parse_cmdline_args()
+    run_model(mode, config, run_config_path)

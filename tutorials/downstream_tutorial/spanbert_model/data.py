@@ -1,11 +1,11 @@
 import logging
 import os
 
-from emmental.data import EmmentalDataLoader
-
 from dataset import TACREDDataset
 from pytorch_pretrained_bert import BertTokenizer
 from utils import load_json
+
+from emmental.data import EmmentalDataLoader
 
 logger = logging.getLogger(__name__)
 

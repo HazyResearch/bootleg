@@ -51,8 +51,8 @@ We start with definitions of terms in the NED process, which are described in fu
 Here we provide our input text (i.e. the TACRED data) as the `infile` (jsonl format); the candidate map, `cand_map` (json format), which maps textual mentions to a list of candidate entities the mention could be referring to; and the `outfile` (jsonl format), which will include the original `infile` plus candidates extracted from the input text. The lines of code executing this step are in  `bootleg_utilities/tacred_e2ebootleg_ned.py` as follows:
 
 ```
-from bootleg.extract_mentions import extract_mentions 
-extract_mentions(in_filepath=infile, out_filepath=outfile, cand_map_file=cand_map, logger=logger)
+from bootleg.end2end.extract_mentions import extract_mentions
+extract_mentions(in_filepath=infile, out_filepath=outfile, cand_map_file=cand_map)
 ```  
 
 Note that the mention extractor code requires the `infile` to be in `jsonl` format, where an example is as follows (including the `id` is optional):
