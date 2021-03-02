@@ -95,6 +95,7 @@ def setup(config, run_config_path=None):
     emmental.init(
         log_dir=config["meta_config"]["log_path"],
         config=config,
+        use_exact_log_path=config["meta_config"]["use_exact_log_path"],
         local_rank=config.learner_config.local_rank,
         level=log_level,
     )

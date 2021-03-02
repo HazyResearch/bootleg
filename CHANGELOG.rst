@@ -1,6 +1,15 @@
 Unreleased_
 -------------------
- 
+Added
+^^^^^^^
+* ``data_config.print_examples_prep`` flag to toggle data example printing during data prep
+
+Fixed
+^^^^^^^
+* Fixed readthedocs so the BootlegAnnotator was loaded correctly
+* Fixed logging in BootlegAnnotator
+* Fixed ``use_exact_path`` argument in Emmental
+
 1.0.0 - 2020-02-15
 -------------------
 We did a major rewrite of our entire codebase and moved to using `Emmental <https://github.com/SenWu/Emmental>`_ for training. Emmental allows for each multi-task training, FP16, and support for both DataParallel and DistributedDataParallel.

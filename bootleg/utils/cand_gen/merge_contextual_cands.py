@@ -188,11 +188,14 @@ def merge_data_hlp(args):
         is_train,
     ) = args
     sent2cands = {}
+    sent2probs = {}
     new_alias2qids = {}
     with open(input_cand_file, "r") as f_in:
         for line in tqdm(f_in, total=total_input, desc="Processing cand data"):
             line = ujson.loads(line)
             sent2cands[line["sent_idx_unq"]] = line["ents"]
+            if "probs" in line:
+                sent2probs[line["sent_idx_unq"]] = line["probs"]
     total_dropped = 0
     total_seen = 0
     total_len = 0
@@ -206,9 +209,16 @@ def merge_data_hlp(args):
                     len(line["aliases"]) == 0
                 ), f"{sent_idx_unq} not in cand maps but there are aliases"
             cands = sent2cands[sent_idx_unq]
+            probs = sent2probs.get(
+                sent_idx_unq,
+                [[500 - j for j in range(len(cand_set))] for cand_set in cands],
+            )
             assert len(cands) == len(
                 line["aliases"]
             ), f"The length of aliases does not match cands in {sent_idx_unq}"
+            assert len(probs) == len(
+                line["aliases"]
+            ), f"The length of aliases does not match probs in {sent_idx_unq}"
 
             new_als, new_qids, new_spans, new_golds = [], [], [], []
             new_slices = {}
@@ -219,9 +229,9 @@ def merge_data_hlp(args):
                 orig_cand_pairs = ed_global.get_qid_count_cands(line["aliases"][i])
                 assert len(orig_cand_pairs) <= max_candidates
                 new_cand_pairs = [
-                    [p, 100 - j]
-                    for j, p in enumerate(sent2cands[sent_idx_unq][i])
-                    if ed_global.qid_exists(p)
+                    [c, p]
+                    for c, p in zip(cands[i], probs[i])
+                    if ed_global.qid_exists(c)
                 ]
                 if keep_orig:
                     final_cand_pairs = orig_cand_pairs

@@ -72,9 +72,9 @@ class LearnedEntityEmb(EntityEmb):
         ), f"LearnedEntityEmb must have learned_embedding_size in args"
         self.learned_embedding_size = emb_args.learned_embedding_size
 
-        # Set sparsity based on optimizer. The None optimizer is Bootleg's SparseDenseAdam
+        # Set sparsity based on optimizer and fp16. The None optimizer is Bootleg's SparseDenseAdam. If fp16 is True, must use dense.
         optimiz = main_args.learner_config.optimizer_config.optimizer
-        if optimiz in [None, "sparse_adam"]:
+        if optimiz in [None, "sparse_adam"] and main_args.learner_config.fp16 is False:
             sparse = True
         else:
             sparse = False
