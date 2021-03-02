@@ -213,8 +213,12 @@ class BootlegAnnotator(object):
         )
         self.config.model_config.device = device
 
+        log_level = logging.getLevelName(self.config["run_config"]["log_level"].upper())
         emmental.init(
-            log_dir=self.config["meta_config"]["log_path"], config=self.config
+            log_dir=self.config["meta_config"]["log_path"],
+            config=self.config,
+            use_exact_log_path=self.config["meta_config"]["use_exact_log_path"],
+            level=log_level,
         )
 
         logger.debug("Reading entity database")

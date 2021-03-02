@@ -74,6 +74,7 @@ config_args = {
         "max_seq_len": (100, "max token length sentences"),
         "max_aliases": (10, "max aliases per sentence"),
         "overwrite_preprocessed_data": (False, "overwrite preprocessed data"),
+        "print_examples_prep": (False, "whether to print examples during prep or not"),
         "type_prediction": {
             "use_type_pred": (False, "whether to add type prediction or not"),
             "file": (

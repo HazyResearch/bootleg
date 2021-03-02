@@ -503,6 +503,7 @@ def convert_examples_to_features_and_save(
                 "max_seq_len": data_config.max_seq_len,
                 "train_in_candidates": data_config.train_in_candidates,
                 "max_aliases": data_config.max_aliases,
+                "pred_examples": data_config.print_examples_prep,
             }
         )
         offset += files_and_counts[in_file_name]
@@ -558,7 +559,7 @@ def convert_examples_to_features_and_save_hlp(input_args):
     save_file_offset = input_args["save_file_offset"]
     ex_print_mod = input_args["ex_print_mod"]
     guid_dtype = input_args["guid_dtype"]
-    is_bert = input_args["is_bert"]
+    print_examples = input_args["pred_examples"]
     max_aliases = input_args["max_aliases"]
     max_seq_len = input_args["max_seq_len"]
     split = input_args["split"]
@@ -735,7 +736,8 @@ def convert_examples_to_features_and_save_hlp(input_args):
                 + "\n"
             )
             output_str += f"guid:                            {feature.guid}" + "\n"
-            print(output_str)
+            if print_examples:
+                print(output_str)
     mmap_file_global.flush()
     mmap_label_file_global.flush()
     return total_saved_features

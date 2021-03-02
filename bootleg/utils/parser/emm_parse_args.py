@@ -177,7 +177,7 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     learner_config.add_argument(
         "--emmental.online_eval",
         type=str2bool,
-        default=True,
+        default=False,
         help="Whether to perform online evaluation",
     )
 
