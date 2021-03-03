@@ -204,6 +204,19 @@ class BootlegAnnotator(object):
             if "emmental" in config:
                 config = parse_boot_and_emm_args(config)
             self.config = config
+            # Ensure some of the critical annotator args are the correct type
+            self.config.data_config.max_aliases = int(
+                self.config.data_config.max_aliases
+            )
+            self.config.run_config.eval_batch_size = int(
+                self.config.run_config.eval_batch_size
+            )
+            self.config.data_config.max_seq_len = int(
+                self.config.data_config.max_seq_len
+            )
+            self.config.data_config.train_in_candidates = bool(
+                self.config.data_config.train_in_candidates
+            )
 
         if not device:
             device = 0 if torch.cuda.is_available() else -1
@@ -334,7 +347,8 @@ class BootlegAnnotator(object):
                 and type(text_list[0]) is str
             ), f"We only accept inputs of strings and lists of strings"
 
-        ebs = self.config.run_config.eval_batch_size
+        ebs = int(self.config.run_config.eval_batch_size)
+        self.config.data_config.max_aliases = int(self.config.data_config.max_aliases)
         total_start_exs = 0
         total_final_exs = 0
         dropped_by_thresh = 0
@@ -504,12 +518,11 @@ class BootlegAnnotator(object):
             # ====================================================
             # EVALUATE MODEL OUTPUTS
             # ====================================================
-
             # recover predictions
             probs = prob_bdict[NED_TASK]
             max_probs = probs.max(2)
             max_probs_indices = probs.argmax(2)
-            for ex_i in range(batch_example_aliases.shape[0]):
+            for ex_i in range(probs.shape[0]):
                 idx_unq = batch_idx_unq[b_i + ex_i]
                 subsplit_idx = batch_subsplit_idx[b_i + ex_i]
                 entity_cands = eval_utils.map_aliases_to_candidates(
@@ -517,7 +530,6 @@ class BootlegAnnotator(object):
                     self.entity_db,
                     batch_aliases_arr[b_i + ex_i],
                 )
-
                 # batch size is 1 so we can reshape
                 probs_ex = probs[ex_i].reshape(
                     self.config.data_config.max_aliases, probs.shape[2]
