@@ -59,6 +59,17 @@ class TypeEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "max_types",
+            "type_dim",
+            "type_labels",
+            "merge_func",
+            "attn_hidden_size",
+            "regularize_mapping",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "max_types" in emb_args
         ), "Type embedding requires max_types to be set in args"

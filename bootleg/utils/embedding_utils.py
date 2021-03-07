@@ -9,6 +9,7 @@ from bootleg.symbols.constants import (
     NORMALIZE,
     SEND_THROUGH_BERT,
 )
+from bootleg.utils.utils import assert_keys_in_dict
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,19 @@ def get_embedding_args(emb):
 
     Returns: parsed arguments with defaults
     """
+    # batch_on_the_fly is used for determining when embeddings are prepped (see data.py)
+    allowable_keys = {
+        "args",
+        "load_class",
+        "key",
+        "cpu",
+        "batch_on_the_fly",
+        FREEZE,
+        DROPOUT_1D,
+        DROPOUT_2D,
+        NORMALIZE,
+        SEND_THROUGH_BERT,
+    }
     emb_args = emb.get("args", None)
     assert (
         "load_class" in emb
@@ -52,6 +66,9 @@ def get_embedding_args(emb):
     assert (
         "key" in emb
     ), "You must specify a key in the embedding config: {load_class: ..., key: ...}"
+    correct, bad_key = assert_keys_in_dict(allowable_keys, emb)
+    if not correct:
+        raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
     # Add cpu
     cpu = emb.get("cpu", False)
     assert type(cpu) is bool

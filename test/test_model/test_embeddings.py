@@ -679,6 +679,7 @@ class TestLearnedEmbedding(unittest.TestCase):
         torch.save(emb, self.static_emb)
 
         self.args.data_config.ent_embeddings[0]["args"]["emb_file"] = self.static_emb
+        del self.args.data_config.ent_embeddings[0]["args"]["learned_embedding_size"]
 
         learned_emb = StaticEmb(
             main_args=self.args,

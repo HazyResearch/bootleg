@@ -1,8 +1,14 @@
-Unreleased_
+Unreleased_ 1.0.1dev1
 -------------------
 Added
 ^^^^^^^
-* ``data_config.print_examples_prep`` flag to toggle data example printing during data prep
+* ``data_config.print_examples_prep`` flag to toggle data example printing during data prep.
+* ``data_config.eval_accumulation_steps`` to support subbatching dumping of predictings. We save outputs to separate files of size approximately ``data_config.eval_accumulation_steps*data_config.eval_batch_size`` and merge into a final file at the end.
+
+Changed
+^^^^^^^^
+* Support for not using multiprocessing if use sets ``data_config.dataset_threads`` to be 1.
+* Added better argument parsing to check for arguments that were misspelled or otherwise wouldn't trigger anything.
 
 Fixed
 ^^^^^^^

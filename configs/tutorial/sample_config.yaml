@@ -1,15 +1,15 @@
 emmental:
   lr: 2e-5
-  n_epochs: 10
-  evaluation_freq: 2.0
+  n_epochs: 1
+  evaluation_freq: 0.00001
   checkpoint_freq: 1
   l2: 0.01
   log_path: logs/turtorial
-  device: 0
 run_config:
-  eval_batch_size: 16
+  eval_batch_size: 256
   dataloader_threads: 2
-  dataset_threads: 2
+  dataset_threads: 5
+  eval_accumulation_step: 10
 train_config:
   batch_size: 16
 model_config:
@@ -19,9 +19,9 @@ model_config:
   ff_inner_size: 256
   attn_class: Bootleg
 data_config:
-  data_dir: data/sample_text_data
+  data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_title_0122
   data_prep_dir: prep
-  emb_dir: data/sample_emb_data
+  emb_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs
   ent_embeddings:
        - key: learned
          load_class: LearnedEntityEmb
@@ -34,7 +34,7 @@ data_config:
          load_class: LearnedTypeEmb
          freeze: false
          args:
-           type_labels: qid2types.json
+           type_labels: wikidata_types_1229.json
            max_types: 3
            type_dim: 128
            merge_func: addattn
@@ -43,7 +43,7 @@ data_config:
          load_class: LearnedTypeEmb
          freeze: false
          args:
-           type_labels: qid2relations.json
+           type_labels: kg_relation_types_1229.json
            max_types: 50
            type_dim: 128
            merge_func: addattn
@@ -53,8 +53,8 @@ data_config:
          batch_on_the_fly: true
          normalize: false
          args:
-           kg_adj: kg_conn.txt
-  entity_dir: data/sample_entity_data
+           kg_adj: kg_adj_1229.txt
+  entity_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_title_0122/entity_db
   max_aliases: 10
   max_seq_len: 100
   overwrite_preprocessed_data: false
@@ -69,6 +69,6 @@ data_config:
     use_weak_label: true
   train_in_candidates: true
   word_embedding:
-    cache_dir: data/sample_emb_data
+    cache_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs/pretrained-bert-models
     freeze: true
     layers: 12
