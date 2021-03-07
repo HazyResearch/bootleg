@@ -12,7 +12,8 @@ import ujson
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import eval_utils
 from bootleg.utils.classes.dotted_dict import DottedDict
-from bootleg.utils.eval_utils import write_data_labels
+from bootleg.utils.eval_utils import check_and_create_alias_cand_trie, write_data_labels
+from bootleg.utils.utils import create_single_item_trie
 
 
 class EntitySymbolsSubclass(EntitySymbols):
@@ -256,6 +257,7 @@ class EvalUtils(unittest.TestCase):
         test_full_emb_file = tempfile.NamedTemporaryFile()
         test_merged_emb_file = tempfile.NamedTemporaryFile()
         gold_merged_emb_file = tempfile.NamedTemporaryFile()
+        cache_folder = tempfile.TemporaryDirectory()
 
         num_examples = 3
         total_num_mentions = 7
@@ -339,17 +341,44 @@ class EvalUtils(unittest.TestCase):
             {"aliases": ["a", "b"], "sent_idx_unq": 0},
             {"aliases": ["c", "d", "e", "f", "g"], "sent_idx_unq": 1},
         ]
-
+        # Keys are string for trie
+        sent_idx2num_mentions = {"0": 2, "1": 5}
         temp_file = tempfile.NamedTemporaryFile(delete=False).name
         with jsonlines.open(temp_file, "w") as f:
             for row in data:
                 f.write(row)
 
         # assert that output of merge_subsentences is correct
+        num_processes = 1
+
+        eval_utils.merge_subsentences(
+            num_processes,
+            sent_idx2num_mentions,
+            cache_folder.name,
+            test_merged_emb_file.name,
+            storage_type_merged,
+            test_full_emb_file.name,
+            storage_type_full,
+            dump_embs=True,
+        )
+        bootleg_merged_emb = np.memmap(
+            test_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
+        )
+        merged_emb_gold = np.memmap(
+            gold_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
+        )
+        assert len(bootleg_merged_emb) == total_num_mentions
+        for i in range(len(bootleg_merged_emb)):
+            assert np.array_equal(
+                bootleg_merged_emb[i]["entity_emb"], merged_emb_gold[i]["entity_emb"]
+            )
+
+        # Try with multiprocessing
         num_processes = 2
         eval_utils.merge_subsentences(
             num_processes,
-            temp_file,
+            sent_idx2num_mentions,
+            cache_folder.name,
             test_merged_emb_file.name,
             storage_type_merged,
             test_full_emb_file.name,
@@ -374,12 +403,14 @@ class EvalUtils(unittest.TestCase):
         test_full_emb_file.close()
         test_merged_emb_file.close()
         gold_merged_emb_file.close()
+        cache_folder.cleanup()
 
     def test_write_out_subsentences(self):
 
         merged_entity_emb_file = tempfile.NamedTemporaryFile()
         out_file = tempfile.NamedTemporaryFile()
         data_file = tempfile.NamedTemporaryFile()
+        cache_folder = tempfile.TemporaryDirectory()
 
         entity_dir = "test/entity_db"
         entity_map_dir = "entity_mappings"
@@ -403,7 +434,8 @@ class EvalUtils(unittest.TestCase):
             {"aliases": ["a", "b"], "sent_idx_unq": 0},
             {"aliases": ["c", "d", "e", "f", "g"], "sent_idx_unq": 1},
         ]
-
+        # Dict is a string key for trie
+        sent_idx2rows = {"0": data[0], "1": data[1]}
         with jsonlines.open(data_file.name, "w") as f:
             for row in data:
                 f.write(row)
@@ -478,20 +510,10 @@ class EvalUtils(unittest.TestCase):
         merged_entity_emb[6]["final_loss_prob"] = 0.9
         merged_entity_emb[6]["final_loss_cand_probs"] = np.array([0.1, 0.9])
 
-        num_processes = 2
+        num_processes = 1
         train_in_candidates = True
         dump_embs = True
-
-        write_data_labels(
-            num_processes,
-            merged_entity_emb_file.name,
-            merged_storage_type,
-            data_file.name,
-            out_file.name,
-            train_in_candidates,
-            dump_embs,
-            data_config,
-        )
+        max_candidates = 2
 
         """
           "a":[["Q1",10.0],["Q4",6]],
@@ -502,10 +524,6 @@ class EvalUtils(unittest.TestCase):
           "f":[["Q2",5.0],["Q1",3]],
           "g":[["Q1",30.0],["Q2",3]]
         """
-        all_lines = []
-        with open(out_file.name) as check_f:
-            for line in check_f:
-                all_lines.append(ujson.loads(line))
 
         gold_lines = [
             {
@@ -542,13 +560,74 @@ class EvalUtils(unittest.TestCase):
             },
         ]
 
+        write_data_labels(
+            num_processes=num_processes,
+            merged_entity_emb_file=merged_entity_emb_file.name,
+            merged_storage_type=merged_storage_type,
+            sent_idx2row=sent_idx2rows,
+            cache_folder=cache_folder.name,
+            out_file=out_file.name,
+            entity_dump=entity_symbols,
+            train_in_candidates=train_in_candidates,
+            max_candidates=max_candidates,
+            dump_embs=dump_embs,
+            trie_candidate_map_folder=None,
+            trie_qid2eid_file=None,
+        )
+        all_lines = []
+        with open(out_file.name) as check_f:
+            for line in check_f:
+                all_lines.append(ujson.loads(line))
+
         assert len(all_lines) == len(gold_lines)
 
         all_lines_sent_idx_map = {line["sent_idx_unq"]: line for line in all_lines}
         gold_lines_sent_idx_map = {line["sent_idx_unq"]: line for line in gold_lines}
 
         assert len(all_lines_sent_idx_map) == len(gold_lines_sent_idx_map)
+        for sent_idx in all_lines_sent_idx_map:
+            self.assertDictEqual(
+                gold_lines_sent_idx_map[sent_idx],
+                all_lines_sent_idx_map[sent_idx],
+                f"{ujson.dumps(gold_lines_sent_idx_map[sent_idx], indent=4)} VS {ujson.dumps(all_lines_sent_idx_map[sent_idx], indent=4)}",
+            )
 
+        # TRY MULTIPROCESSING
+        num_processes = 2
+        # create memmory files for multiprocessing
+        trie_candidate_map_folder = tempfile.TemporaryDirectory()
+        trie_qid2eid_file = tempfile.NamedTemporaryFile()
+        create_single_item_trie(
+            entity_symbols.get_qid2eid(), out_file=trie_qid2eid_file.name
+        )
+        check_and_create_alias_cand_trie(trie_candidate_map_folder.name, entity_symbols)
+
+        write_data_labels(
+            num_processes=num_processes,
+            merged_entity_emb_file=merged_entity_emb_file.name,
+            merged_storage_type=merged_storage_type,
+            sent_idx2row=sent_idx2rows,
+            cache_folder=cache_folder.name,
+            out_file=out_file.name,
+            entity_dump=entity_symbols,
+            train_in_candidates=train_in_candidates,
+            max_candidates=max_candidates,
+            dump_embs=dump_embs,
+            trie_candidate_map_folder=trie_candidate_map_folder.name,
+            trie_qid2eid_file=trie_qid2eid_file.name,
+        )
+
+        all_lines = []
+        with open(out_file.name) as check_f:
+            for line in check_f:
+                all_lines.append(ujson.loads(line))
+
+        assert len(all_lines) == len(gold_lines)
+
+        all_lines_sent_idx_map = {line["sent_idx_unq"]: line for line in all_lines}
+        gold_lines_sent_idx_map = {line["sent_idx_unq"]: line for line in gold_lines}
+
+        assert len(all_lines_sent_idx_map) == len(gold_lines_sent_idx_map)
         for sent_idx in all_lines_sent_idx_map:
             self.assertDictEqual(
                 gold_lines_sent_idx_map[sent_idx],
@@ -562,3 +641,6 @@ class EvalUtils(unittest.TestCase):
         merged_entity_emb_file.close()
         out_file.close()
         data_file.close()
+        trie_candidate_map_folder.cleanup()
+        cache_folder.cleanup()
+        trie_qid2eid_file.close()

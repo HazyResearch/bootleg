@@ -160,55 +160,74 @@ def create_examples(
     log_rank_0_debug(logger, "Starting to extract subsentences")
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
-    log_rank_0_info(
-        logger, f"Strating to extract examples with {num_processes} threads"
-    )
-    log_rank_0_debug(logger, "Parallelizing with " + str(num_processes) + " threads.")
 
     log_rank_0_debug(logger, f"Counting lines")
     total_input = sum(1 for _ in open(dataset))
-    chunk_input = int(np.ceil(total_input / num_processes))
-    log_rank_0_debug(
-        logger,
-        f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines",
-    )
-    total_input_from_chunks, input_files_dict = utils.chunk_file(
-        dataset, create_ex_indir, chunk_input
-    )
-
-    input_files = list(input_files_dict.keys())
-    input_file_lines = [input_files_dict[k] for k in input_files]
-    output_files = [
-        in_file_name.replace(create_ex_indir, create_ex_outdir)
-        for in_file_name in input_files
-    ]
-    assert (
-        total_input == total_input_from_chunks
-    ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-    log_rank_0_debug(logger, f"Done chunking files")
-
-    pool = multiprocessing.Pool(
-        processes=num_processes,
-        initializer=create_examples_initializer,
-        initargs=[
-            data_config,
-            slice_names,
-            use_weak_label,
-            data_config.max_aliases,
-            split,
-            data_config.train_in_candidates,
-        ],
-    )
-    total_output = 0
-    max_alias2pred = 0
-    input_args = list(zip(input_files, input_file_lines, output_files))
-    # Store output files and counts for saving in next step
-    files_and_counts = {}
-    for res in pool.imap_unordered(create_examples_hlp, input_args, chunksize=1):
-        total_output += res["total_lines"]
-        max_alias2pred = max(max_alias2pred, res["max_alias2pred"])
+    if num_processes == 1:
+        out_file_name = os.path.join(create_ex_outdir, os.path.basename(dataset))
+        constants_dict = {
+            "slice_names": slice_names,
+            "use_weak_label": use_weak_label,
+            "max_aliases": data_config.max_aliases,
+            "split": split,
+            "train_in_candidates": data_config.train_in_candidates,
+        }
+        files_and_counts = {}
+        res = create_examples_single(
+            dataset, total_input, out_file_name, constants_dict
+        )
+        total_output = res["total_lines"]
+        max_alias2pred = res["max_alias2pred"]
         files_and_counts[res["output_filename"]] = res["total_lines"]
-    pool.close()
+    else:
+        log_rank_0_info(
+            logger, f"Strating to extract examples with {num_processes} threads"
+        )
+        log_rank_0_debug(
+            logger, "Parallelizing with " + str(num_processes) + " threads."
+        )
+        chunk_input = int(np.ceil(total_input / num_processes))
+        log_rank_0_debug(
+            logger,
+            f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines",
+        )
+        total_input_from_chunks, input_files_dict = utils.chunk_file(
+            dataset, create_ex_indir, chunk_input
+        )
+
+        input_files = list(input_files_dict.keys())
+        input_file_lines = [input_files_dict[k] for k in input_files]
+        output_files = [
+            in_file_name.replace(create_ex_indir, create_ex_outdir)
+            for in_file_name in input_files
+        ]
+        assert (
+            total_input == total_input_from_chunks
+        ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
+        log_rank_0_debug(logger, f"Done chunking files")
+
+        pool = multiprocessing.Pool(
+            processes=num_processes,
+            initializer=create_examples_initializer,
+            initargs=[
+                data_config,
+                slice_names,
+                use_weak_label,
+                data_config.max_aliases,
+                split,
+                data_config.train_in_candidates,
+            ],
+        )
+        total_output = 0
+        max_alias2pred = 0
+        input_args = list(zip(input_files, input_file_lines, output_files))
+        # Store output files and counts for saving in next step
+        files_and_counts = {}
+        for res in pool.imap_unordered(create_examples_hlp, input_args, chunksize=1):
+            total_output += res["total_lines"]
+            max_alias2pred = max(max_alias2pred, res["max_alias2pred"])
+            files_and_counts[res["output_filename"]] = res["total_lines"]
+        pool.close()
     utils.dump_json_file(
         meta_file,
         {
@@ -225,13 +244,19 @@ def create_examples(
 
 
 def create_examples_hlp(args):
-    """Create examples multiprocessing helper."""
     in_file_name, in_file_lines, out_file_name = args
-    split = constants_global["split"]
-    train_in_candidates = constants_global["train_in_candidates"]
-    use_weak_label = constants_global["use_weak_label"]
-    max_aliases = constants_global["max_aliases"]
-    slice_names = constants_global["slice_names"]
+    return create_examples_single(
+        in_file_name, in_file_lines, out_file_name, constants_global
+    )
+
+
+def create_examples_single(in_file_name, in_file_lines, out_file_name, constants_dict):
+    """Create examples multiprocessing helper."""
+    split = constants_dict["split"]
+    train_in_candidates = constants_dict["train_in_candidates"]
+    use_weak_label = constants_dict["use_weak_label"]
+    max_aliases = constants_dict["max_aliases"]
+    slice_names = constants_dict["slice_names"]
     with open(out_file_name, "w") as out_f:
         total_subsents = 0
         # The memmap stores things differently when you have two integers and we want to keep a2p as an array
@@ -397,22 +422,28 @@ def convert_examples_to_features_and_save(
         )
         offset += files_and_counts[in_file_name]
 
-    log_rank_0_debug(
-        logger,
-        "Initializing pool. This make take a few minutes.",
-    )
-    pool = multiprocessing.Pool(
-        processes=num_processes,
-        initializer=convert_examples_to_features_and_save_initializer,
-        initargs=[save_dataset_name, storage],
-    )
+    if num_processes == 1:
+        assert len(input_args) == 1
+        total_output = convert_examples_to_features_and_save_single(
+            input_args[0], memmap_file
+        )
+    else:
+        log_rank_0_debug(
+            logger,
+            "Initializing pool. This make take a few minutes.",
+        )
+        pool = multiprocessing.Pool(
+            processes=num_processes,
+            initializer=convert_examples_to_features_and_save_initializer,
+            initargs=[save_dataset_name, storage],
+        )
 
-    total_output = 0
-    for res in pool.imap_unordered(
-        convert_examples_to_features_and_save_hlp, input_args, chunksize=1
-    ):
-        total_output += res
-    pool.close()
+        total_output = 0
+        for res in pool.imap_unordered(
+            convert_examples_to_features_and_save_hlp, input_args, chunksize=1
+        ):
+            total_output += res
+        pool.close()
 
     # Verify that sentences are unique and saved correctly
     mmap_file = np.memmap(save_dataset_name, dtype=storage, mode="r")
@@ -436,14 +467,18 @@ def convert_examples_to_features_and_save(
     return
 
 
-def convert_examples_to_features_and_save_hlp(input_args):
+def convert_examples_to_features_and_save_hlp(input_dict):
+    return convert_examples_to_features_and_save_single(input_dict, mmap_file_global)
+
+
+def convert_examples_to_features_and_save_single(input_dict, mmap_file):
     """Convert examples to features multiprocessing helper."""
-    file_name = input_args["file_name"]
-    in_file_lines = input_args["in_file_lines"]
-    save_file_offset = input_args["save_file_offset"]
-    ex_print_mod = input_args["ex_print_mod"]
-    max_alias2pred = input_args["max_alias2pred"]
-    slice_names = input_args["slice_names"]
+    file_name = input_dict["file_name"]
+    in_file_lines = input_dict["in_file_lines"]
+    save_file_offset = input_dict["save_file_offset"]
+    ex_print_mod = input_dict["ex_print_mod"]
+    max_alias2pred = input_dict["max_alias2pred"]
+    slice_names = input_dict["slice_names"]
     total_saved_features = 0
     for idx, in_line in tqdm(
         enumerate(open(file_name)), total=in_file_lines, desc=f"Processing {file_name}"
@@ -489,16 +524,12 @@ def convert_examples_to_features_and_save_hlp(input_args):
                 alias2pred_probs=alias2pred_probs,
             )
             # We are storing mmap file in column format, so column name first
-            mmap_file_global[slice_name]["sent_idx"][example_idx] = feature.sent_idx
-            mmap_file_global[slice_name]["subslice_idx"][
-                example_idx
-            ] = feature.subslice_idx
-            mmap_file_global[slice_name]["alias_slice_incidence"][
+            mmap_file[slice_name]["sent_idx"][example_idx] = feature.sent_idx
+            mmap_file[slice_name]["subslice_idx"][example_idx] = feature.subslice_idx
+            mmap_file[slice_name]["alias_slice_incidence"][
                 example_idx
             ] = feature.alias_slice_incidence
-            mmap_file_global[slice_name]["prob_labels"][
-                example_idx
-            ] = feature.alias2pred_probs
+            mmap_file[slice_name]["prob_labels"][example_idx] = feature.alias2pred_probs
         if example_idx % ex_print_mod == 0:
             for slice_name in row_data:
                 # Make one string for distributed computation consistency
@@ -527,7 +558,7 @@ def convert_examples_to_features_and_save_hlp(input_args):
                     + "\n"
                 )
                 print(output_str)
-    mmap_file_global.flush()
+    mmap_file.flush()
     return total_saved_features
 
 

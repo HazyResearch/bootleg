@@ -67,6 +67,15 @@ class LearnedEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"LearnedEntityEmb must have learned_embedding_size in args"
@@ -295,6 +304,17 @@ class TopKEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "perc_emb_drop",
+            "qid2topk_eid",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"TopKEntityEmb must have learned_embedding_size in args"
@@ -532,6 +552,10 @@ class StaticEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"emb_file", "proj"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "emb_file" in emb_args, f"Must have emb_file in args for StaticEmb"
         self.entity2static = self.prep(
             data_config=main_args.data_config,

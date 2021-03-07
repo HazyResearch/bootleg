@@ -79,6 +79,10 @@ class TitleEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"proj", "requires_grad"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         self.orig_dim = BERT_WORD_DIM
         self.merge_func = self.average_titles
         self.M = main_args.data_config.max_aliases

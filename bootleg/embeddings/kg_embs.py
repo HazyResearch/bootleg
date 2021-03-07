@@ -67,6 +67,10 @@ class KGAdjEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"kg_adj", "threshold", "log_weight"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "kg_adj" in emb_args, f"KG embedding requires kg_adj to be set in args"
         assert (
             self.normalize is False

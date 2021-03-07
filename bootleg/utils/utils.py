@@ -92,6 +92,21 @@ def load_yaml_file(filename):
     return contents
 
 
+def assert_keys_in_dict(allowable_keys, d):
+    """
+    Checks that all keys in d are in allowable keys
+    Args:
+        allowable_keys: Set or List of allowable keys
+        d: Dict
+
+    Returns: Boolean if satisfied, None if correct/key that is not in allowable keys
+    """
+    for k in d:
+        if k not in allowable_keys:
+            return False, k
+    return True, None
+
+
 def write_to_file(filename, value):
     """Write generic value to a file. If value is not string, will cast to
     str()
@@ -214,7 +229,7 @@ def create_single_item_trie(in_dict, out_file=""):
     """
     keys = []
     values = []
-    for k in tqdm(in_dict, total=len(in_dict), desc="Reading values for marisa trie"):
+    for k in in_dict:
         assert type(in_dict[k]) is int
         keys.append(k)
         # Tries require list of item for the record trie

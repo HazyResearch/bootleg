@@ -60,7 +60,8 @@ class TestEnd2End(unittest.TestCase):
     def test_end2end_withoutkg(self):
         # KG IS LAST EMBEDDING SO WE REMOVE IT
         self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:-1]
-
+        # Just setting this for testing pipelines
+        self.args.data_config.max_aliases = 1
         scores = run_model(mode="train", config=self.args)
 
         assert type(scores) is dict
@@ -81,7 +82,8 @@ class TestEnd2End(unittest.TestCase):
     def test_end2end_withtype(self):
         self.args.data_config.type_prediction.use_type_pred = True
         self.args.model_config.hidden_size = 20
-
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
         # unfreezing the word embedding helps the type prediction task
         self.args.data_config.word_embedding.freeze = False
 
@@ -110,11 +112,13 @@ class TestEnd2End(unittest.TestCase):
                     "key": "title1",
                     "load_class": "TitleEmb",
                     "send_through_bert": True,
-                    "through_bert_metadata_keys": [4, 5],
                     "args": {"proj": 6},
                 }
             )
         )
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
         scores = run_model(mode="train", config=self.args)
 
         assert type(scores) is dict
@@ -142,6 +146,9 @@ class TestEnd2End(unittest.TestCase):
             ["Q3", "0.2"],
             ["Q4", "0.9"],
         ]
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
+        self.args.run_config.eval_batch_size = 2
         with open(reg_file, "w") as out_f:
             for item in reg_data:
                 out_f.write(",".join(item) + "\n")

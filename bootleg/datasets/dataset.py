@@ -237,52 +237,75 @@ def create_examples(
     """
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
-    log_rank_0_info(
-        logger, f"Starting to extract examples using {num_processes} processes"
-    )
+
     log_rank_0_debug(logger, f"Counting lines")
     total_input = sum(1 for _ in open(dataset))
-    chunk_input = int(np.ceil(total_input / num_processes))
-    log_rank_0_debug(
-        logger,
-        f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines",
-    )
-    total_input_from_chunks, input_files_dict = utils.chunk_file(
-        dataset, create_ex_indir, chunk_input
-    )
 
-    input_files = list(input_files_dict.keys())
-    input_file_lines = [input_files_dict[k] for k in input_files]
-    output_files = [
-        in_file_name.replace(create_ex_indir, create_ex_outdir)
-        for in_file_name in input_files
-    ]
-    assert (
-        total_input == total_input_from_chunks
-    ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-    log_rank_0_debug(logger, f"Done chunking files. Starting pool.")
-
-    pool = multiprocessing.Pool(
-        processes=num_processes,
-        initializer=create_examples_initializer,
-        initargs=[
-            tokenizer,
-            is_bert,
-            use_weak_label,
-            split,
-            data_config.max_aliases,
-            data_config.max_seq_len,
-        ],
-    )
-
-    total_output = 0
-    input_args = list(zip(input_files, input_file_lines, output_files))
-    # Store output files and counts for saving in next step
-    files_and_counts = {}
-    for res in pool.imap_unordered(create_examples_hlp, input_args, chunksize=1):
-        total_output += res["total_lines"]
+    if num_processes == 1:
+        constants_dict = {
+            "is_bert": is_bert,
+            "use_weak_label": use_weak_label,
+            "split": split,
+            "max_aliases": data_config.max_aliases,
+            "max_seq_len": data_config.max_seq_len,
+        }
+        out_file_name = os.path.join(create_ex_outdir, os.path.basename(dataset))
+        print("INPUT", dataset, "OUTPUT", out_file_name)
+        res = create_examples_single(
+            in_file_name=dataset,
+            in_file_lines=total_input,
+            out_file_name=out_file_name,
+            constants_dict=constants_dict,
+            tokenizer=tokenizer,
+        )
+        files_and_counts = {}
+        total_output = res["total_lines"]
         files_and_counts[res["output_filename"]] = res["total_lines"]
-    pool.close()
+    else:
+        log_rank_0_info(
+            logger, f"Starting to extract examples using {num_processes} processes"
+        )
+        chunk_input = int(np.ceil(total_input / num_processes))
+        log_rank_0_debug(
+            logger,
+            f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines",
+        )
+        total_input_from_chunks, input_files_dict = utils.chunk_file(
+            dataset, create_ex_indir, chunk_input
+        )
+
+        input_files = list(input_files_dict.keys())
+        input_file_lines = [input_files_dict[k] for k in input_files]
+        output_files = [
+            in_file_name.replace(create_ex_indir, create_ex_outdir)
+            for in_file_name in input_files
+        ]
+        assert (
+            total_input == total_input_from_chunks
+        ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
+        log_rank_0_debug(logger, f"Done chunking files. Starting pool.")
+
+        pool = multiprocessing.Pool(
+            processes=num_processes,
+            initializer=create_examples_initializer,
+            initargs=[
+                tokenizer,
+                is_bert,
+                use_weak_label,
+                split,
+                data_config.max_aliases,
+                data_config.max_seq_len,
+            ],
+        )
+
+        total_output = 0
+        input_args = list(zip(input_files, input_file_lines, output_files))
+        # Store output files and counts for saving in next step
+        files_and_counts = {}
+        for res in pool.imap_unordered(create_examples_hlp, input_args, chunksize=1):
+            total_output += res["total_lines"]
+            files_and_counts[res["output_filename"]] = res["total_lines"]
+        pool.close()
     utils.dump_json_file(
         meta_file, {"num_mentions": total_output, "files_and_counts": files_and_counts}
     )
@@ -296,11 +319,19 @@ def create_examples(
 def create_examples_hlp(args):
     """Create examples multiprocessing helper."""
     in_file_name, in_file_lines, out_file_name = args
-    split = constants_global["split"]
-    max_aliases = constants_global["max_aliases"]
-    max_seq_len = constants_global["max_seq_len"]
-    is_bert = constants_global["is_bert"]
-    use_weak_label = constants_global["use_weak_label"]
+    return create_examples_single(
+        in_file_name, in_file_lines, out_file_name, constants_global, tokenizer_global
+    )
+
+
+def create_examples_single(
+    in_file_name, in_file_lines, out_file_name, constants_dict, tokenizer
+):
+    split = constants_dict["split"]
+    max_aliases = constants_dict["max_aliases"]
+    max_seq_len = constants_dict["max_seq_len"]
+    is_bert = constants_dict["is_bert"]
+    use_weak_label = constants_dict["use_weak_label"]
     with open(out_file_name, "w", encoding="utf-8") as out_f:
         total_subsents = 0
         total_lines = 0
@@ -375,7 +406,7 @@ def create_examples_hlp(args):
                 aliases_seen_by_model=aliases_seen_by_model,
                 seq_len=max_seq_len,
                 is_bert=is_bert,
-                tokenizer=tokenizer_global,
+                tokenizer=tokenizer,
             )
             aliases_arr = [[aliases[idx] for idx in idxs] for idxs in idxs_arr]
             anchor_arr = [[anchor[idx] for idx in idxs] for idxs in idxs_arr]
@@ -446,6 +477,7 @@ def convert_examples_to_features_and_save(
     X_storage,
     Y_storage,
     tokenizer,
+    entity_symbols,
 ):
     """Converts the prepped examples into input features and saves in memmap
     files. These are used in the __get_item__ method.
@@ -463,15 +495,12 @@ def convert_examples_to_features_and_save(
         X_storage: data features storage type (for memmap)
         Y_storage: data labels storage type (for memmap)
         tokenizer: tokenizer
+        entity_symbols: entity symbols
 
     Returns:
     """
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
-    log_rank_0_debug(
-        logger,
-        f"Starting to extract and save training data with {num_processes} threads",
-    )
 
     total_input = utils.load_json_file(meta_file)["num_mentions"]
     files_and_counts = utils.load_json_file(meta_file)["files_and_counts"]
@@ -482,7 +511,7 @@ def convert_examples_to_features_and_save(
     )
     # Save -1 in sent_idx to check that things are loaded correctly later
     memmap_file["sent_idx"][:] = -1
-    np.memmap(
+    memmap_label_file = np.memmap(
         save_labels_name, dtype=Y_storage, mode="w+", shape=(total_input,), order="C"
     )
 
@@ -508,29 +537,35 @@ def convert_examples_to_features_and_save(
         )
         offset += files_and_counts[in_file_name]
 
-    log_rank_0_debug(
-        logger,
-        "Initializing pool. This make take a few minutes.",
-    )
-    pool = multiprocessing.Pool(
-        processes=num_processes,
-        initializer=convert_examples_to_features_and_save_initializer,
-        initargs=[
-            tokenizer,
-            data_config,
-            save_dataset_name,
-            save_labels_name,
-            X_storage,
-            Y_storage,
-        ],
-    )
+    if num_processes == 1:
+        assert len(input_args) == 1
+        total_output = convert_examples_to_features_and_save_single(
+            input_args[0], tokenizer, entity_symbols, memmap_file, memmap_label_file
+        )
+    else:
+        log_rank_0_debug(
+            logger,
+            "Initializing pool. This make take a few minutes.",
+        )
+        pool = multiprocessing.Pool(
+            processes=num_processes,
+            initializer=convert_examples_to_features_and_save_initializer,
+            initargs=[
+                tokenizer,
+                data_config,
+                save_dataset_name,
+                save_labels_name,
+                X_storage,
+                Y_storage,
+            ],
+        )
 
-    total_output = 0
-    for res in pool.imap_unordered(
-        convert_examples_to_features_and_save_hlp, input_args, chunksize=1
-    ):
-        total_output += res
-    pool.close()
+        total_output = 0
+        for res in pool.imap_unordered(
+            convert_examples_to_features_and_save_hlp, input_args, chunksize=1
+        ):
+            total_output += res
+        pool.close()
 
     # Verify that sentences are unique and saved correctly
     mmap_file = np.memmap(save_dataset_name, dtype=X_storage, mode="r")
@@ -552,18 +587,30 @@ def convert_examples_to_features_and_save(
     return
 
 
-def convert_examples_to_features_and_save_hlp(input_args):
+def convert_examples_to_features_and_save_hlp(input_dict):
+    return convert_examples_to_features_and_save_single(
+        input_dict,
+        tokenizer_global,
+        entitysymbols_global,
+        mmap_file_global,
+        mmap_label_file_global,
+    )
+
+
+def convert_examples_to_features_and_save_single(
+    input_dict, tokenizer, entitysymbols, mmap_file, mmap_label_file
+):
     """Convert examples to features multiprocessing helper."""
-    file_name = input_args["file_name"]
-    in_file_lines = input_args["in_file_lines"]
-    save_file_offset = input_args["save_file_offset"]
-    ex_print_mod = input_args["ex_print_mod"]
-    guid_dtype = input_args["guid_dtype"]
-    print_examples = input_args["pred_examples"]
-    max_aliases = input_args["max_aliases"]
-    max_seq_len = input_args["max_seq_len"]
-    split = input_args["split"]
-    train_in_candidates = input_args["train_in_candidates"]
+    file_name = input_dict["file_name"]
+    in_file_lines = input_dict["in_file_lines"]
+    save_file_offset = input_dict["save_file_offset"]
+    ex_print_mod = input_dict["ex_print_mod"]
+    guid_dtype = input_dict["guid_dtype"]
+    print_examples = input_dict["pred_examples"]
+    max_aliases = input_dict["max_aliases"]
+    max_seq_len = input_dict["max_seq_len"]
+    split = input_dict["split"]
+    train_in_candidates = input_dict["train_in_candidates"]
     total_saved_features = 0
     for idx, in_line in tqdm(
         enumerate(open(file_name, "r", encoding="utf-8")),
@@ -575,7 +622,7 @@ def convert_examples_to_features_and_save_hlp(input_args):
         train_aliases_to_predict_arr = example.train_aliases_to_predict_arr
         aliases_to_predict = example.aliases_to_predict
         spans = example.spans
-        word_indices = tokenizer_global.convert_tokens_to_ids(example.phrase_tokens)
+        word_indices = tokenizer.convert_tokens_to_ids(example.phrase_tokens)
         aliases = example.aliases
         qids = example.qids
         alias_list_pos = example.alias_list_pos
@@ -607,16 +654,16 @@ def convert_examples_to_features_and_save_hlp(input_args):
                 span_end_idx <= max_seq_len
             ), f"{span_end_idx} is beyond max len {max_seq_len}."
             # generate indexes into alias table.
-            assert entitysymbols_global.alias_exists(
+            assert entitysymbols.alias_exists(
                 alias
             ), f"Alias {alias} not in alias mapping"
-            alias_trie_idx = entitysymbols_global.get_alias_idx(alias)
-            alias_qids = np.array(entitysymbols_global.get_qid_cands(alias))
+            alias_trie_idx = entitysymbols.get_alias_idx(alias)
+            alias_qids = np.array(entitysymbols.get_qid_cands(alias))
             # When doing eval, we allow for QID to be "Q-1" so we can predict anyways - as this QID isn't in our alias_qids, the assert
             # below verifies that this will happen only for test/dev
             eid = -1
-            if entitysymbols_global.qid_exists(qid):
-                eid = entitysymbols_global.get_eid(qid)
+            if entitysymbols.qid_exists(qid):
+                eid = entitysymbols.get_eid(qid)
             if not qid in alias_qids:
                 # assert not data_args.train_in_candidates
                 if not train_in_candidates:
@@ -637,9 +684,9 @@ def convert_examples_to_features_and_save_hlp(input_args):
                 gold_cand_K_idx = np.nonzero(alias_qids == qid)[0][0] + (
                     not train_in_candidates
                 )
-            assert gold_cand_K_idx < entitysymbols_global.max_candidates + int(
+            assert gold_cand_K_idx < entitysymbols.max_candidates + int(
                 not train_in_candidates
-            ), f"The qid {qid} and alias {alias} is not in the top {entitysymbols_global.max_candidates} max candidates. The QID must be within max candidates."
+            ), f"The qid {qid} and alias {alias} is not in the top {entitysymbols.max_candidates} max candidates. The QID must be within max candidates."
             example_aliases[idx : idx + 1] = alias_trie_idx
             example_aliases_locs_start[idx : idx + 1] = span_start_idx
             # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
@@ -682,19 +729,19 @@ def convert_examples_to_features_and_save_hlp(input_args):
         )
         # Write feature
         # We are storing mmap file in column format, so column name first
-        mmap_file_global["sent_idx"][example_idx] = feature.sent_idx
-        mmap_file_global["subsent_idx"][example_idx] = feature.subsent_idx
-        mmap_file_global["guids"][example_idx] = feature.guid
-        mmap_file_global["start_span_idx"][example_idx] = feature.start_idx_in_sent
-        mmap_file_global["end_span_idx"][example_idx] = feature.end_idx_in_sent
-        mmap_file_global["alias_idx"][example_idx] = feature.alias_idx
-        mmap_file_global["token_ids"][example_idx] = feature.word_indices
-        mmap_file_global["alias_orig_list_pos"][example_idx] = feature.alias_list_pos
-        mmap_file_global["for_dump_gold_cand_K_idx_train"][
+        mmap_file["sent_idx"][example_idx] = feature.sent_idx
+        mmap_file["subsent_idx"][example_idx] = feature.subsent_idx
+        mmap_file["guids"][example_idx] = feature.guid
+        mmap_file["start_span_idx"][example_idx] = feature.start_idx_in_sent
+        mmap_file["end_span_idx"][example_idx] = feature.end_idx_in_sent
+        mmap_file["alias_idx"][example_idx] = feature.alias_idx
+        mmap_file["token_ids"][example_idx] = feature.word_indices
+        mmap_file["alias_orig_list_pos"][example_idx] = feature.alias_list_pos
+        mmap_file["for_dump_gold_cand_K_idx_train"][
             example_idx
         ] = feature.for_dump_gold_cand_K_idx_train
-        mmap_file_global["gold_eid"][example_idx] = feature.gold_eid
-        mmap_label_file_global["gold_cand_K_idx"][example_idx] = feature.gold_cand_K_idx
+        mmap_file["gold_eid"][example_idx] = feature.gold_eid
+        mmap_label_file["gold_cand_K_idx"][example_idx] = feature.gold_cand_K_idx
         if example_idx % ex_print_mod == 0:
             # Make one string for distributed computation consistency
             output_str = ""
@@ -738,8 +785,8 @@ def convert_examples_to_features_and_save_hlp(input_args):
             output_str += f"guid:                            {feature.guid}" + "\n"
             if print_examples:
                 print(output_str)
-    mmap_file_global.flush()
-    mmap_label_file_global.flush()
+    mmap_file.flush()
+    mmap_label_file.flush()
     return total_saved_features
 
 
@@ -801,69 +848,104 @@ def build_and_save_type_features(
     # We'll use the -1 to check that things were written correctly later because at the end, there should be no -1
 
     memfile["gold_type_id"][:] = -2
-    temp_qidfile = tempfile.NamedTemporaryFile()
-    log_rank_0_info(
-        logger, f"Creating type prediction labeled data using {num_processes} threads"
-    )
-    utils.create_single_item_trie(eid2type, temp_qidfile.name)
 
-    input_args = list(range(len(Y_gold_cand_K_idx)))
-    chunk_size = int(np.ceil(len(input_args) / num_processes))
-    input_chunks = [
-        input_args[i : i + chunk_size] for i in range(0, len(input_args), chunk_size)
-    ]
-
-    log_rank_0_debug(logger, f"Starting pool with {num_processes} processes")
-    pool = multiprocessing.Pool(
-        processes=num_processes,
-        initializer=build_and_save_type_features_initializer,
-        initargs=[
-            data_config,
-            temp_qidfile.name,
-            save_type_labels_name,
-            Y_type_storage,
+    if num_processes == 1:
+        input_idxs = list(range(len(Y_gold_cand_K_idx)))
+        build_and_save_type_features_single(
+            input_idxs,
+            data_config.train_in_candidates,
             X_gold_eid,
             Y_gold_cand_K_idx,
-        ],
-    )
-    cnt = 0
-    for res in tqdm(
-        pool.imap_unordered(
-            build_and_save_type_features_hlp, input_chunks, chunksize=1
-        ),
-        total=len(input_chunks),
-        desc="Building type data",
-    ):
-        cnt += res
-    pool.close()
+            memfile,
+            eid2type,
+        )
+    else:
+        temp_qidfile = tempfile.NamedTemporaryFile()
+        log_rank_0_info(
+            logger,
+            f"Creating type prediction labeled data using {num_processes} threads",
+        )
+        utils.create_single_item_trie(eid2type, temp_qidfile.name)
+
+        input_args = list(range(len(Y_gold_cand_K_idx)))
+        chunk_size = int(np.ceil(len(input_args) / num_processes))
+        input_chunks = [
+            input_args[i : i + chunk_size]
+            for i in range(0, len(input_args), chunk_size)
+        ]
+
+        log_rank_0_debug(logger, f"Starting pool with {num_processes} processes")
+        pool = multiprocessing.Pool(
+            processes=num_processes,
+            initializer=build_and_save_type_features_initializer,
+            initargs=[
+                data_config,
+                temp_qidfile.name,
+                save_type_labels_name,
+                Y_type_storage,
+                X_gold_eid,
+                Y_gold_cand_K_idx,
+            ],
+        )
+        cnt = 0
+        for res in tqdm(
+            pool.imap_unordered(
+                build_and_save_type_features_hlp, input_chunks, chunksize=1
+            ),
+            total=len(input_chunks),
+            desc="Building type data",
+        ):
+            cnt += res
+        pool.close()
+        temp_qidfile.close()
 
     memfile = np.memmap(save_type_labels_name, dtype=Y_type_storage, mode="r")
     for i in tqdm(range(len(Y_gold_cand_K_idx)), desc="Verifying type labels"):
         assert all(memfile["gold_type_id"][i] != -2), f"Memfile at {i} is -2."
-    temp_qidfile.close()
     return
 
 
 def build_and_save_type_features_hlp(input_idxs):
+    return build_and_save_type_features_single(
+        input_idxs,
+        train_in_candidates_global,
+        X_gold_eid_global,
+        Y_gold_cand_K_idx_global,
+        mmap_label_file_global,
+        eid2type_global,
+    )
+
+
+def build_and_save_type_features_single(
+    input_idxs,
+    train_in_candidates,
+    X_gold_eid,
+    Y_gold_cand_K_idx,
+    mmap_label_file,
+    eid2type,
+):
     for i in tqdm(input_idxs, desc="Processing types"):
-        gold_eids = X_gold_eid_global[i]
-        for j, gold_cand in enumerate(Y_gold_cand_K_idx_global[i]):
+        gold_eids = X_gold_eid[i]
+        for j, gold_cand in enumerate(Y_gold_cand_K_idx[i]):
             # If padded entity or special eval padded entity
             if gold_cand == -1:
                 type_id = -1
             # If the "not in candidate" entity
-            elif gold_cand == 0 and not train_in_candidates_global:
+            elif gold_cand == 0 and not train_in_candidates:
                 type_id = 0
             # Otherwise, the qid is the gold_cand[j] index into the list of QID candidates
             else:
                 # str() for marisa tri
                 gold_eid = str(gold_eids[j])
                 type_id = 0
-                if gold_eid in eid2type_global:
-                    # The [0] is because this is a record trie and it returns lists of elements
-                    type_id = eid2type_global[gold_eid][0][0]
-            mmap_label_file_global["gold_type_id"][i][j] = type_id
-    mmap_label_file_global.flush()
+                if gold_eid in eid2type:
+                    if isinstance(eid2type, dict):
+                        type_id = eid2type[gold_eid]
+                    else:
+                        # The [0] is because this is a record trie and it returns lists of elements
+                        type_id = eid2type[gold_eid][0][0]
+            mmap_label_file["gold_type_id"][i][j] = type_id
+    mmap_label_file.flush()
     return len(input_idxs)
 
 
@@ -1037,6 +1119,7 @@ class BootlegDataset(EmmentalDataset):
                     self.X_storage,
                     self.Y_storage,
                     tokenizer,
+                    entity_symbols,
                 )
                 log_rank_0_debug(
                     logger,

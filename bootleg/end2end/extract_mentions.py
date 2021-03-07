@@ -29,8 +29,18 @@ except OSError:
     logger.warning(
         f"Spacy models en_core_web_sm not found.  Downloading and installing."
     )
-    spacy_download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    try:
+        spacy_download("en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    except:
+        nlp = None
+
+# We want this to pass gracefully in the case Readthedocs is trying to build.
+# This will fail later on if a user is actually trying to run Bootleg without mention extraction
+if nlp is not None:
+    ALL_STOPWORDS = nlp.Defaults.stop_words
+else:
+    ALL_STOPWORDS = {}
 
 ALL_STOPWORDS = nlp.Defaults.stop_words
 PUNC = string.punctuation
