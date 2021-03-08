@@ -236,7 +236,9 @@ def batched_pred_iter(
     Will yield a new prediction set after each set accumulation steps for
     writing out.
 
-    Recall that we split up senteces that are too long to feed to the model.
+    If a sentence or batch doesn't have any mentions, it will not be returned by this method.
+
+    Recall that we split up sentences that are too long to feed to the model.
     We use the sent_idx2num_mentions dict to ensure we have full sentences evaluated before
     returning, otherwise we'll have incomplete sentences to merge together when dumping.
 
@@ -259,6 +261,7 @@ def batched_pred_iter(
         final_gold_d = defaultdict(list)
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
+        # print("FINALIZE", cur_sentidx_nummen, sent_idx2num_mentions)
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
                 len(cur_mention_set) <= sent_idx2num_mentions[str(sent_idx)]
@@ -411,11 +414,11 @@ def batched_pred_iter(
     assert (
         len(cur_sentidx2_nummentions) == 0
     ), f"After eval, some sentences had left over mentions {cur_sentidx2_nummentions}"
-    assert len(
-        set(all_finalized_sentences).intersection(sent_idx2num_mentions.keys())
-    ) == len(set(sent_idx2num_mentions.keys())), (
+    assert set(all_finalized_sentences).intersection(
+        sent_idx2num_mentions.keys()
+    ) == set([k for k, v in sent_idx2num_mentions.items() if v > 0]), (
         f"Some sentences are left over "
-        f"{[s for s in sent_idx2num_mentions if s not in set(all_finalized_sentences)]}"
+        f"{[s for s in sent_idx2num_mentions if s not in set(all_finalized_sentences) and sent_idx2num_mentions[s] > 0]}"
     )
     return None
 
@@ -436,6 +439,14 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
         )
         alias_trie.dump(save_folder)
     return
+
+
+def get_emb_file(result_idx, save_folder):
+    return os.path.join(save_folder, f"out_emb_file_{result_idx}.npy")
+
+
+def get_result_file(result_idx, save_folder):
+    return os.path.join(save_folder, f"result_label_file_{result_idx}.jsonl")
 
 
 def disambig_dump_preds(
@@ -615,20 +626,19 @@ def disambig_dump_preds(
             # write chosen entity embs to file for contextualized entity embeddings
             mmap_file[i]["entity_emb"] = chosen_entity_embs.reshape(1, -1)
 
-    for i in range(len(mmap_file)):
-        si = mmap_file[i]["sent_idx"]
-        if -1 == si:
-            import pdb
-
-            pdb.set_trace()
-        assert si != -1, f"{i} {mmap_file[i]}"
+    # for i in range(len(mmap_file)):
+    #     si = mmap_file[i]["sent_idx"]
+    #     if -1 == si:
+    #         import pdb
+    #         pdb.set_trace()
+    #     assert si != -1, f"{i} {mmap_file[i]}"
     # Store all predicted sentences to filter the sentence mapping by
     subset_sent_idx2num_mentions = {
         k: v for k, v in sent_idx2num_mentions.items() if k in all_sent_idx
     }
     # print("ALL SEEN", all_sent_idx)
     subsent_sent_idx2row = {k: v for k, v in sent_idx2row.items() if k in all_sent_idx}
-    result_file = os.path.join(save_folder, f"result_label_file_{result_idx}.jsonl")
+    result_file = get_result_file(result_idx, save_folder)
     log_rank_0_debug(logger, f"Writing predictions to {result_file}...")
     merge_subsentences(
         num_processes=num_processes,
@@ -662,7 +672,7 @@ def disambig_dump_preds(
             merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
         )
         hidden_size = filt_emb_data[0]["hidden_size"]
-        out_emb_file = os.path.join(save_folder, f"out_emb_file_{result_idx}.npy")
+        out_emb_file = get_emb_file(result_idx, save_folder)
         np.save(out_emb_file, filt_emb_data["entity_emb"].reshape(-1, hidden_size))
         log_rank_0_debug(
             logger,
@@ -671,7 +681,7 @@ def disambig_dump_preds(
     # Cleanup cache
     shutil.rmtree(cache_dir)
     log_rank_0_debug(logger, f"Wrote predictions for {result_idx} to {result_file}")
-    return result_file, out_emb_file
+    return result_file, out_emb_file, all_sent_idx
 
 
 #
@@ -868,7 +878,7 @@ def merge_subsentences_single(
     return seen_ids
 
 
-def get_sent_idx_map(merged_entity_emb_file, merged_storage_type):
+def get_sental2embid(merged_entity_emb_file, merged_storage_type):
     """Get sent_idx, alias_idx mapping to emb idx for quick lookup.
 
     Args:
@@ -880,7 +890,7 @@ def get_sent_idx_map(merged_entity_emb_file, merged_storage_type):
     filt_emb_data = np.memmap(
         merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
     )
-    sent_idx_map = {}
+    sental2embid = {}
     for i, row in enumerate(filt_emb_data):
         sent_idx = row["sent_idx"]
         alias_idx = row["alias_list_pos"]
@@ -888,8 +898,8 @@ def get_sent_idx_map(merged_entity_emb_file, merged_storage_type):
             sent_idx != -1 and alias_idx != -1
         ), f"{i} {row} Has Sent {sent_idx}, Al {alias_idx}"
         # Keep as string for Marisa Tri later
-        sent_idx_map[f"{sent_idx}_{alias_idx}"] = i
-    return sent_idx_map
+        sental2embid[f"{sent_idx}_{alias_idx}"] = i
+    return sental2embid
 
 
 def write_data_labels(
@@ -928,7 +938,7 @@ def write_data_labels(
     Returns:
     """
     st = time.time()
-    sent_idx_map = get_sent_idx_map(merged_entity_emb_file, merged_storage_type)
+    sental2embid = get_sental2embid(merged_entity_emb_file, merged_storage_type)
     log_rank_0_debug(logger, f"Finished getting sentence map {time.time() - st}s")
 
     total_input = len(sent_idx2row)
@@ -940,7 +950,7 @@ def write_data_labels(
             sentidx2row=sent_idx2row,
             output_file=out_file,
             filt_emb_data=filt_emb_data,
-            sent_idx_map=sent_idx_map,
+            sental2embid=sental2embid,
             alias_cand_map=entity_dump.get_alias2qids(),
             qid2eid=entity_dump.get_qid2eid(),
             train_in_cands=train_in_candidates,
@@ -956,10 +966,10 @@ def write_data_labels(
         ), "trie_qid2eid_file is None and you have parallel turned on"
 
         # Get trie of sentence map
-        trie_folder = os.path.join(cache_folder, "bootleg_sent_idx_map")
+        trie_folder = os.path.join(cache_folder, "bootleg_sental2embid")
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
-        utils.create_single_item_trie(sent_idx_map, out_file=trie_file)
+        utils.create_single_item_trie(sental2embid, out_file=trie_file)
 
         # Chunk file for parallel writing
         # We do not use TemporaryFolders as the temp dir may not have enough space for large files
@@ -1032,7 +1042,7 @@ def write_data_labels(
 def write_data_labels_initializer(
     merged_entity_emb_file,
     merged_storage_type,
-    sent_idx_map_file,
+    sental2embid_file,
     train_in_candidates,
     max_cands,
     dump_embs,
@@ -1043,8 +1053,8 @@ def write_data_labels_initializer(
     filt_emb_data_global = np.memmap(
         merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
     )
-    global sent_idx_map_global
-    sent_idx_map_global = utils.load_single_item_trie(sent_idx_map_file)
+    global sental2embid_global
+    sental2embid_global = utils.load_single_item_trie(sental2embid_file)
     global alias_cand_trie_global
     alias_cand_trie_global = AliasCandRecordTrie(load_dir=trie_candidate_map_folder)
     global qid2eid_global
@@ -1068,7 +1078,7 @@ def write_data_labels_hlp(args):
         s_idx2row,
         output_file,
         filt_emb_data_global,
-        sent_idx_map_global,
+        sental2embid_global,
         alias_cand_trie_global,
         qid2eid_global,
         train_in_candidates_global,
@@ -1081,7 +1091,7 @@ def write_data_labels_single(
     sentidx2row,
     output_file,
     filt_emb_data,
-    sent_idx_map,
+    sental2embid,
     alias_cand_map,
     qid2eid,
     train_in_cands,
@@ -1108,13 +1118,13 @@ def write_data_labels_single(
             for al_idx, alias in enumerate(aliases):
                 sent_idx_key = f"{sent_idx}_{al_idx}"
                 assert (
-                    sent_idx_key in sent_idx_map
+                    sent_idx_key in sental2embid
                 ), f"Dumped prediction data does not match data file. Can not find {sent_idx} - {al_idx}"
-                if isinstance(sent_idx_map, dict):
-                    emb_idx = sent_idx_map[sent_idx_key]
+                if isinstance(sental2embid, dict):
+                    emb_idx = sental2embid[sent_idx_key]
                 else:
                     # Get from Trie
-                    emb_idx = sent_idx_map[sent_idx_key][0][0]
+                    emb_idx = sental2embid[sent_idx_key][0][0]
                 ctx_emb_ids.append(emb_idx)
                 prob = filt_emb_data[emb_idx]["final_loss_prob"]
                 cand_prob = filt_emb_data[emb_idx]["final_loss_cand_probs"]

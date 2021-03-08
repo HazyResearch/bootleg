@@ -527,7 +527,8 @@ class BootlegAnnotator(object):
                 subsplit_idx = batch_subsplit_idx[b_i + ex_i]
                 entity_cands = eval_utils.map_aliases_to_candidates(
                     self.config.data_config.train_in_candidates,
-                    self.entity_db,
+                    self.config.data_config.max_aliases,
+                    self.entity_db.get_alias2qids(),
                     batch_aliases_arr[b_i + ex_i],
                 )
                 # batch size is 1 so we can reshape
