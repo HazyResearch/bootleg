@@ -41,6 +41,7 @@ if nlp is not None:
     ALL_STOPWORDS = nlp.Defaults.stop_words
 else:
     ALL_STOPWORDS = {}
+
 PUNC = string.punctuation
 KEEP_POS = {"PROPN", "NOUN"}  # ADJ, VERB, ADV, SYM
 PLURAL = {"s", "'s"}
