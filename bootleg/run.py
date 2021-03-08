@@ -303,6 +303,16 @@ def run_model(mode, config, run_config_path=None):
         if config.learner_config.local_rank in [0, -1]:
             model.save(f"{emmental.Meta.log_path}/last_model.pth")
 
+    # Multi-gpu DataParallel eval (NOT distributed)
+    if mode in ["eval", "dump_embs", "dump_preds"]:
+        # This happens inside EmmentalLearner for training
+        if (
+            config["learner_config"]["local_rank"] == -1
+            and config["model_config"]["dataparallel"]
+        ):
+            model._to_dataparallel()
+            # raise NotImplementedError(f"Laurel is working on this")
+
     # If just finished training a model or in eval mode, run eval
     if mode in ["train", "eval"]:
         scores = model.score(dataloaders)
