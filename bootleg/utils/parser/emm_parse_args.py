@@ -96,7 +96,7 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     model_config.add_argument(
         "--emmental.dataparallel",
         type=str2bool,
-        default=True,
+        default=False,
         help="Whether to use dataparallel or not",
     )
 
