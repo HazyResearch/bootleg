@@ -2,7 +2,6 @@ import os
 import shutil
 import unittest
 
-import psutil
 import torch
 
 import emmental
@@ -21,10 +20,8 @@ class TestEnd2End(unittest.TestCase):
         emmental.init(log_dir="test/temp_log", config=self.args)
         if not os.path.exists(emmental.Meta.log_path):
             os.makedirs(emmental.Meta.log_path)
-        print("OPEN", psutil.Process().open_files())
 
     def tearDown(self) -> None:
-        print("OPEN", psutil.Process().open_files())
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -65,9 +62,7 @@ class TestEnd2End(unittest.TestCase):
         self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:-1]
         # Just setting this for testing pipelines
         self.args.data_config.max_aliases = 1
-        print("OPEN", psutil.Process().open_files())
         scores = run_model(mode="train", config=self.args)
-        print("OPEN", psutil.Process().open_files())
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.05
@@ -90,9 +85,7 @@ class TestEnd2End(unittest.TestCase):
         self.args.data_config.eval_accumulation_steps = 2
         # unfreezing the word embedding helps the type prediction task
         self.args.data_config.word_embedding.freeze = False
-        print("OPEN", psutil.Process().open_files())
         scores = run_model(mode="train", config=self.args)
-        print("OPEN", psutil.Process().open_files())
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
@@ -123,9 +116,7 @@ class TestEnd2End(unittest.TestCase):
         # Just setting this for testing pipelines
         self.args.data_config.eval_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
-        print("OPEN", psutil.Process().open_files())
         scores = run_model(mode="train", config=self.args)
-        print("OPEN", psutil.Process().open_files())
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.08
@@ -159,9 +150,7 @@ class TestEnd2End(unittest.TestCase):
                 out_f.write(",".join(item) + "\n")
 
         self.args.data_config.ent_embeddings[0]["args"]["regularize_mapping"] = reg_file
-        print("OPEN", psutil.Process().open_files())
         scores = run_model(mode="train", config=self.args)
-        print("OPEN", psutil.Process().open_files())
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.05
@@ -186,9 +175,7 @@ class TestEnd2End(unittest.TestCase):
         # Set the learned embedding to hidden size for BERTNED
         self.args.data_config.ent_embeddings[0].args.learned_embedding_size = 20
         self.args.data_config.word_embedding.use_sent_proj = False
-        print("OPEN", psutil.Process().open_files())
         scores = run_model(mode="train", config=self.args)
-        print("OPEN", psutil.Process().open_files())
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.5
