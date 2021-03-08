@@ -26,7 +26,6 @@ setup(
         "tensorboardX==2.1.*",
         "tensorboard==2.4.*",
         "torch>=1.7.0",
-        "torchtext==0.9.0",
         "tqdm==4.49.0",
         "transformers~=4.0.0",
         "ujson==4.0.2",
