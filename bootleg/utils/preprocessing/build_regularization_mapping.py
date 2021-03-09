@@ -122,7 +122,7 @@ def main():
     print(ujson.dumps(args, indent=4))
     num_processes = min(args.processes, int(0.8 * multiprocessing.cpu_count()))
     print("Loading entity symbols")
-    entity_symbols = EntitySymbols(
+    entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
     )

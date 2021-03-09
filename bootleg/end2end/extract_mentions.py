@@ -15,22 +15,38 @@ import nltk
 import numpy as np
 import spacy
 import ujson
+from spacy.cli.download import download as spacy_download
 from tqdm import tqdm
 
 from bootleg.symbols.constants import ANCHOR_KEY
 from bootleg.utils.utils import get_lnrm
 
-nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-ALL_STOPWORDS = nlp.Defaults.stop_words
+logger = logging.getLogger(__name__)
 
+try:
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+except OSError:
+    logger.warning(
+        f"Spacy models en_core_web_sm not found.  Downloading and installing."
+    )
+    try:
+        spacy_download("en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    except:
+        nlp = None
+
+# We want this to pass gracefully in the case Readthedocs is trying to build.
+# This will fail later on if a user is actually trying to run Bootleg without mention extraction
+if nlp is not None:
+    ALL_STOPWORDS = nlp.Defaults.stop_words
+else:
+    ALL_STOPWORDS = {}
 PUNC = string.punctuation
 KEEP_POS = {"PROPN", "NOUN"}  # ADJ, VERB, ADV, SYM
 PLURAL = {"s", "'s"}
 table = str.maketrans(
     dict.fromkeys(PUNC)
 )  # OR {key: None for key in string.punctuation}
-
-logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -127,14 +143,14 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
 
     Args:
         sentence: text
-        all_aliases: Trie of all aliases in our dump
+        all_aliases: Trie of all aliases in our save
         max_alias_len: maximum length (in words) of an alias
 
     Returns: list of aliases, list of span offsets
     """
     used_aliases = []
     # Remove multiple spaces and replace with single - tokenization eats multiple spaces but ngrams doesn't which can cause parse issues
-    sentence = re.sub(" +", " ", sentence)
+    sentence = " ".join(sentence.strip().split())
 
     doc = nlp(sentence)
     split_sent = sentence.split()

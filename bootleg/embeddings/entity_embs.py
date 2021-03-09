@@ -67,14 +67,23 @@ class LearnedEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"LearnedEntityEmb must have learned_embedding_size in args"
         self.learned_embedding_size = emb_args.learned_embedding_size
 
-        # Set sparsity based on optimizer. The None optimizer is Bootleg's SparseDenseAdam
+        # Set sparsity based on optimizer and fp16. The None optimizer is Bootleg's SparseDenseAdam. If fp16 is True, must use dense.
         optimiz = main_args.learner_config.optimizer_config.optimizer
-        if optimiz in [None, "sparse_adam"]:
+        if optimiz in [None, "sparse_adam"] and main_args.learner_config.fp16 is False:
             sparse = True
         else:
             sparse = False
@@ -176,7 +185,7 @@ class LearnedEntityEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = os.path.splitext(os.path.basename(reg_file))[0]
+        reg_str = os.path.splitext(os.path.basename(reg_file.replace("/", "_")))[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_regularization_mapping_{reg_str}.pt"
@@ -295,6 +304,17 @@ class TopKEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "perc_emb_drop",
+            "qid2topk_eid",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"TopKEntityEmb must have learned_embedding_size in args"
@@ -411,7 +431,7 @@ class TopKEntityEmb(EntityEmb):
                     emb_args.regularize_mapping,
                 )
         # Keep this mapping so a topK model can simply be loaded without needing the new eid mapping
-        self.register_buffer("eid2topkeid", eid2topkeid)
+        self.register_buffer("eid2topkeid", eid2topkeid, persistent=False)
         self.register_buffer("eid2reg", eid2reg)
 
     def load_regularization_mapping(
@@ -434,7 +454,7 @@ class TopKEntityEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = reg_file.split(".csv")[0]
+        reg_str = reg_file.replace("/", "_").split(".csv")[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_topk_regularization_mapping_{reg_str}.pt"
@@ -532,6 +552,10 @@ class StaticEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"emb_file", "proj"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "emb_file" in emb_args, f"Must have emb_file in args for StaticEmb"
         self.entity2static = self.prep(
             data_config=main_args.data_config,
@@ -580,7 +604,9 @@ class StaticEmb(EntityEmb):
 
         Returns: numpy embedding array where each row is the embedding for an EID
         """
-        static_str = os.path.splitext(os.path.basename(emb_args.emb_file))[0]
+        static_str = os.path.splitext(
+            os.path.basename(emb_args.emb_file.replace("/", "_"))
+        )[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"static_table_{static_str}.npy")
         log_rank_0_debug(logger, f"Looking for static embedding saved at {prep_file}")

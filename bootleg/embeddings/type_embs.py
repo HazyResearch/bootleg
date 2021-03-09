@@ -59,6 +59,17 @@ class TypeEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "max_types",
+            "type_dim",
+            "type_labels",
+            "merge_func",
+            "attn_hidden_size",
+            "regularize_mapping",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "max_types" in emb_args
         ), "Type embedding requires max_types to be set in args"
@@ -67,7 +78,10 @@ class TypeEmb(EntityEmb):
         ), "Type embedding requires type_dim to be set in args"
         assert (
             "type_labels" in emb_args
-        ), "Type embedding requires type_labels to be set in args"
+        ), "Type embedding requires type_labels to be set in args. A Dict from QID -> TypeId or TypeName"
+        assert (
+            "type_vocab" in emb_args
+        ), "Type embedding requires type_vocab to be set in args. A Dict from TypeName -> TypeId"
         assert (
             self.cpu is False
         ), f"We don't support putting type embeddings on CPU right now"
@@ -101,7 +115,7 @@ class TypeEmb(EntityEmb):
             emb_args=emb_args,
             entity_symbols=entity_symbols,
         )
-        self.register_buffer("eid2typeids_table", eid2typeids_table)
+        self.register_buffer("eid2typeids_table", eid2typeids_table, persistent=False)
         # self.eid2typeids_table.requires_grad = False
         self.num_types_with_pad_and_unk = num_types_with_unk + 1
 
@@ -148,7 +162,7 @@ class TypeEmb(EntityEmb):
 
         Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix, and number of types with unk type
         """
-        type_str = os.path.splitext(emb_args.type_labels)[0]
+        type_str = os.path.splitext(emb_args.type_labels.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"type_table_{type_str}_{emb_args.max_types}.pt"
@@ -165,9 +179,11 @@ class TypeEmb(EntityEmb):
         else:
             start = time.time()
             type_labels = os.path.join(data_config.emb_dir, emb_args.type_labels)
+            type_vocab = os.path.join(data_config.emb_dir, emb_args.type_vocab)
             log_rank_0_debug(logger, f"Building type table from {type_labels}")
             eid2typeids_table, type2row_dict, num_types_with_unk = cls.build_type_table(
                 type_labels=type_labels,
+                type_vocab=type_vocab,
                 max_types=emb_args.max_types,
                 entity_symbols=entity_symbols,
             )
@@ -181,25 +197,31 @@ class TypeEmb(EntityEmb):
         return eid2typeids_table, type2row_dict, num_types_with_unk, prep_file
 
     @classmethod
-    def build_type_table(cls, type_labels, max_types, entity_symbols):
+    def build_type_table(cls, type_labels, type_vocab, max_types, entity_symbols):
         """Builds the EID to type ids table.
 
         Args:
-            type_labels: QID to type ids json mapping
+            type_labels: QID to type ids or type names json mapping
+            type_vocab: type name to type ids
             max_types: maximum number of types for an entity
             entity_symbols: entity symbols
 
         Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix, and number of types with unk type
         """
+        with open(type_vocab) as f:
+            vocab = json.load(f)
+        all_type_ids = set(list(vocab.values()))
+        assert (
+            0 not in all_type_ids
+        ), f"The type id of 0 is reserved for UNK type. Please offset the typeids by 1"
         # all eids are initially assigned to unk types
         # if they occur in the type file, then they are assigned the types in the file plus padded types
         eid2typeids = torch.zeros(
             entity_symbols.num_entities_with_pad_and_nocand, max_types
         )
         eid2typeids[0] = torch.zeros(1, max_types)
-        # currently types are assigned by wikipageid
-        # keep track of the max_type_id to set the size of the type embedding
-        max_type_id_all = -1
+
+        max_type_id_all = max(all_type_ids)
         type_hit = 0
         type2row_dict = {}
         with open(type_labels) as f:
@@ -213,18 +235,24 @@ class TypeEmb(EntityEmb):
                     type_hit += 1
                     # increment by 1 to account for unk row
                     typeids_list = []
-                    for type_id in row_types:
-                        typeids_list.append(type_id + 1)
-                        type2row_dict[type_id] = type_id + 1
-                    # we take the max_id over all of the types
-                    # not just the ones we filter with max_types
-                    max_type_id = max(typeids_list)
-                    if max_type_id > max_type_id_all:
-                        max_type_id_all = max_type_id
+                    for type_id_or_name in row_types:
+                        # If typename, map to typeid
+                        if type(type_id_or_name) is str:
+                            type_id = vocab[type_id_or_name]
+                        else:
+                            type_id = type_id_or_name
+                        assert (
+                            type_id > 0
+                        ), f"Typeid for {qid} is 0. That is reserved. Please offset by 1"
+                        assert (
+                            type_id in all_type_ids
+                        ), f"Typeid for {qid} isn't in vocab"
+                        typeids_list.append(type_id)
+                        type2row_dict[type_id] = type_id
                     num_types = min(len(typeids_list), max_types)
                     typeids[:num_types] = torch.tensor(typeids_list)[:num_types]
                     eid2typeids[entity_symbols.get_eid(qid)] = typeids
-        # + 1 bc indices start at 0 (we've already incremented for the unk row)
+        # + 1 bc we need to account for pad row
         labeled_num_types = max_type_id_all + 1
         # assign padded types to the last row of the type embedding
         # make sure adding type labels doesn't add new types
@@ -253,7 +281,7 @@ class TypeEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = os.path.splitext(os.path.basename(reg_file))[0]
+        reg_str = os.path.splitext(os.path.basename(reg_file.replace("/", "_")))[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"type_regularization_mapping_{reg_str}.pt")
         utils.ensure_dir(os.path.dirname(prep_file))
@@ -282,7 +310,7 @@ class TypeEmb(EntityEmb):
             # default of no mask
             typeid2reg_arr = [0.0] * num_types_with_pad_and_unk
             for row_idx, row in typeid2reg_raw.iterrows():
-                # Happens when we filter QIDs not in our entity dump and the max typeid is smaller than the total number
+                # Happens when we filter QIDs not in our entity save and the max typeid is smaller than the total number
                 if int(row["typeid"]) not in type2row_dict:
                     continue
                 typeid = type2row_dict[int(row["typeid"])]

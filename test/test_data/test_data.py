@@ -68,7 +68,7 @@ class DataLoader(unittest.TestCase):
             cache_dir="test/data/emb_data/pretrained_bert_models",
         )
         self.is_bert = True
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),

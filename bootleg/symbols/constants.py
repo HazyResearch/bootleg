@@ -41,3 +41,25 @@ ANCHOR_KEY = "gold"
 # used for tasks
 BERT_MODEL_NAME = "bert"
 PRED_LAYER = "pred_layer"
+
+# profile constants/utils wrappers
+def edit_op(func):
+    def wrapper_check_edit_mode(obj, *args, **kwargs):
+        if obj.edit_mode is False:
+            raise AttributeError(f"You must load object in edit_mode=True")
+        return func(obj, *args, **kwargs)
+
+    return wrapper_check_edit_mode
+
+
+def check_qid_exists(func):
+    def wrapper_check_qid(obj, *args, **kwargs):
+        if len(args) > 0:
+            qid = args[0]
+        else:
+            qid = kwargs["qid"]
+        if not obj._entity_symbols.qid_exists(qid):
+            raise ValueError(f"The entity {qid} is not in our dump")
+        return func(obj, *args, **kwargs)
+
+    return wrapper_check_qid

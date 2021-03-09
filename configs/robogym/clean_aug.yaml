@@ -1,0 +1,102 @@
+emmental:
+  lr: 1e-4
+  n_epochs: 5
+  evaluation_freq: 1.0
+  log_path: logs/robogym_sports_wl
+  checkpointing: true
+  checkpoint_all: true
+  checkpoint_freq: 1
+  clear_intermediate_checkpoints: false
+  model_path: /dfs/scratch1/lorr1/projects/bootleg-emmental/logs_01_10/robogym_sports/2021_01_05/15_56_05/ff93d493/last_model.pth
+#  warmup_percentage: 0.1
+#  lr_scheduler: linear
+run_config:
+  eval_batch_size: 128
+  dataloader_threads: 1
+  dataset_threads: 50
+  spawn_method: fork
+train_config:
+  batch_size: 96
+model_config:
+  hidden_size: 256
+  num_heads: 16
+  num_model_stages: 2
+  ff_inner_size: 1024
+  attn_class: Bootleg
+data_config:
+  data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/sports_notitle_1229
+  data_prep_dir: prep
+  emb_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs
+  alias_cand_map: alias2qids.json
+  eval_slices:
+    - unif_TS
+    - unif_NS_TS
+    - unif_TO
+    - unif_NS_TO
+    - unif_TL
+    - unif_NS_TL
+  type_prediction:
+    use_type_pred: true
+    num_types: 5
+    file: hyena_types_coarse_0905.json
+  ent_embeddings:
+       - key: learned
+         load_class: LearnedEntityEmb
+         cpu: true
+         freeze: false
+         args:
+           learned_embedding_size: 256
+#           perc_emb_drop: 0.95
+           regularize_mapping: /dfs/scratch0/lorr1/projects/bootleg-data/data/sports_notitle_1229/qid2reg_pow.csv
+#           qid2topk_eid: /dfs/scratch0/lorr1/projects/bootleg-data/data/sports_notitle_1229/entity_db/entity_mappings/qid2eid_top5.json
+       - key: learned_type
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: hyena_types_0905.json
+           max_types: 3
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: learned_type_wiki
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: wikidata_types_0905.json
+           max_types: 3
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: learned_type_relations
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: kg_relation_types_0905.json
+           max_types: 50
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: adj_index
+         load_class: KGIndices
+         batch_on_the_fly: true
+         normalize: false
+         args:
+           kg_adj: kg_adj_0905.txt
+  entity_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/sports_notitle_1229/entity_db
+  max_aliases: 10
+  max_seq_len: 100
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: dev.jsonl
+    use_weak_label: true
+  test_dataset:
+    file: test.jsonl
+    use_weak_label: true
+  train_dataset:
+    file: train_wl.jsonl
+    use_weak_label: true
+  train_in_candidates: true
+  word_embedding:
+    cache_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs/pretrained_bert_models
+    freeze: true
+    layers: 12

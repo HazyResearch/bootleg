@@ -21,7 +21,8 @@
         "type_prediction": {
             "use_type_pred": true,
             "num_types": 3,
-            "file": "type_pred_mapping.json"
+            "type_labels": "type_pred_mapping.json",
+            "type_vocab": "type_pred_vocab.json"
         },
         "word_embedding":
         {

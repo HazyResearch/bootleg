@@ -3,7 +3,7 @@ import unittest
 import torch
 
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.utils.postprocessing.compress_topk_entity_embeddings import (
+from bootleg.utils.entity_profile.compress_topk_entity_embeddings import (
     filter_embs,
     filter_qids,
 )
@@ -12,7 +12,7 @@ from bootleg.utils.postprocessing.compress_topk_entity_embeddings import (
 class TestTopKEmbsCompression(unittest.TestCase):
     def test_filter_qids(self):
         entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
-        entity_db = EntitySymbols(
+        entity_db = EntitySymbols.load_from_cache(
             load_dir=entity_dump_dir, alias_cand_map_file="alias2qids.json"
         )
         qid2count = {"Q1": 10, "Q2": 20, "Q3": 2, "Q4": 4}
@@ -39,7 +39,7 @@ class TestTopKEmbsCompression(unittest.TestCase):
 
     def test_filter_embs(self):
         entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
-        entity_db = EntitySymbols(
+        entity_db = EntitySymbols.load_from_cache(
             load_dir=entity_dump_dir, alias_cand_map_file="alias2qids.json"
         )
         num_topk_entities = 2

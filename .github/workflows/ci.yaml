@@ -2,7 +2,8 @@ name: CI
 
 on:
     push:
-        branches: [ emmental_master, master ]
+        branches:
+            - '**'
     pull_request:
         branches: [ emmental_master, master ]
     
@@ -34,7 +35,7 @@ jobs:
                     python -m pip install --upgrade pip
                     make dev
 
-            -   name: Lint with isort, black, docformatter, flake8
+            -   name: Lint with isort, black, docformatter
                 run: |
                     make format
                     make check

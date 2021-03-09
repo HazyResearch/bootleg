@@ -55,14 +55,15 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withoutkg(self):
         # KG IS LAST EMBEDDING SO WE REMOVE IT
         self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:-1]
-
+        # Just setting this for testing pipelines
+        self.args.data_config.max_aliases = 1
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.05
@@ -76,17 +77,17 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withtype(self):
         self.args.data_config.type_prediction.use_type_pred = True
         self.args.model_config.hidden_size = 20
-
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
         # unfreezing the word embedding helps the type prediction task
         self.args.data_config.word_embedding.freeze = False
-
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
@@ -101,6 +102,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withtitle(self):
@@ -110,13 +112,14 @@ class TestEnd2End(unittest.TestCase):
                     "key": "title1",
                     "load_class": "TitleEmb",
                     "send_through_bert": True,
-                    "through_bert_metadata_keys": [4, 5],
                     "args": {"proj": 6},
                 }
             )
         )
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.08
@@ -130,6 +133,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withreg(self):
@@ -142,14 +146,15 @@ class TestEnd2End(unittest.TestCase):
             ["Q3", "0.2"],
             ["Q4", "0.9"],
         ]
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
+        self.args.run_config.eval_batch_size = 2
         with open(reg_file, "w") as out_f:
             for item in reg_data:
                 out_f.write(",".join(item) + "\n")
 
         self.args.data_config.ent_embeddings[0]["args"]["regularize_mapping"] = reg_file
-
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.05
@@ -163,8 +168,8 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
-
         shutil.rmtree("test/temp", ignore_errors=True)
 
     def test_end2end_bert(self):
@@ -174,9 +179,7 @@ class TestEnd2End(unittest.TestCase):
         # Set the learned embedding to hidden size for BERTNED
         self.args.data_config.ent_embeddings[0].args.learned_embedding_size = 20
         self.args.data_config.word_embedding.use_sent_proj = False
-
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         assert scores["model/all/train/loss"] < 0.5
@@ -190,8 +193,8 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
-
         shutil.rmtree("test/temp", ignore_errors=True)
 
 

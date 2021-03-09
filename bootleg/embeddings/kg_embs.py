@@ -67,6 +67,10 @@ class KGAdjEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"kg_adj", "threshold", "log_weight"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "kg_adj" in emb_args, f"KG embedding requires kg_adj to be set in args"
         assert (
             self.normalize is False
@@ -122,7 +126,7 @@ class KGAdjEmb(EntityEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"kg_adj_file_{file_tag}.npz")
         utils.ensure_dir(os.path.dirname(prep_file))
@@ -288,7 +292,7 @@ class KGWeightedAdjEmb(KGAdjEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"kg_adj_file_{file_tag}_{threshold}_{log_weight}.npz"

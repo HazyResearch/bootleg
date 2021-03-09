@@ -22,7 +22,7 @@
         "type_prediction": {
             "use_type_pred": false,
             "num_types": 3,
-            "file": "type_pred_mapping.json"
+            "type_labels": "type_pred_mapping.json"
         },
         "word_embedding":
         {

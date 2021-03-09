@@ -340,7 +340,7 @@ If a GPU is not available, we can also get away with training this tiny dataset 
 
    python3 bootleg/run.py --config_script configs/tutorial/sample_config.json --emmental.device -1
 
-At each eval step, we see a json dump of eval metrics. At the beginning end end of the model training, you should see a print out of the log direction. E.g.,
+At each eval step, we see a json save of eval metrics. At the beginning end end of the model training, you should see a print out of the log direction. E.g.,
 
 ``Saving metrics to logs/tutorial/2021_02_06/11_43_32/dc290ed5``
 
@@ -370,7 +370,7 @@ As our data was very tiny, our model is not doing great, but the train loss is g
 Evaluating the Model
 ---------------------
 
-After the model is trained, we can also run eval to get test scores or to dump predictions. To eval the model on a single GPU, we run:
+After the model is trained, we can also run eval to get test scores or to save predictions. To eval the model on a single GPU, we run:
 
 .. code-block::
 

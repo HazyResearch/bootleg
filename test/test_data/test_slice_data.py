@@ -44,7 +44,7 @@ class DataSlice(unittest.TestCase):
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args("test/run_args/test_data.json")
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
@@ -775,6 +775,106 @@ class DataSlice(unittest.TestCase):
         )
         assert_slice_data_equal(gold_data, dataset.data)
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
+
+    def test_multiple_processes(self):
+        """ENTITY SYMBOLS
+        {
+          "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
+          "alias1":[["Q1",10.0],["Q4",6.0]],
+          "alias3":[["Q1",30.0]],
+          "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
+        }
+        """
+        max_seq_len = 5
+        max_aliases = 2
+        self.args.data_config.max_aliases = max_aliases
+        self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.eval_slices = ["slice1", "slice2"]
+        input_data = [
+            {
+                "aliases": ["alias3", "alias4", "alias3"],
+                "qids": ["Q1", "Q4", "Q1"],
+                "sent_idx_unq": 0,
+                "sentence": "alias3 alias4 alias3",
+                "spans": [[0, 1], [1, 2], [2, 3]],
+                "slices": {
+                    "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
+                    "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
+                },
+                "gold": [True, True, True],
+            },
+            {
+                "aliases": ["alias3"],
+                "qids": ["Q1"],
+                "sent_idx_unq": "1",
+                "sentence": "alias3",
+                "spans": [[0, 1]],
+                "slices": {"slice1": {"0": 0.4}, "slice2": {"0": 1.0}},
+                "gold": [True],
+            },
+        ]
+
+        slice_dt = np.dtype(
+            [
+                ("sent_idx", int),
+                ("subslice_idx", int),
+                ("alias_slice_incidence", int, 3),
+                ("prob_labels", float, 3),
+            ]
+        )
+        storage_type = np.dtype(
+            [
+                (slice_name, slice_dt, 1)
+                for slice_name in [FINAL_LOSS, "slice1", "slice2"]
+            ]
+        )
+
+        ex1 = [
+            np.rec.array(
+                [0, 0, [1, 1, 1], [1.0, 1.0, 1.0]], dtype=slice_dt
+            ),  # FINAL LOSS
+            np.rec.array([0, 0, [1, 0, 0], [0.9, 0.3, 0.5]], dtype=slice_dt),  # slice1
+            np.rec.array([0, 0, [0, 0, 1], [0.0, 0.0, 1.0]], dtype=slice_dt),  # slice2
+        ]
+        ex2 = [
+            np.rec.array(
+                [1, 0, [1, 0, 0], [1.0, -1.0, -1.0]], dtype=slice_dt
+            ),  # FINAL LOSS
+            np.rec.array(
+                [1, 0, [0, 0, 0], [0.4, -1.0, -1.0]], dtype=slice_dt
+            ),  # slice1
+            np.rec.array(
+                [1, 0, [1, 0, 0], [1.0, -1.0, -1.0]], dtype=slice_dt
+            ),  # slice2
+        ]
+        mat1 = np.rec.array(ex1, dtype=storage_type).reshape(1, 1)
+        mat2 = np.rec.array(ex2, dtype=storage_type).reshape(1, 1)
+        gold_data = np.vstack((mat1, mat2))
+        # As we are doing multiprocessing in this test, the order may be reversed
+        # This is cleaner than an order independent equality check of recarrays
+        gold_data_rev_order = np.vstack((mat2, mat1))
+        gold_sent_to_row_id_dict = {0: [0], 1: [1]}
+        gold_sent_to_row_id_dict_rev_order = {0: [0], 1: [1]}
+
+        utils.write_jsonl(self.temp_file_name, input_data)
+        use_weak_label = True
+        split = "dev"
+        dataset = BootlegSliceDataset(
+            self.args,
+            self.temp_file_name,
+            use_weak_label,
+            self.entity_symbols,
+            dataset_threads=1,
+            split=split,
+        )
+        try:
+            assert_slice_data_equal(gold_data, dataset.data)
+            self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
+        except AssertionError as e:
+            assert_slice_data_equal(gold_data_rev_order, dataset.data)
+            self.assertDictEqual(
+                gold_sent_to_row_id_dict_rev_order, dataset.sent_to_row_id_dict
+            )
 
 
 if __name__ == "__main__":

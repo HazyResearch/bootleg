@@ -1,0 +1,67 @@
+emmental:
+  lr: 1e-4
+  n_epochs: 5
+  evaluation_freq: 1.0
+  warmup_percentage: 0.1
+  lr_scheduler: linear
+  log_path: logs_guid/ent_only_wl_socc_air
+  checkpointing: true
+  checkpoint_all: true
+  checkpoint_freq: 1
+  clear_intermediate_checkpoints: false
+  model_path: /dfs/scratch1/lorr1/projects/bootleg/logs_guid/ent_only/2021_01_23/23_48_06/75fdf972/checkpoint_10.0.pth
+  fp16: true
+run_config:
+  eval_batch_size: 256
+  dataloader_threads: 3
+  dataset_threads: 50
+  spawn_method: fork
+train_config:
+  batch_size: 96
+model_config:
+  hidden_size: 256
+  num_heads: 16
+  num_model_stages: 2
+  ff_inner_size: 1024
+  attn_class: BootlegM2E
+data_config:
+  data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_title_0122
+  data_prep_dir: prep
+  emb_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs
+  eval_slices:
+    - unif_TS
+    - unif_NS_TS
+    - unif_TO
+    - unif_NS_TO
+    - unif_TL
+    - unif_NS_TL
+  type_prediction:
+    use_type_pred: false
+    num_types: 5
+    file: hyena_types_coarse_0905.json
+  ent_embeddings:
+       - key: learned
+         load_class: LearnedEntityEmb
+         freeze: false
+         cpu: true
+         args:
+           learned_embedding_size: 256
+  entity_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_title_0122/entity_db
+  max_aliases: 10
+  max_seq_len: 100
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: dev.jsonl
+    use_weak_label: true
+  test_dataset:
+    file: test.jsonl
+    use_weak_label: true
+  train_dataset:
+    file: train_aug.jsonl
+    use_weak_label: true
+  train_in_candidates: true
+  word_embedding:
+    cache_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs/pretrained_bert_models
+    freeze: true
+    bert_model: bert-base-uncased
+    layers: 12

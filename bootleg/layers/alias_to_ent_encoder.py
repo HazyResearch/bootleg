@@ -68,11 +68,12 @@ class AliasEntityTable(nn.Module):
         total_size = data_shape[0] * data_shape[1]
         # dependent on train_in_candidates flag
         prep_dir = data_utils.get_emb_prep_dir(data_config)
-        alias_str = os.path.splitext(data_config.alias_cand_map)[0]
+        alias_str = os.path.splitext(data_config.alias_cand_map.replace("/", "_"))[0]
         prep_file = os.path.join(
             prep_dir,
             f"alias2entity_table_{alias_str}_InC{int(data_config.train_in_candidates)}.pt",
         )
+        log_rank_0_debug(logger, f"Looking for alias table in {prep_file}")
         if not data_config.overwrite_preprocessed_data and os.path.exists(prep_file):
             log_rank_0_debug(logger, f"Loading alias table from {prep_file}")
             start = time.time()

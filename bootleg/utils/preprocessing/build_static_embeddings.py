@@ -119,7 +119,7 @@ def build_title_table(cpu, batch_size, model, tokenizer, entity_symbols):
 def main():
     args = parse_args()
     print(ujson.dumps(args, indent=4))
-    entity_symbols = EntitySymbols(
+    entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
     )

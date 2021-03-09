@@ -679,6 +679,7 @@ class TestLearnedEmbedding(unittest.TestCase):
         torch.save(emb, self.static_emb)
 
         self.args.data_config.ent_embeddings[0]["args"]["emb_file"] = self.static_emb
+        del self.args.data_config.ent_embeddings[0]["args"]["learned_embedding_size"]
 
         learned_emb = StaticEmb(
             main_args=self.args,
@@ -706,6 +707,9 @@ class TestTypeEmbedding(unittest.TestCase):
         self.type_file = os.path.join(
             self.args.data_config.emb_dir, "temp_type_file.json"
         )
+        self.type_vocab_file = os.path.join(
+            self.args.data_config.emb_dir, "temp_type_vocab.json"
+        )
         self.regularization_csv = os.path.join(
             self.args.data_config.data_dir, "test_reg.csv"
         )
@@ -713,6 +717,8 @@ class TestTypeEmbedding(unittest.TestCase):
     def tearDown(self) -> None:
         if os.path.exists(self.type_file):
             os.remove(self.type_file)
+        if os.path.exists(self.type_vocab_file):
+            os.remove(self.type_vocab_file)
         if os.path.exists(self.regularization_csv):
             os.remove(self.regularization_csv)
         dir = os.path.join(
@@ -730,15 +736,30 @@ class TestTypeEmbedding(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_build_type_table(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor(
             [[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0], [7, 8, 9], [0, 0, 0]]
         ).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=3, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=3,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)
@@ -746,8 +767,20 @@ class TestTypeEmbedding(unittest.TestCase):
         assert max_labels == 10
 
     def test_build_type_table_pad_types(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor(
             [
@@ -759,9 +792,12 @@ class TestTypeEmbedding(unittest.TestCase):
                 [0, 0, 0, 0],
             ]
         ).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=4, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=4,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)
@@ -769,13 +805,28 @@ class TestTypeEmbedding(unittest.TestCase):
         assert max_labels == 10
 
     def test_build_type_table_too_many_types(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor([[0], [1], [4], [0], [7], [0]]).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=1, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=1,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)

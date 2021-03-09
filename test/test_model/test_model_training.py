@@ -51,7 +51,7 @@ class ModelTrainTest(unittest.TestCase):
         self.args = parser_utils.parse_boot_and_emm_args(
             "test/run_args/test_model_training.json"
         )
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
