@@ -63,6 +63,7 @@ class TypeEmb(EntityEmb):
             "max_types",
             "type_dim",
             "type_labels",
+            "type_vocab",
             "merge_func",
             "attn_hidden_size",
             "regularize_mapping",
