@@ -261,7 +261,6 @@ def batched_pred_iter(
         final_gold_d = defaultdict(list)
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
-        # print("FINALIZE", cur_sentidx_nummen, sent_idx2num_mentions)
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
                 len(cur_mention_set) <= sent_idx2num_mentions[str(sent_idx)]
@@ -745,7 +744,6 @@ def merge_subsentences(
             full_pred_data,
             sentidx2offset,
         )
-
     else:
         # Get trie for sentence start map
         trie_folder = os.path.join(cache_folder, "bootleg_sent_idx2num_mentions")
@@ -786,7 +784,6 @@ def merge_subsentences(
                     emb_id not in seen_ids
                 ), f"{emb_id} already seen, something went wrong with sub-sentences"
                 seen_ids.add(emb_id)
-
     # filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
     # for i in range(len(filt_emb_data)):
     #     si = filt_emb_data[i]["sent_idx"]
@@ -970,7 +967,6 @@ def write_data_labels(
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
         utils.create_single_item_trie(sental2embid, out_file=trie_file)
-
         # Chunk file for parallel writing
         # We do not use TemporaryFolders as the temp dir may not have enough space for large files
         create_ex_indir = os.path.join(cache_folder, "_bootleg_eval_temp_indir")

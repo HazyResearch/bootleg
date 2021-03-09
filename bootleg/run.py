@@ -285,6 +285,16 @@ def run_model(mode, config, run_config_path=None):
     if config["model_config"]["model_path"] is not None:
         model.load(config["model_config"]["model_path"])
 
+    # Multi-gpu DataParallel eval (NOT distributed)
+    if mode in ["eval", "dump_embs", "dump_preds"]:
+        # This happens inside EmmentalLearner for training
+        if (
+            config["learner_config"]["local_rank"] == -1
+            and config["model_config"]["dataparallel"]
+        ):
+            model._to_dataparallel()
+            raise NotImplementedError(f"Laurel is working on this")
+
     # Train model
     if mode == "train":
         emmental_learner = EmmentalLearner()
