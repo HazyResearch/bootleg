@@ -1,118 +1,136 @@
 """Type symbols class."""
 
 import os
+from datetime import datetime
+from typing import Dict, List, Optional
 
 import ujson as json
 from tqdm import tqdm
 
+from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
 
 
 class TypeSymbols:
-    """Type symbols class.
-
-    Args:
-        entity_symbols: entity symbols
-        emb_dir: embedding directory
-        max_types: maximum number of types per entity
-        type_vocab_file: json vocab file of type id to type names
-        type_file: json file for QID to type id
-    """
-
     def __init__(
         self,
-        entity_symbols,
-        emb_dir,
-        max_types,
-        type_vocab_file,
-        type_file,
+        qid2typenames: Dict[str, List[str]],
+        qid2typeid: Optional[Dict[str, List[int]]] = None,
+        type_vocab: Optional[Dict[str, int]] = None,
+        max_types: Optional[int] = 10,
+        edit_mode: Optional[bool] = False,
+        verbose: Optional[bool] = False,
     ):
-        self.type_vocab_file = type_vocab_file
-        self.type_file = os.path.join(emb_dir, type_file)
-        self.qid2typenames, self.qid2typeid, self.typeid2typename = self.load_types(
-            entity_symbols, emb_dir, max_types
-        )
+        if max_types <= 0:
+            raise ValueError(f"max_types must be greater than 0")
+        self.max_types = max_types
+        self.edit_mode = edit_mode
+        self.verbose = verbose
+        self._qid2typenames: Dict[str, List[str]] = {}
 
-    def load_type_file(
-        self,
-        type_file,
-        entity_symbols,
-        max_types,
-        qid2typeid,
-        qid2typenames,
-        typeid2typename,
-    ):
-        """Loads type file and generates QID to type id mappings.
-
-        Args:
-            type_file: json QID to list of type id file
-            entity_symbols: entity symbols
-            max_types: maximum number of types per entity
-            qid2typeid: QID to typeid dict to add types to
-            qid2typenames: QID to type names dict to add types to
-            typeid2typename: Typeid to type names dict to add types to
-
-        Returns: qid2typeid dict, qid2typenames dict
-        """
-        with open(type_file, "r") as f:
-            total = 0.0
-            count = 0.0
-            qid2typeid_raw = json.load(f)
-            for qid in tqdm(qid2typeid_raw, desc=f"Reading {type_file}"):
-                typeids = qid2typeid_raw[qid][:max_types]
-                total += len(typeids)
-                # Use identity map if type is not in vocab
-                for t in typeids:
-                    if t not in typeid2typename:
-                        typeid2typename[t] = str(t)
-                qidtypenames = [typeid2typename[t] for t in typeids]
-                count += 1
-                if entity_symbols.qid_exists(qid):
-                    qid2typeid[qid] = typeids
-                    qid2typenames[qid] = qidtypenames
-            return qid2typeid, qid2typenames
-
-    def load_types(self, entity_symbols, emb_dir, max_types):
-        """Loads all type information.
-
-        Args:
-            entity_symbols: entity symbols
-            emb_dir: embedding directory
-            max_types: maximum number of types per entity
-
-        Returns: qid2typenames dict, qid2typeid dict, typeid2typename dict
-        """
-        # load type vocab
-        if self.type_vocab_file == "":
-            print(
-                "You did not give a type vocab file (from type name to typeid). We will use identity mapping"
+        if type_vocab is None:
+            all_typenames = set(
+                [t for typeset in qid2typenames.values() for t in typeset]
             )
-            typeid2typename = {}
+            # +1 to save space for the UNK type
+            self._type_vocab: Dict[str, int] = {
+                v: i + 1 for i, v in enumerate(sorted(all_typenames))
+            }
         else:
-            extension = os.path.splitext(self.type_vocab_file)[-1]
-            if extension == ".json":
-                type_vocab = utils.load_json_file(
-                    os.path.join(emb_dir, self.type_vocab_file)
-                )
-            else:
-                print(
-                    f"We only support loading json files for TypeSymbol. You have a file ending in {extension}"
-                )
-                return {}, {}, {}
-            typeid2typename = {i: v for v, i in type_vocab.items()}
-        # load mapping of entities to type ids
-        qid2typenames = {qid: [] for qid in entity_symbols.get_all_qids()}
-        qid2typeid = {qid: [] for qid in entity_symbols.get_all_qids()}
-        print(f"Loading types from {self.type_file}")
-        qid2typeid, qid2typenames = self.load_type_file(
-            type_file=self.type_file,
-            max_types=max_types,
-            entity_symbols=entity_symbols,
-            qid2typeid=qid2typeid,
-            qid2typenames=qid2typenames,
-            typeid2typename=typeid2typename,
+            self._type_vocab: Dict[str, int] = type_vocab
+            assert (
+                0 not in self._type_vocab.values()
+            ), f"You can't have a type id that is 0. That is reserved for UNK"
+        self._type_vocab_inv = {v: i for i, v in self._type_vocab.items()}
+
+        for qid in qid2typenames:
+            self._qid2typenames[qid] = qid2typenames.get(qid, [])[: self.max_types]
+
+        if qid2typeid is None:
+            self._qid2typeid: Dict[str, List[int]] = {
+                qid: list(map(lambda x: self._type_vocab[x], typnames))
+                for qid, typnames in self._qid2typenames.items()
+            }
+        else:
+            self._qid2typeid: Dict[str, List[int]] = qid2typeid
+
+        for typeids in self._qid2typeid.values():
+            assert (
+                0 not in typeids
+            ), f"Typeids can't be 0. This is reserved for UNK type"
+
+        self._typename2qids = None
+        if edit_mode:
+            self._typename2qids = {}
+            for qid in tqdm(
+                self._qid2typenames,
+                total=len(self._qid2typenames),
+                desc="Building edit mode objs",
+                disable=not verbose,
+            ):
+                for typname in self._qid2typenames[qid]:
+                    if typname not in self._typename2qids:
+                        self._typename2qids[typname] = set()
+                    self._typename2qids[typname].add(qid)
+
+    def save(self, save_dir, prefix=""):
+        """Dumps the type symbols.
+
+        Args:
+            save_dir: directory string to save
+            prefix: prefix to add to beginning to file
+
+        Returns:
+        """
+        utils.ensure_dir(str(save_dir))
+        utils.dump_json_file(
+            filename=os.path.join(save_dir, "config.json"),
+            contents={
+                "max_types": self.max_types,
+            },
         )
-        return qid2typenames, qid2typeid, typeid2typename
+        utils.dump_json_file(
+            filename=os.path.join(save_dir, f"{prefix}qid2typenames.json"),
+            contents=self._qid2typenames,
+        )
+        utils.dump_json_file(
+            filename=os.path.join(save_dir, f"{prefix}qid2typeids.json"),
+            contents=self._qid2typeid,
+        )
+        utils.dump_json_file(
+            filename=os.path.join(save_dir, f"{prefix}type_vocab.json"),
+            contents=self._type_vocab,
+        )
+
+    @classmethod
+    def load_from_cache(cls, load_dir, prefix="", edit_mode=False, verbose=False):
+        """Loads type symbols from load_dir.
+
+        Args:
+            load_dir: directory to load from
+            prefix: prefix to add to beginning to file
+
+        Returns: TypeSymbols
+        """
+        config = utils.load_json_file(filename=os.path.join(load_dir, "config.json"))
+        max_types = config["max_types"]
+        qid2typenames: Dict[str, List[str]] = utils.load_json_file(
+            filename=os.path.join(load_dir, f"{prefix}qid2typenames.json")
+        )
+        qid2typeid: Dict[str, List[int]] = utils.load_json_file(
+            filename=os.path.join(load_dir, f"{prefix}qid2typeids.json")
+        )
+        type_vocab: Dict[str, int] = utils.load_json_file(
+            filename=os.path.join(load_dir, f"{prefix}type_vocab.json")
+        )
+        return cls(qid2typenames, qid2typeid, type_vocab, max_types, edit_mode, verbose)
+
+    def get_all_types(self):
+        """Returns all typenames.
+
+        Returns:
+        """
+        return list(self._type_vocab.keys())
 
     def get_types(self, qid):
         """Gets the type names associated with the given QID.
@@ -122,7 +140,7 @@ class TypeSymbols:
 
         Returns: list of typename strings
         """
-        types = self.qid2typenames.get(qid, [])
+        types = self._qid2typenames.get(qid, [])
         return types
 
     def get_typeids(self, qid):
@@ -133,4 +151,110 @@ class TypeSymbols:
 
         Returns: list of type id ints
         """
-        return self.qid2typeid.get(qid, [])
+        return self._qid2typeid.get(qid, [])
+
+    # ============================================================
+    # EDIT MODE OPERATIONS
+    # ============================================================
+    @edit_op
+    def get_entities_of_type(self, typename):
+        if typename not in self._type_vocab:
+            raise ValueError(f"{typename} is not a type in the typesystem")
+        # This will not be None as we are in edit mode
+        return self._typename2qids[typename]
+
+    @edit_op
+    def add_type(self, qid, typename):
+        if typename not in self._type_vocab:
+            raise ValueError(
+                f"The type {typename} is not in our vocab. We only support adding types in our vocab."
+            )
+        typeid = self._type_vocab[typename]
+        # Update qid->type mappings
+        if typename not in self._qid2typenames[qid]:
+            assert (
+                typeid not in self._qid2typeid[qid]
+            ), f"Invalid state a typeid is in self._qid2typeid for {typename} and {qid}"
+            # Remove last type if too many types
+            if len(self._qid2typenames[qid]) >= self.max_types:
+                type_to_remove = self._qid2typenames[qid][-1]
+                self.remove_type(qid, type_to_remove)
+            self._qid2typenames[qid].append(typename)
+            self._qid2typeid[qid].append(typeid)
+            # As we are in edit mode, self._typename2qids will not be None
+            self._typename2qids[typename].add(qid)
+        return
+
+    @edit_op
+    def remove_type(self, qid, typename):
+        if typename not in self._type_vocab:
+            raise ValueError(
+                f"The type {typename} is not in our vocab. We only support adding types in our vocab."
+            )
+        if typename not in self._qid2typenames[qid]:
+            return
+        assert (
+            self._type_vocab[typename] in self._qid2typeid[qid]
+        ), f"Invalid state a typeid is in self._qid2typeid for {typename} and {qid}"
+        assert (
+            typename in self._typename2qids
+        ), f"Invalid state a typename is in self._typename2qids for {typename} and {qid}"
+        self._qid2typenames[qid].remove(typename)
+        self._qid2typeid[qid].remove(self._type_vocab[typename])
+        # As we are in edit mode, self._typename2qids will not be None
+        # Further, we want to keep the typename even if list is empty as our type system doesn't change
+        self._typename2qids[typename].remove(qid)
+        return
+
+    @edit_op
+    def add_entity(self, qid, types):
+        for typename in types:
+            if typename not in self._type_vocab:
+                raise ValueError(
+                    f"Tried adding type {typename}. We do not support adding new types."
+                )
+        # Add the qid to the qid dicts so we can call the add/remove functions
+        self._qid2typenames[qid] = []
+        self._qid2typeid[qid] = []
+        for typename in types:
+            self._qid2typenames[qid].append(typename)
+            self._qid2typeid[qid].append(self._type_vocab[typename])
+        # Cutdown to max types
+        self._qid2typenames[qid] = self._qid2typenames[qid][: self.max_types]
+        self._qid2typeid[qid] = self._qid2typeid[qid][: self.max_types]
+        # Add to typenames to qids
+        for typename in self._qid2typenames[qid]:
+            self._typename2qids[typename].add(qid)
+        return
+
+    @edit_op
+    def reidentify_entity(self, old_qid, new_qid):
+        assert (
+            old_qid in self._qid2typenames and new_qid not in self._qid2typenames
+        ), f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} failed"
+        # Update qid2typenames
+        self._qid2typenames[new_qid] = self._qid2typenames[old_qid]
+        del self._qid2typenames[old_qid]
+        # Update qid2typeid
+        self._qid2typeid[new_qid] = self._qid2typeid[old_qid]
+        del self._qid2typeid[old_qid]
+        # Update qid2typenames
+        for typename in self._qid2typenames[new_qid]:
+            self._typename2qids[typename].remove(old_qid)
+            self._typename2qids[typename].add(new_qid)
+
+    @edit_op
+    def prune_to_entities(self, entities_to_keep):
+        # Update qid2typenames
+        self._qid2typenames = {
+            k: v for k, v in self._qid2typenames.items() if k in entities_to_keep
+        }
+        # Update qid2typeid
+        self._qid2typeid = {
+            k: v for k, v in self._qid2typeid.items() if k in entities_to_keep
+        }
+        # Update qid2typenames, keeping the typenames even if empty lists
+        for typename in self._typename2qids:
+            self._typename2qids[typename] = self._typename2qids[typename].intersection(
+                entities_to_keep
+            )

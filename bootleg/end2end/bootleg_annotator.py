@@ -235,7 +235,7 @@ class BootlegAnnotator(object):
         )
 
         logger.debug("Reading entity database")
-        self.entity_db = EntitySymbols(
+        self.entity_db = EntitySymbols.load_from_cache(
             os.path.join(
                 self.config.data_config.entity_dir,
                 self.config.data_config.entity_map_dir,
@@ -527,7 +527,8 @@ class BootlegAnnotator(object):
                 subsplit_idx = batch_subsplit_idx[b_i + ex_i]
                 entity_cands = eval_utils.map_aliases_to_candidates(
                     self.config.data_config.train_in_candidates,
-                    self.entity_db,
+                    self.config.data_config.max_aliases,
+                    self.entity_db.get_alias2qids(),
                     batch_aliases_arr[b_i + ex_i],
                 )
                 # batch size is 1 so we can reshape

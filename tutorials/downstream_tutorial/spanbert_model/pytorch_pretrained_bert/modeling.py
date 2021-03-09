@@ -583,7 +583,7 @@ class BertPreTrainedModel(nn.Module):
                     . `bert-base-chinese`
                 - a path or url to a pretrained model archive containing:
                     . `bert_config.json` a configuration file for the model
-                    . `pytorch_model.bin` a PyTorch dump of a BertForPreTraining instance
+                    . `pytorch_model.bin` a PyTorch save of a BertForPreTraining instance
                 - a path or url to a pretrained model archive containing:
                     . `bert_config.json` a configuration file for the model
                     . `model.chkpt` a TensorFlow checkpoint

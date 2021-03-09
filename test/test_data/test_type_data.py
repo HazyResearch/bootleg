@@ -27,7 +27,7 @@ class DataTypeLoader(unittest.TestCase):
             cache_dir="test/data/emb_data/pretrained_bert_models",
         )
         self.is_bert = True
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
@@ -77,7 +77,7 @@ class DataTypeLoader(unittest.TestCase):
         self.assertDictEqual(eid2type, eid2type_gold)
 
     def test_load_type_data_extra_entity(self):
-        # Test that we only add entities in our dump
+        # Test that we only add entities in our save
         """ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],

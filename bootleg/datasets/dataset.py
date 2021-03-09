@@ -163,31 +163,48 @@ def read_in_types(data_config):
     Returns: dictionary of EID to type id
     """
     emb_dir = data_config.emb_dir
-    coarse_type_file = data_config.type_prediction.file
+    coarse_type_file = data_config.type_prediction.type_labels
+    coarse_type_vocab_file = data_config.type_prediction.type_vocab
     type_file = os.path.join(emb_dir, coarse_type_file)
-    entitysymbols = EntitySymbols(
+    vocab_file = os.path.join(emb_dir, coarse_type_vocab_file)
+    entitysymbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
         alias_cand_map_file=data_config.alias_cand_map,
     )
-    log_rank_0_debug(logger, f"Building type labels from {type_file}.")
+    with open(vocab_file, "r") as in_f:
+        vocab = ujson.load(in_f)
+
+    log_rank_0_debug(logger, f"Building type labels from {type_file} and {vocab_file}.")
+    all_type_ids = set(vocab.values())
+    assert (
+        0 not in all_type_ids
+    ), f"We assume type indices start at 1. 0 is reserved for UNK type. You have index 0."
     with open(type_file) as in_f:
         # take the first type; UNK type is 0
         eid2type = {}
-        max_type = 0
         for k, v in ujson.load(in_f).items():
-            # Happens if have QIDs that are not in dump
+            # Happens if have QIDs that are not in save
             if not entitysymbols.qid_exists(k):
                 continue
+            mapped_values = []
+            for sub_item in v:
+                if type(sub_item) is str:
+                    sub_item_id = vocab[sub_item]
+                else:
+                    sub_item_id = sub_item
+                mapped_values.append(sub_item_id)
+                assert (
+                    sub_item_id in all_type_ids
+                ), f"Type id {sub_item_id} is not in all type ids for {vocab_file}."
             eid = entitysymbols.get_eid(k)
             # Store strings as keys for making a Tri later
-            if len(v) > 0:
-                eid2type[str(eid)] = v[0] + 1
+            if len(mapped_values) > 0:
+                eid2type[str(eid)] = mapped_values[0]
             else:
                 eid2type[str(eid)] = 0
-            max_type = max(max_type, eid2type[str(eid)])
-    # We assume types are indexed from 0. So, 6 types will have indices 0 - 5. Max type will get 5+1 = 6.
+    # We assume types are indexed from 1. So, 6 types will have indices 1 - 6. Max type will get 6.
     assert (
-        max_type == data_config.type_prediction.num_types
+        len(all_type_ids) == data_config.type_prediction.num_types
     ), f"{data_config.type_prediction.num_types} from args.data_config.type_prediction.num_types must match our computed number {max_type}"
     return eid2type
 
@@ -454,7 +471,7 @@ def convert_examples_to_features_and_save_initializer(
     global tokenizer_global
     tokenizer_global = tokenizer
     global entitysymbols_global
-    entitysymbols_global = EntitySymbols(
+    entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
         alias_cand_map_file=data_config.alias_cand_map,
     )
@@ -1159,7 +1176,7 @@ class BootlegDataset(EmmentalDataset):
             self.add_type_pred = True
             self.save_type_labels_name = os.path.join(
                 save_dataset_folder,
-                f"{os.path.splitext(os.path.basename(data_config.type_prediction.file))[0]}_type_pred_label.bin",
+                f"{os.path.splitext(os.path.basename(data_config.type_prediction.type_labels))[0]}_type_pred_label.bin",
             )
             log_rank_0_debug(logger, f"Seeing if {self.save_type_labels_name} exists")
             if data_config.overwrite_preprocessed_data or (

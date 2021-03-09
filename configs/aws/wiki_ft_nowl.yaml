@@ -1,0 +1,119 @@
+emmental:
+  lr: 2e-5
+  n_epochs: 4
+  evaluation_freq: 0.2
+  warmup_percentage: 0.1
+  lr_scheduler: linear
+  log_path: /data/logs/wiki_full_ft_nowl
+  checkpointing: true
+  checkpoint_all: true
+  checkpoint_freq: 1
+  clear_intermediate_checkpoints: false
+  l2: 0.01
+  grad_clip: 1.0
+  distributed_backend: nccl
+  fp16: true
+run_config:
+  eval_batch_size: 32
+  dataloader_threads: 1
+  dataset_threads: 40
+  spawn_method: fork
+  log_level: debug
+train_config:
+  batch_size: 32
+model_config:
+  hidden_size: 512
+  num_heads: 16
+  num_model_stages: 2
+  ff_inner_size: 1024
+  attn_class: BootlegM2E
+data_config:
+  data_dir: /data/data/wiki_title_0122_nowl
+  data_prep_dir: prep
+  emb_dir: /data/embs
+  eval_slices:
+    - unif_NS_all
+    - unif_NS_HD
+    - unif_NS_TO
+    - unif_NS_TL
+    - unif_NS_TS
+  type_prediction:
+    use_type_pred: true
+    num_types: 5
+    file: hyena_types_coarse_1229.json # COARSE TYPES for type prediction. IF you don't want to use this, set use_type_pred to False
+  ent_embeddings:
+       - key: learned
+         load_class: LearnedEntityEmb
+         freeze: false
+         cpu: false
+         args:
+           learned_embedding_size: 200
+#           perc_emb_drop: 0.90
+           regularize_mapping: /data/data/wiki_title_0122_nowl/qid2reg_pow.csv # GENERATED IN bootleg/utils/preprocessing/build_regularization_mapping.py
+#           qid2topk_eid: /data/data/wiki_0906_pg_emm/entity_db/entity_mappings/qid2eid_top10.json
+#       - key: title
+#         load_class: TitleEmb
+#         freeze: false # Freeze the projection layer or not
+#         send_through_bert: true
+#         args:
+#           proj: 128
+#           requires_grad: false
+       - key: title_static
+         load_class: StaticEmb
+         freeze: false # Freeze the projection layer or not
+         cpu: false
+         args:
+           emb_file: /data/data/wiki_title_0122_nowl/static_wiki_0122_title.pt # GENERATED IN bootleg/utils/preprocessing/build_static_embeddings.py
+           proj: 256
+       - key: learned_type
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: hyena_types_1229.json
+           max_types: 3
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: learned_type_wiki
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: wikidata_types_1229.json
+           max_types: 3
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: learned_type_relations
+         load_class: LearnedTypeEmb
+         freeze: false
+         args:
+           type_labels: kg_relation_types_1229.json
+           max_types: 50
+           type_dim: 128
+           merge_func: addattn
+           attn_hidden_size: 128
+       - key: adj_index
+         load_class: KGIndices
+         batch_on_the_fly: true
+         normalize: false
+         args:
+           kg_adj: kg_adj_1229.txt
+  entity_dir: /data/data/wiki_title_0122_nowl/entity_db
+  max_aliases: 10
+  max_seq_len: 100
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: merged_sampled.jsonl
+    use_weak_label: true
+  test_dataset:
+    file: merged_sampled.jsonl
+    use_weak_label: true
+  train_dataset:
+    file: train.jsonl
+    use_weak_label: true
+  train_in_candidates: true
+  word_embedding:
+    cache_dir: /data/embs/pretrained_bert_models
+    freeze: false # FINE TUNE OR NOT
+    bert_model: bert-base-cased # CAN CHANGE TO ANY BERT MODEL
+    layers: 12

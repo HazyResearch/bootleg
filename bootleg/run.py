@@ -81,7 +81,7 @@ def parse_cmdline_args():
 
 def setup(config, run_config_path=None):
     """
-    Setup distributed backend and dump configuration files.
+    Setup distributed backend and save configuration files.
     Args:
         config: config
         run_config_path: path for original run config
@@ -203,12 +203,12 @@ def run_model(mode, config, run_config_path=None):
 
     """
 
-    # Set up distributed backend and dump configuration files
+    # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 
     # Load entity symbols
     log_rank_0_info(logger, f"Loading entity symbols...")
-    entity_symbols = EntitySymbols(
+    entity_symbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
@@ -311,7 +311,6 @@ def run_model(mode, config, run_config_path=None):
             and config["model_config"]["dataparallel"]
         ):
             model._to_dataparallel()
-            # raise NotImplementedError(f"Laurel is working on this")
 
     # If just finished training a model or in eval mode, run eval
     if mode in ["train", "eval"]:
@@ -327,7 +326,7 @@ def run_model(mode, config, run_config_path=None):
             )
         return scores
 
-    # If you want detailed dumps, dump model outputs
+    # If you want detailed dumps, save model outputs
     assert mode in [
         "dump_preds",
         "dump_embs",
@@ -351,7 +350,9 @@ def run_model(mode, config, run_config_path=None):
         eval_folder = eval_utils.get_eval_folder(filename)
         subeval_folder = os.path.join(eval_folder, "batch_results")
         utils.ensure_dir(subeval_folder)
-
+        # Will keep track of sentences dumped already. These will only be ones with mentions
+        all_dumped_sentences = set()
+        number_dumped_batches = 0
         all_result_files = []
         all_out_emb_files = []
         # Iterating over batches of predictions
@@ -363,7 +364,7 @@ def run_model(mode, config, run_config_path=None):
                 sentidx2num_mentions,
             )
         ):
-            result_file, out_emb_file = eval_utils.disambig_dump_preds(
+            result_file, out_emb_file, final_sent_idxs = eval_utils.disambig_dump_preds(
                 res_i,
                 config,
                 res_dict,
@@ -374,8 +375,38 @@ def run_model(mode, config, run_config_path=None):
                 dump_embs,
                 NED_TASK,
             )
+            all_dumped_sentences.update(final_sent_idxs)
             all_result_files.append(result_file)
             all_out_emb_files.append(out_emb_file)
+            number_dumped_batches += 1
+
+        # Dump the sentences that had no mentions and were not already dumped
+        # Assert all remaining sentences have no mentions
+        assert all(
+            v == 0
+            for k, v in sentidx2num_mentions.items()
+            if k not in all_dumped_sentences
+        ), f"Sentences with mentions were not dumped: {[k for k, v in sentidx2num_mentions.items() if k not in all_dumped_sentences]}"
+        empty_sentidx2row = {
+            k: v for k, v in sent_idx2row.items() if k not in all_dumped_sentences
+        }
+        empty_resultfile = eval_utils.get_result_file(
+            number_dumped_batches, subeval_folder
+        )
+        all_result_files.append(empty_resultfile)
+        # Dump the outputs
+        eval_utils.write_data_labels_single(
+            sentidx2row=empty_sentidx2row,
+            output_file=empty_resultfile,
+            filt_emb_data=None,
+            sental2embid={},
+            alias_cand_map=entity_symbols.get_alias2qids(),
+            qid2eid=entity_symbols.get_qid2eid(),
+            train_in_cands=config.data_config.train_in_candidates,
+            max_cands=entity_symbols.max_candidates,
+            dump_embs=dump_embs,
+        )
+
         log_rank_0_info(
             logger, f"Finished dumping. Merging results across accumulation steps."
         )

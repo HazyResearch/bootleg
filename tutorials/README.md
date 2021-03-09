@@ -17,5 +17,5 @@ In this [tutorial](downstream_tutorial/), we show you how to integrate Bootleg e
 In this [tutorial](https://bootleg.readthedocs.io/en/latest/gettingstarted/training.html), learn how to train a Bootleg model on a small dataset. This will cover input data formatting, data preprocessing, and training.
 
 ### Advanced Training
-In this [tutorial](https://bootleg.readthedocs.io/en/latest/advanced/distributed_training.html), learn how to use distributed training to train a Bootleg model on the full English Wikipedia dump (over 50 million sentences!). You will need access to GPUs to train this model.
+In this [tutorial](https://bootleg.readthedocs.io/en/latest/advanced/distributed_training.html), learn how to use distributed training to train a Bootleg model on the full English Wikipedia save (over 50 million sentences!). You will need access to GPUs to train this model.
 

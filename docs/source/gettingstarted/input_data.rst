@@ -17,11 +17,11 @@ Bootleg uses Wikipedia and Wikidata to collect a variety of metadata files assoc
 * ``qid2eid.json``: This is a mapping from entity id (we refer to this as QID) to an entity index used internally to extract embeddings. Note that these entity ids start at 1 (0 index is reserved for a "not in candidate list" entity). We use Wikidata QIDs in our tutorials and documentation but any string identifier will work.
 * ``qid2title.json``: This is a mapping from entity QID to entity Wikipedia title.
 * ``alias2qids.json``: This is a mapping from possible mentions (or aliases) to a list possible candidates. We restrict our candidate lists to be a predefined max length, typically 30. Each item in the list is a pair of [QID, QID score] values. The QID score is used for sorting candidates before filtering to the top 30. The scores are otherwise not used in Bootleg. This mapping is mined from both Wikipedia and Wikidata (reach out with a github issue if you want to know more).
-* ``config.json``: This gives metadata associated with the entity data. Specifically, the maximum number of candidates, the maximum number of words in any alias, and the time the dump was created.
+* ``config.json``: This gives metadata associated with the entity data. Specifically, the maximum number of candidates, the maximum number of words in any alias, and the time the save was created.
 
 Internally, we have an `EntitySymbols <../apidocs/bootleg.symbols.html#module-bootleg.symbols.entity_symbols>`_ class that loads and manages this metadata.
 
-As our ``alias2qid.json`` dump gives us our candidates for each mention, we now need to describe how we generate mentions.
+As our ``alias2qid.json`` save gives us our candidates for each mention, we now need to describe how we generate mentions.
 
 Mention Extraction
 ------------------

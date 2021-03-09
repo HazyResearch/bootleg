@@ -126,7 +126,7 @@ class KGAdjEmb(EntityEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"kg_adj_file_{file_tag}.npz")
         utils.ensure_dir(os.path.dirname(prep_file))
@@ -292,7 +292,7 @@ class KGWeightedAdjEmb(KGAdjEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"kg_adj_file_{file_tag}_{threshold}_{log_weight}.npz"

@@ -1,5 +1,6 @@
 import json
 import os
+import pathlib
 import time
 import unicodedata
 from importlib import import_module
@@ -19,9 +20,7 @@ def ensure_dir(d):
 
     Returns:
     """
-    if len(d) > 0:
-        if not os.path.exists(d):
-            os.makedirs(d, exist_ok=True)
+    pathlib.Path(d).mkdir(exist_ok=True, parents=True)
 
 
 def exists_dir(d):
@@ -32,7 +31,7 @@ def exists_dir(d):
 
     Returns:
     """
-    return os.path.exists(d)
+    return pathlib.Path(d).exists()
 
 
 def dump_json_file(filename, contents):
@@ -40,11 +39,12 @@ def dump_json_file(filename, contents):
 
     Args:
         filename: file to write to
-        contents: dictionary to dump
+        contents: dictionary to save
 
     Returns:
     """
-    ensure_dir(os.path.dirname(filename))
+    filename = pathlib.Path(filename)
+    filename.parent.mkdir(exist_ok=True, parents=True)
     with open(filename, "w") as f:
         try:
             ujson.dump(contents, f)
@@ -57,11 +57,12 @@ def dump_yaml_file(filename, contents):
 
     Args:
         filename: file to write to
-        contents: dictionary to dump
+        contents: dictionary to save
 
     Returns:
     """
-    ensure_dir(os.path.dirname(filename))
+    filename = pathlib.Path(filename)
+    filename.parent.mkdir(exist_ok=True, parents=True)
     with open(filename, "w") as f:
         yaml.dump(contents, f)
 

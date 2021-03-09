@@ -55,6 +55,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withoutkg(self):
@@ -76,6 +77,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withtype(self):
@@ -100,6 +102,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withtitle(self):
@@ -130,6 +133,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withreg(self):
@@ -164,8 +168,8 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
-
         shutil.rmtree("test/temp", ignore_errors=True)
 
     def test_end2end_bert(self):
@@ -189,8 +193,8 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        assert 17 == len([l for l in open(result_file)])
         assert os.path.exists(out_emb_file)
-
         shutil.rmtree("test/temp", ignore_errors=True)
 
 

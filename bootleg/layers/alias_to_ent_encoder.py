@@ -68,7 +68,7 @@ class AliasEntityTable(nn.Module):
         total_size = data_shape[0] * data_shape[1]
         # dependent on train_in_candidates flag
         prep_dir = data_utils.get_emb_prep_dir(data_config)
-        alias_str = os.path.splitext(data_config.alias_cand_map)[0]
+        alias_str = os.path.splitext(data_config.alias_cand_map.replace("/", "_"))[0]
         prep_file = os.path.join(
             prep_dir,
             f"alias2entity_table_{alias_str}_InC{int(data_config.train_in_candidates)}.pt",

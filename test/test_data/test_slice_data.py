@@ -44,7 +44,7 @@ class DataSlice(unittest.TestCase):
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args("test/run_args/test_data.json")
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),

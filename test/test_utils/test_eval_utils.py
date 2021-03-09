@@ -23,6 +23,7 @@ class EntitySymbolsSubclass(EntitySymbols):
         self.max_alias_len = 1
         self._qid2title = {"Q1": "a b c d e", "Q2": "f", "Q3": "dd a b", "Q4": "x y z"}
         self._qid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+        self._alias2id = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6}
         self._alias2qids = {
             "a": [["Q1", 10.0], ["Q4", 6]],
             "b": [["Q2", 5.0], ["Q1", 3]],
@@ -421,7 +422,7 @@ class EvalUtils(unittest.TestCase):
             alias_cand_map=alias_cand_map,
         )
         entity_symbols = EntitySymbolsSubclass()
-        entity_symbols.dump(save_dir=os.path.join(entity_dir, entity_map_dir))
+        entity_symbols.save(save_dir=os.path.join(entity_dir, entity_map_dir))
 
         num_examples = 3
         total_num_mentions = 7

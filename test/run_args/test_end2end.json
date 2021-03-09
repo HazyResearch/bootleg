@@ -29,7 +29,8 @@
         "type_prediction": {
             "use_type_pred": false,
             "num_types": 3,
-            "file": "type_pred_mapping.json"
+            "type_labels": "type_pred_mapping.json",
+            "type_vocab": "type_pred_vocab.json"
         },
         "word_embedding":
         {
@@ -53,6 +54,7 @@
                "freeze": false,
                "args": {
                    "type_labels": "type_pred_mapping.json",
+                   "type_vocab": "type_pred_vocab.json",
                    "max_types": 1,
                    "type_dim": 10,
                    "merge_func": "addattn",

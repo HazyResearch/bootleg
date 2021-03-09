@@ -185,7 +185,7 @@ class LearnedEntityEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = os.path.splitext(os.path.basename(reg_file))[0]
+        reg_str = os.path.splitext(os.path.basename(reg_file.replace("/", "_")))[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_regularization_mapping_{reg_str}.pt"
@@ -431,7 +431,7 @@ class TopKEntityEmb(EntityEmb):
                     emb_args.regularize_mapping,
                 )
         # Keep this mapping so a topK model can simply be loaded without needing the new eid mapping
-        self.register_buffer("eid2topkeid", eid2topkeid)
+        self.register_buffer("eid2topkeid", eid2topkeid, persistent=False)
         self.register_buffer("eid2reg", eid2reg)
 
     def load_regularization_mapping(
@@ -454,7 +454,7 @@ class TopKEntityEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = reg_file.split(".csv")[0]
+        reg_str = reg_file.replace("/", "_").split(".csv")[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_topk_regularization_mapping_{reg_str}.pt"
@@ -604,7 +604,9 @@ class StaticEmb(EntityEmb):
 
         Returns: numpy embedding array where each row is the embedding for an EID
         """
-        static_str = os.path.splitext(os.path.basename(emb_args.emb_file))[0]
+        static_str = os.path.splitext(
+            os.path.basename(emb_args.emb_file.replace("/", "_"))
+        )[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"static_table_{static_str}.npy")
         log_rank_0_debug(logger, f"Looking for static embedding saved at {prep_file}")

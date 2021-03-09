@@ -81,9 +81,13 @@ config_args = {
         "print_examples_prep": (False, "whether to print examples during prep or not"),
         "type_prediction": {
             "use_type_pred": (False, "whether to add type prediction or not"),
-            "file": (
+            "type_labels": (
                 "types_coarse.json",
-                "type file from qid to list of type ids",
+                "type file from qid to list of type ids or type names",
+            ),
+            "type_vocab": (
+                "vocab_coarse.json",
+                "type vocab file from typename to type id",
             ),
             "num_types": (5, "number of types for prediction"),
             "dim": (128, "type dimension"),

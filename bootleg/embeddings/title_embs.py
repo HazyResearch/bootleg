@@ -107,9 +107,15 @@ class TitleEmb(EntityEmb):
             data_config=main_args.data_config,
             entity_symbols=entity_symbols,
         )
-        self.register_buffer("entity2titleid_table", entity2titleid_table)
-        self.register_buffer("entity2titlemask_table", entity2titlemask_table)
-        self.register_buffer("entity2tokentypeid_table", entity2tokentypeid_table)
+        self.register_buffer(
+            "entity2titleid_table", entity2titleid_table, persistent=False
+        )
+        self.register_buffer(
+            "entity2titlemask_table", entity2titlemask_table, persistent=False
+        )
+        self.register_buffer(
+            "entity2tokentypeid_table", entity2tokentypeid_table, persistent=False
+        )
 
     @classmethod
     def prep(cls, data_config, entity_symbols):

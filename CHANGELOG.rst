@@ -37,7 +37,7 @@ Added
 Changed
 ^^^^^^^^
 * Mention extraction code and alias map has been updated
-* Models trained on October 2020 dump of Wikipedia
+* Models trained on October 2020 save of Wikipedia
 * Have uncased and cased models
 
 Removed

@@ -143,7 +143,7 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
 
     Args:
         sentence: text
-        all_aliases: Trie of all aliases in our dump
+        all_aliases: Trie of all aliases in our save
         max_alias_len: maximum length (in words) of an alias
 
     Returns: list of aliases, list of span offsets
