@@ -261,6 +261,7 @@ def batched_pred_iter(
         final_gold_d = defaultdict(list)
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
+        # print("FINALIZE", cur_sentidx_nummen, sent_idx2num_mentions)
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
                 len(cur_mention_set) <= sent_idx2num_mentions[str(sent_idx)]
