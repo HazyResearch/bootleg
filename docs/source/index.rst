@@ -11,19 +11,20 @@ submit your contributions as a pull request.
 .. _Bootleg: https://github.com/HazyResearch/bootleg
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
     :caption: Getting Started
 
     gettingstarted/install
     gettingstarted/quickstart
     gettingstarted/emmental
-    gettingstarted/config
+    gettingstarted/entity_profile
     gettingstarted/input_data
     gettingstarted/model
     gettingstarted/training
+    gettingstarted/config
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
     :caption: Advanced
 
     advanced/distributed_training

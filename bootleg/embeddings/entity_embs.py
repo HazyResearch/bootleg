@@ -215,8 +215,9 @@ class LearnedEntityEmb(EntityEmb):
             # default of no mask
             eid2reg_arr = [0.0] * entity_symbols.num_entities_with_pad_and_nocand
             for row_idx, row in qid2reg.iterrows():
-                eid = entity_symbols.get_eid(row["qid"])
-                eid2reg_arr[eid] = row["regularization"]
+                if entity_symbols.qid_exists(row["qid"]):
+                    eid = entity_symbols.get_eid(row["qid"])
+                    eid2reg_arr[eid] = row["regularization"]
             eid2reg = torch.tensor(eid2reg_arr)
             torch.save(eid2reg, prep_file)
             log_rank_0_debug(
@@ -426,17 +427,19 @@ class TopKEntityEmb(EntityEmb):
                 )
                 eid2reg = self.load_regularization_mapping(
                     main_args.data_config,
+                    entity_symbols,
                     qid2topk_eid,
                     num_topk_entities_with_pad_and_nocand,
                     emb_args.regularize_mapping,
                 )
         # Keep this mapping so a topK model can simply be loaded without needing the new eid mapping
-        self.register_buffer("eid2topkeid", eid2topkeid, persistent=False)
+        self.register_buffer("eid2topkeid", eid2topkeid)
         self.register_buffer("eid2reg", eid2reg)
 
     def load_regularization_mapping(
         cls,
         data_config,
+        entity_symbols,
         qid2topk_eid,
         num_entities_with_pad_and_nocand,
         reg_file,
@@ -448,6 +451,7 @@ class TopKEntityEmb(EntityEmb):
 
         Args:
             data_config: data config
+            entity_symbols: entity symbols
             qid2topk_eid: Dict from QID to eid in the topK entity embedding
             num_entities_with_pad_and_nocand: number of entities including pad and null candidate option
             reg_file: regularization csv file
@@ -484,8 +488,9 @@ class TopKEntityEmb(EntityEmb):
             # default of no mask
             eid2reg_arr = [0.0] * num_entities_with_pad_and_nocand
             for row_idx, row in qid2reg.iterrows():
-                eid = qid2topk_eid[row["qid"]]
-                eid2reg_arr[eid] = row["regularization"]
+                if entity_symbols.qid_exists(row["qid"]):
+                    eid = qid2topk_eid[row["qid"]]
+                    eid2reg_arr[eid] = row["regularization"]
             eid2reg = torch.tensor(eid2reg_arr)
             torch.save(eid2reg, prep_file)
             log_rank_0_debug(
@@ -604,9 +609,7 @@ class StaticEmb(EntityEmb):
 
         Returns: numpy embedding array where each row is the embedding for an EID
         """
-        static_str = os.path.splitext(
-            os.path.basename(emb_args.emb_file.replace("/", "_"))
-        )[0]
+        static_str = os.path.splitext(os.path.basename(emb_args.emb_file))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"static_table_{static_str}.npy")
         log_rank_0_debug(logger, f"Looking for static embedding saved at {prep_file}")
@@ -646,6 +649,8 @@ class StaticEmb(EntityEmb):
         Returns: numpy embedding matrix where each row is an emedding
         """
         ending = os.path.splitext(emb_file)[1]
+        found = 0
+        raw_num_ents = 0
         if ending == ".json":
             dct = utils.load_json_file(emb_file)
             val = next(iter(dct.values()))
@@ -666,34 +671,49 @@ class StaticEmb(EntityEmb):
             entity2staticemb_table = np.zeros(
                 (entity_symbols.num_entities_with_pad_and_nocand, embedding_size)
             )
-            found = 0
+            raw_num_ents = len(embeddings)
             for qid in tqdm(entity_symbols.get_all_qids()):
                 if qid in embeddings:
                     found += 1
                     emb = embeddings[qid]
                     eid = entity_symbols.get_eid(qid)
                     entity2staticemb_table[eid, :embedding_size] = emb
-            log_rank_0_debug(
-                logger,
-                f"Found {found/len(entity_symbols.get_all_qids())} percent of all entities have a static embedding",
-            )
         elif ending == ".pt":
             log_rank_0_debug(
                 logger,
                 f"We are readining in the embedding file from a .pt. We assume this is already mapped to eids",
             )
-            entity2staticemb_table = torch.load(emb_file).detach().cpu().numpy()
-            assert (
-                entity2staticemb_table.shape[0]
-                == entity_symbols.num_entities_with_pad_and_nocand
-            ), (
-                f"To load a saved pt file, it must be of shape {entity_symbols.num_entities_with_pad_and_nocand} "
-                f"which is in eid space with the number of entities (including PAD and UNK)"
+            (qid2eid_map, entity2staticemb_table_raw) = torch.load(emb_file)
+            entity2staticemb_table_raw = (
+                entity2staticemb_table_raw.detach().cpu().numpy()
             )
+            raw_num_ents = entity2staticemb_table_raw.shape[0]
+            # +2 handles the PAD and UNK entities
+            assert (
+                entity2staticemb_table_raw.shape[0] == len(qid2eid_map) + 2
+            ), f"The saved static embeddings file had mismatched shapes between qid2eid {len(qid2eid_map)} and weights {entity2staticemb_table.shape[0]}"
+            entity2staticemb_table = np.zeros(
+                (
+                    entity_symbols.num_entities_with_pad_and_nocand,
+                    entity2staticemb_table_raw.shape[1],
+                )
+            )
+            found = 0
+            for qid in tqdm(entity_symbols.get_all_qids()):
+                if qid in qid2eid_map:
+                    found += 1
+                    raw_eid = qid2eid_map[qid]
+                    emb = entity2staticemb_table_raw[raw_eid]
+                    new_eid = entity_symbols.get_eid(qid)
+                    entity2staticemb_table[new_eid, :] = emb
         else:
             raise ValueError(
                 f"We do not support static embeddings from {ending}. We only support .json and .pt"
             )
+        log_rank_0_debug(
+            logger,
+            f"Found {found} ({found/len(entity_symbols.get_all_qids())} percent) of all entities after reading {raw_num_ents} original entities have a static embedding",
+        )
         return entity2staticemb_table
 
     def forward(self, entity_cand_eid, batch_on_the_fly_data):

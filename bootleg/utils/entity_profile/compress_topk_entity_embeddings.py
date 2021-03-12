@@ -34,6 +34,7 @@ from collections import OrderedDict
 import numpy as np
 import torch
 import ujson as json
+import yaml
 from tqdm import tqdm
 
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -56,31 +57,13 @@ def parse_args():
         help="Percentage of embeddings to remove by popularity",
     )
     parser.add_argument(
-        "--alias_cand_map_file",
-        type=str,
-        default="alias2qids.json",
-        help="Name of file to read the alias2qids in the entity_dir",
-    )
-    parser.add_argument(
         "--save_qid2topk_file",
         type=str,
         required=True,
         help="Where to save topk qid2eid mapping in entity_db/entity_mappings",
     )
     parser.add_argument(
-        "--save_qid2topk_reg_file",
-        type=str,
-        required=True,
-        help="Where to save topk qid2reg mapping",
-    )
-    parser.add_argument(
         "--entity_dir", type=str, required=True, help="Directory to read entity_db"
-    )
-    parser.add_argument(
-        "--entity_map_dir",
-        type=str,
-        default="entity_mappings",
-        help="Directory to read entity_mappings inside entity_dir",
     )
     parser.add_argument(
         "--model_path",
@@ -89,9 +72,22 @@ def parse_args():
         help="Which model to load. If empty, we just generate the entity mappings",
     )
     parser.add_argument(
-        "--save_checkpoint",
+        "--model_config",
         type=str,
-        help="Where to save the model. If empty, we just generate the entity mappings",
+        default=None,
+        help="If you'd like us to also modify the run config to use the new profile/model, pass in the path here",
+    )
+    parser.add_argument(
+        "--save_model_path",
+        type=str,
+        required=True,
+        help="Where to save the model.",
+    )
+    parser.add_argument(
+        "--save_model_config",
+        type=str,
+        default=None,
+        help="Where to save the config if it was passed in.",
     )
     args = parser.parse_args()
     return args
@@ -166,17 +162,14 @@ def load_statedict(model_path):
 
 def filter_qids(perc_emb_drop, entity_db, qid2count):
     """Creates a new QID -> EID mapping to have the top (1-perc_emb_drop)
-    percent most popular entities. Also creates a regularization mapping if
-    needed that adds 95% regularization on the single toe embedding (this toe
-    embedding replaces the perc_emb_drop entities). This does not have to be
-    used.
+    percent most popular entities.
 
     Args:
         perc_emb_drop: percent to drop
         entity_db: entity save
         qid2count: qid to count in training data dictionary
 
-    Returns: qid2topk_eid, qid2topk_reg, old2new_eid, new_toes_eid, num_topk_entities
+    Returns: qid2topk_eid, old2new_eid, new_toes_eid, num_topk_entities
     """
     old2new_eid = {}
     print(f"Removing the least popular {perc_emb_drop} embeddings")
@@ -207,22 +200,17 @@ def filter_qids(perc_emb_drop, entity_db, qid2count):
     # We start indexing eids by 1 (0 is reserved). So the +1 is correct for an index for an eid.
     num_topk_entities = len(qid2count_list) - to_drop + 1
     new_toes_eid = num_topk_entities
-    new_toes_reg = 0.95
-    non_toes_reg = 0.05
     new_eid_idx = 1
     # Build qid2neweid mapping
     qid2topk_eid = {}
-    qid2topk_reg = {}
     for i, qid_pair in enumerate(qid2count_list):
         qid = qid_pair[0]
         eid = entity_db.get_eid(qid)
         if i < to_drop:
             qid2topk_eid[qid] = new_toes_eid
-            qid2topk_reg[qid] = new_toes_reg
             old2new_eid[old_toes_eid] = new_toes_eid
         else:
             qid2topk_eid[qid] = new_eid_idx
-            qid2topk_reg[qid] = non_toes_reg
             old2new_eid[eid] = new_eid_idx
             new_eid_idx += 1
     assert -1 not in old2new_eid
@@ -233,7 +221,7 @@ def filter_qids(perc_emb_drop, entity_db, qid2count):
         new_eid_idx == new_toes_eid
     ), f"{new_eid_idx} is not {new_toes_eid} {to_drop} {old_toes_eid} {perc_emb_drop} {len(qid2count_list)} {num_topk_entities}"
     assert len(qid2topk_eid) == entity_db.num_entities
-    return qid2topk_eid, qid2topk_reg, old2new_eid, new_toes_eid, num_topk_entities
+    return qid2topk_eid, old2new_eid, new_toes_eid, num_topk_entities
 
 
 def filter_embs(
@@ -290,29 +278,58 @@ def filter_embs(
     return state_dict
 
 
-def main():
-    args = parse_args()
-    print(json.dumps(args, indent=4))
+def modify_config(
+    old_config_path, new_config_path, model_save_path, eidsave_path, perc_emb_drop
+):
+    """Modifies the old config with the new profile and model for running.
+
+    Args:
+        old_config_path: old config path
+        new_config_path: new config path
+        model_save_path: model path to load
+        new_entity_path: path to new profile
+
+    Returns:
+    """
+    with open(old_config_path) as file:
+        old_config = yaml.load(file, Loader=yaml.FullLoader)
+
+    if "emmental" not in old_config:
+        old_config["emmental"] = {}
+    old_config["emmental"]["model_path"] = model_save_path
+
+    for ent in old_config["data_config"]["ent_embeddings"]:
+        if ent["load_class"] == "LearnedEntityEmb":
+            ent["load_class"] = "TopKEntityEmb"
+            del ent["args"]["regularize_mapping"]
+            ent["args"]["perc_emb_drop"] = perc_emb_drop
+            ent["args"]["qid2topk_eid"] = str(eidsave_path)
+
+    with open(new_config_path, "w") as file:
+        yaml.dump(old_config, file)
+    print(f"Dumped config to {new_config_path}")
+
+
+def compress_topk_embeddings(args):
     assert 0 < args.perc_emb_drop < 1, f"perc_emb_drop must be between 0 and 1"
     print(
-        f"Loading entity symbols from {os.path.join(args.entity_dir, args.entity_map_dir)}"
+        f"Loading entity symbols from {os.path.join(args.entity_dir, 'entity_mappings')}"
     )
     entity_db = EntitySymbols.load_from_cache(
-        os.path.join(args.entity_dir, args.entity_map_dir), args.alias_cand_map_file
+        os.path.join(args.entity_dir, "entity_mappings")
     )
     print(f"Loading qid2count from {args.qid2count}")
     qid2count = utils.load_json_file(args.qid2count)
     print(f"Filtering qids")
     (
         qid2topk_eid,
-        qid2topk_reg,
         old2new_eid,
         toes_eid,
         new_num_topk_entities,
     ) = filter_qids(args.perc_emb_drop, entity_db, qid2count)
     if len(args.model_path) > 0:
         assert (
-            len(args.save_checkpoint) > 0
+            args.save_model_path is not None and len(args.save_model_path) > 0
         ), f"If you give a model path, you must give a save checkpoint"
         print(f"Filtering embeddings")
         state_dict, model_state_dict = load_statedict(args.model_path)
@@ -352,21 +369,27 @@ def main():
             )
         print(model_state_dict["module_pool"]["learned"].keys())
         state_dict["model"] = model_state_dict
-        print(f"Saving model at {args.save_checkpoint}")
-        torch.save(state_dict, args.save_checkpoint)
+        print(f"Saving model at {args.save_model_path}")
+        torch.save(state_dict, args.save_model_path)
     print(
-        f"Saving topk to eid at {os.path.join(args.entity_dir, args.entity_map_dir, args.save_qid2topk_file)}"
+        f"Saving topk to eid at {os.path.join(args.entity_dir, 'entity_mappings', args.save_qid2topk_file)}"
     )
     utils.dump_json_file(
-        os.path.join(args.entity_dir, args.entity_map_dir, args.save_qid2topk_file),
+        os.path.join(args.entity_dir, "entity_mappings", args.save_qid2topk_file),
         qid2topk_eid,
     )
-    print(f"Saving topk to reg at {args.save_qid2topk_reg_file}")
-    with open(args.save_qid2topk_reg_file, "w") as out_f:
-        out_f.write(f"qid,regularization\n")
-        for k, v in qid2topk_reg.items():
-            out_f.write(f"{k},{v}\n")
+
+    if args.model_config is not None:
+        modify_config(
+            args.model_config,
+            args.save_model_config,
+            args.save_model_path,
+            os.path.join(args.entity_dir, "entity_mappings", args.save_qid2topk_file),
+            args.perc_emb_drop,
+        )
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    print(json.dumps(vars(args), indent=4))
+    compress_topk_embeddings(args)

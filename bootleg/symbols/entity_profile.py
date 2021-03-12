@@ -32,6 +32,9 @@ class EntityObj(BaseModel):
 
 
 class EntityProfile:
+    """Entity Profile object to handle and manage entity, type, and KG
+    metadata."""
+
     def __init__(
         self,
         entity_symbols,
@@ -47,6 +50,13 @@ class EntityProfile:
         self._kg_symbols = kg_symbols
 
     def save(self, save_dir):
+        """Save the profile.
+
+        Args:
+            save_dir: save directory
+
+        Returns:
+        """
         save_dir = Path(save_dir)
         self._entity_symbols.save(save_dir / ENTITY_SUBFOLDER)
         for type_sys in self._type_systems:
@@ -54,8 +64,33 @@ class EntityProfile:
         self._kg_symbols.save(save_dir / KG_SUBFOLDER)
 
     @classmethod
-    def load_from_cache(cls, load_dir, edit_mode=False, verbose=False):
+    def load_from_cache(
+        cls, load_dir, edit_mode=False, verbose=False, type_systems=None
+    ):
+        """Loaded a pre-saved profile.
+
+        Args:
+            load_dir: load directory
+            edit_mode: edit mode flag
+            verbose: verbose flag
+            type_systems: list of type systems to load (useful if wanting to only look at one)
+
+        Returns: entity profile object
+        """
+        # Check type system input
         load_dir = Path(load_dir)
+        type_subfolder = load_dir / TYPE_SUBFOLDER
+        if type_systems is not None:
+            if not isinstance(type_systems, list):
+                raise ValueError(
+                    f"`type_systems` must be a list of subfolders in {type_subfolder}"
+                )
+            for sys in type_systems:
+                if sys not in list(type_subfolder.iterdir()):
+                    raise ValueError(
+                        f"`type_systems` must be a list of subfolders in {type_subfolder}"
+                    )
+
         if verbose:
             print("Loading Entity Symbols")
         entity_symbols = EntitySymbols.load_from_cache(
@@ -63,13 +98,12 @@ class EntityProfile:
             edit_mode=edit_mode,
             verbose=verbose,
         )
-        type_systems = {}
-        type_subfolder = load_dir / TYPE_SUBFOLDER
+        type_sys_dict = {}
         for fold in type_subfolder.iterdir():
-            if fold.is_dir():
+            if (type_systems is None or fold in type_systems) and fold.is_dir():
                 if verbose:
                     print(f"Loading Type Symbols from {fold}")
-                type_systems[fold.name] = TypeSymbols.load_from_cache(
+                type_sys_dict[fold.name] = TypeSymbols.load_from_cache(
                     type_subfolder / fold.name,
                     edit_mode=edit_mode,
                     verbose=verbose,
@@ -81,7 +115,7 @@ class EntityProfile:
             edit_mode=edit_mode,
             verbose=verbose,
         )
-        return cls(entity_symbols, type_systems, kg_symbols, edit_mode, verbose)
+        return cls(entity_symbols, type_sys_dict, kg_symbols, edit_mode, verbose)
 
     @classmethod
     def load_from_jsonl(
@@ -92,6 +126,31 @@ class EntityProfile:
         max_kg_connections=100,
         edit_mode=False,
     ):
+        """Loads an entity profile from the raw jsonl file. Each line is a JSON
+        object with entity metadata.
+
+        Example object::
+
+            {
+                "entity_id": "C000",
+                "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+                "title": "Dog",
+                "types": {"hyena": ["animal"], "wiki": ["dog"]},
+                "relations": [
+                    {"relation": "sibling", "object": "Q345"},
+                    {"relation": "sibling", "object": "Q567"},
+                ],
+            }
+
+        Args:
+            profile_file: file where jsonl data lives
+            max_candidates: maximum entity candidates
+            max_types: maximum types per entity
+            max_kg_connections: maximum KG connections per entity
+            edit_mode: edit mode
+
+        Returns: entity profile object
+        """
         qid2title, alias2qids, type_systems, qid2relations = cls._read_profile_file(
             profile_file
         )
@@ -115,6 +174,13 @@ class EntityProfile:
 
     @classmethod
     def _read_profile_file(cls, profile_file):
+        """Helper method for reading profile data.
+
+        Args:
+            profile_file: file where jsonl data lives
+
+        Returns: Dicts of qid2title, alias2qids, type_systems, qid2relations
+        """
         qid2title: Dict[str, str] = {}
         alias2qids: Dict[str, list] = {}
         type_systems: Dict[str, Dict[str, List[str]]] = {}
@@ -181,25 +247,93 @@ class EntityProfile:
                 qid2relations[qid] = {}
         return qid2title, alias2qids, type_systems, qid2relations
 
+    # To quickly get the mention scores, the object must be in edit mode
+    @edit_op
+    def save_to_jsonl(self, profile_file):
+        """Dump the entity dump to jsonl format.
+
+        Args:
+            profile_file: file to save the data
+
+        Returns:
+        """
+        with open(profile_file, "w") as out_f:
+            for qid in tqdm(self.get_all_qids(), disable=not self.verbose):
+                mentions = self.get_mentions_with_scores(qid)
+                title = self.get_title(qid)
+                ent_type_sys = {}
+                for type_sys in self._type_systems:
+                    types = self.get_types(qid, type_sys)
+                    if len(types) > 0:
+                        ent_type_sys[type_sys] = types
+                relations = []
+                all_connections = self.get_all_connections(qid)
+                for rel in all_connections:
+                    for qid2 in all_connections[rel]:
+                        relations.append({"relation": rel, "object": qid2})
+                ent_obj = {
+                    "entity_id": qid,
+                    "mentions": mentions,
+                    "title": title,
+                }
+                if len(ent_type_sys) > 0:
+                    ent_obj["types"] = ent_type_sys
+                if len(relations) > 0:
+                    ent_obj["relations"] = relations
+                out_f.write(ujson.dumps(ent_obj) + "\n")
+
     # ============================================================
     # GETTERS
     # ============================================================
     def qid_exists(self, qid):
+        """Checks if QID exists.
+
+        Args:
+            qid: entity QID
+
+        Returns: Boolean
+        """
         return self._entity_symbols.qid_exists(qid)
 
     def mention_exists(self, mention):
+        """Checks if mention exists.
+
+        Args:
+            mention: mention
+
+        Returns: Boolean
+        """
         return self._entity_symbols.alias_exists(mention)
 
     def get_all_qids(self):
+        """Returns all entity QIDs.
+
+        Returns: List of strings
+        """
         return self._entity_symbols.get_all_qids()
 
     def get_all_mentions(self):
+        """Returns list of all mentions.
+
+        Returns: List of strings
+        """
         return self._entity_symbols.get_all_aliases()
 
     def get_all_typesystems(self):
+        """Returns list of all type systems.
+
+        Returns: List of strings
+        """
         return list(self._type_systems.keys())
 
     def get_all_types(self, type_system):
+        """Returns list of all type names for a type system.
+
+        Args:
+            type_system: type system
+
+        Returns: List of strings
+        """
         if type_system not in self._type_systems:
             raise ValueError(
                 f"The type system {type_system} is not one of {self._type_systems.keys()}"
@@ -208,25 +342,66 @@ class EntityProfile:
 
     @check_qid_exists
     def get_title(self, qid):
+        """Gets the title of an entity QID.
+
+        Args:
+            qid: entity QID
+
+        Returns: string
+        """
         return self._entity_symbols.get_title(qid)
 
     @check_qid_exists
     def get_eid(self, qid):
+        """Gets the entity EID (internal number) of an entity QID.
+
+        Args:
+            qid: entity QID
+
+        Returns: integer
+        """
         return self._entity_symbols.get_eid(qid)
 
     @check_qid_exists
-    def get_qid_cands(self, qid):
-        return self._entity_symbols.get_qid_cands(qid)
+    def get_qid_cands(self, mention):
+        """Gets the entity QID candidates of the mention.
+
+        Args:
+            qid: mention
+
+        Returns: List of QIDs
+        """
+        return self._entity_symbols.get_qid_cands(mention)
 
     @check_qid_exists
     def get_qid_count_cands(self, qid):
+        """Gets the entity QID candidates with their scores of the mention.
+
+        Args:
+            qid: entity QID
+
+        Returns: List of tuples [QID, score]
+        """
         return self._entity_symbols.get_qid_count_cands(qid)
 
     def get_num_entities_with_pad_and_nocand(self):
+        """Gets the number of entities including a PAD and UNK entity.
+
+        Returns: integer
+        """
         return self._entity_symbols.num_entities_with_pad_and_nocand
 
     @check_qid_exists
     def get_types(self, qid, type_system):
+        """Gets the type names associated with the given QID for the
+        ``type_system`` system.
+
+        Args:
+            qid: QID
+            type_system: type system
+
+        Returns: list of typename strings
+        """
         if type_system not in self._type_systems:
             raise ValueError(
                 f"The type system {type_system} is not one of {self._type_systems.keys()}"
@@ -235,14 +410,38 @@ class EntityProfile:
 
     @check_qid_exists
     def get_connections_by_relation(self, qid, relation):
+        """Returns list of other_qids connected to ``qid`` by relation.
+
+        Args:
+            qid: QID
+            relation: relation
+
+        Returns: List
+        """
         return self._kg_symbols.get_connections_by_relation(qid, relation)
 
     @check_qid_exists
     def get_all_connections(self, qid):
+        """Returns dictionary of relation -> list of other_qids connected to
+        ``qid`` by relation.
+
+        Args:
+            qid: QID
+
+        Returns: Dict
+        """
         return self._kg_symbols.get_all_connections(qid)
 
     @check_qid_exists
     def is_connected(self, qid, qid2):
+        """Checks if two QIDs are connected in KG.
+
+        Args:
+            qid: QID one
+            qid2: QID two
+
+        Returns: boolean
+        """
         self._kg_symbols.is_connected(qid, qid2)
 
     # ============================================================
@@ -253,15 +452,38 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def get_mentions(self, qid):
+        """Gets the mentions for the QID.
+
+        Args:
+            qid: QID
+
+        Returns: List of mentions
+        """
         return self._entity_symbols.get_mentions(qid)
 
     @edit_op
     @check_qid_exists
     def get_mentions_with_scores(self, qid):
+        """Gets the mentions with thier scores associated with the QID.
+
+        Args:
+            qid: QID
+
+        Returns: List of tuples [mention, score]
+        """
         return self._entity_symbols.get_mentions_with_scores(qid)
 
     @edit_op
     def get_entities_of_type(self, typename, type_system):
+        """Get all entities of type ``typename`` for type system
+        ``type_system``
+
+        Args:
+            typename: type name
+            type_system: type system
+
+        Returns: List of QIDs
+        """
         if type_system not in self._type_systems:
             raise ValueError(
                 f"The type system {type_system} is not one of {self._type_systems.keys()}"
@@ -271,6 +493,13 @@ class EntityProfile:
     # UPDATES
     @edit_op
     def add_entity(self, entity_obj):
+        """Add entity to our dump.
+
+        Args:
+            entity_obj: JSON object of entity metadata
+
+        Returns:
+        """
         if (
             type(entity_obj) is not dict
             or "entity_id" not in entity_obj
@@ -329,6 +558,14 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def reidentify_entity(self, qid, new_qid):
+        """Rename ``qid`` to ``new_qid``
+
+        Args:
+            qid: old QID
+            new_qid: new QID
+
+        Returns:
+        """
         # We assume this is a new entity
         if self._entity_symbols.qid_exists(new_qid):
             raise ValueError(
@@ -341,6 +578,14 @@ class EntityProfile:
 
     @edit_op
     def update_entity(self, entity_obj):
+        """Updates the metadata associated with the entity. The entity must
+        already be in our dump to be updated.
+
+        Args:
+            entity_obj: JSON of entity metadata.
+
+        Returns:
+        """
         if (
             type(entity_obj) is not dict
             or "entity_id" not in entity_obj
@@ -389,6 +634,13 @@ class EntityProfile:
 
     @edit_op
     def prune_to_entities(self, entities_to_keep):
+        """Remove all entities except those in ``entities_to_keep``.
+
+        Args:
+            entities_to_keep: List or Set of entities to keep
+
+        Returns:
+        """
         entities_to_keep = set(entities_to_keep)
         # Check that all entities to keep actually exist
         for qid in entities_to_keep:
@@ -410,6 +662,15 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def add_type(self, qid, type, type_system):
+        """Add type to QID in for the given type system.
+
+        Args:
+            qid: QID
+            type: type name
+            type_system: type system
+
+        Returns:
+        """
         if type_system not in self._type_systems:
             raise ValueError(
                 f"The type system {type_system} is not one of {self._type_systems.keys()}"
@@ -419,16 +680,43 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def add_relation(self, qid, relation, qid2):
+        """Add the relation triple.
+
+        Args:
+            qid: head QID
+            relation: relation
+            qid2: tail QID
+
+        Returns:
+        """
         self._kg_symbols.add_relation(qid, relation, qid2)
 
     @edit_op
     @check_qid_exists
     def add_mention(self, qid: str, mention: str, score: float):
+        """Adds the mention with its score to the QID.
+
+        Args:
+            qid: QID
+            mention: mention
+            score: score
+
+        Returns:
+        """
         self._entity_symbols.add_mention(qid, mention, score)
 
     @edit_op
     @check_qid_exists
     def remove_type(self, qid, type, type_system):
+        """Remove the type from QID in the given type system.
+
+        Args:
+            qid: QID
+            type: type to remove
+            type_system: type system
+
+        Returns:
+        """
         if type_system not in self._type_systems:
             raise ValueError(
                 f"The type system {type_system} is not one of {self._type_systems.keys()}"
@@ -438,9 +726,26 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def remove_relation(self, qid, relation, qid2):
+        """Remove the relation triple.
+
+        Args:
+            qid: head QID
+            relation: relation
+            qid2: tail QID
+
+        Returns:
+        """
         self._kg_symbols.remove_relation(qid, relation, qid2)
 
     @edit_op
     @check_qid_exists
     def remove_mention(self, qid, mention):
+        """Remove the mention from being associated with the QID.
+
+        Args:
+            qid: QID
+            mention: mention
+
+        Returns:
+        """
         self._entity_symbols.remove_mention(qid, mention)

@@ -12,6 +12,8 @@ from bootleg.utils import utils
 
 
 class TypeSymbols:
+    """Type Symbols class for managing type metadata."""
+
     def __init__(
         self,
         qid2typenames: Dict[str, List[str]],
@@ -109,6 +111,8 @@ class TypeSymbols:
         Args:
             load_dir: directory to load from
             prefix: prefix to add to beginning to file
+            edit_mode: edit mode flag
+            verbose: verbose flag
 
         Returns: TypeSymbols
         """
@@ -158,6 +162,13 @@ class TypeSymbols:
     # ============================================================
     @edit_op
     def get_entities_of_type(self, typename):
+        """Get all entity QIDs of type ``typename``.
+
+        Args:
+            typename: typename
+
+        Returns: List
+        """
         if typename not in self._type_vocab:
             raise ValueError(f"{typename} is not a type in the typesystem")
         # This will not be None as we are in edit mode
@@ -165,6 +176,15 @@ class TypeSymbols:
 
     @edit_op
     def add_type(self, qid, typename):
+        """Adds the type to the QID. If the QID already has maximum types, the
+        last type is removed and replaced by ``typename``.
+
+        Args:
+            qid: QID
+            typename: type name
+
+        Returns:
+        """
         if typename not in self._type_vocab:
             raise ValueError(
                 f"The type {typename} is not in our vocab. We only support adding types in our vocab."
@@ -187,6 +207,14 @@ class TypeSymbols:
 
     @edit_op
     def remove_type(self, qid, typename):
+        """Remove the type from the QID.
+
+        Args:
+            qid: QID
+            typename: type name to remove
+
+        Returns:
+        """
         if typename not in self._type_vocab:
             raise ValueError(
                 f"The type {typename} is not in our vocab. We only support adding types in our vocab."
@@ -208,6 +236,15 @@ class TypeSymbols:
 
     @edit_op
     def add_entity(self, qid, types):
+        """
+        Add an entity QID with its types to our mappings
+        Args:
+            qid: QID
+            types: list of type names
+
+        Returns:
+
+        """
         for typename in types:
             if typename not in self._type_vocab:
                 raise ValueError(
@@ -229,6 +266,14 @@ class TypeSymbols:
 
     @edit_op
     def reidentify_entity(self, old_qid, new_qid):
+        """Rename ``old_qid`` to ``new_qid``.
+
+        Args:
+            old_qid: old QID
+            new_qid: new QID
+
+        Returns:
+        """
         assert (
             old_qid in self._qid2typenames and new_qid not in self._qid2typenames
         ), f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} failed"
@@ -245,6 +290,13 @@ class TypeSymbols:
 
     @edit_op
     def prune_to_entities(self, entities_to_keep):
+        """Remove all entities except those in ``entities_to_keep``.
+
+        Args:
+            entities_to_keep: Set of entities to keep
+
+        Returns:
+        """
         # Update qid2typenames
         self._qid2typenames = {
             k: v for k, v in self._qid2typenames.items() if k in entities_to_keep

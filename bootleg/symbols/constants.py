@@ -1,5 +1,7 @@
 """Constants."""
 
+from functools import wraps
+
 UNK_AL = "_unk_"
 PAD = "<pad>"
 UNK_ID = 0
@@ -44,6 +46,7 @@ PRED_LAYER = "pred_layer"
 
 # profile constants/utils wrappers
 def edit_op(func):
+    @wraps(func)
     def wrapper_check_edit_mode(obj, *args, **kwargs):
         if obj.edit_mode is False:
             raise AttributeError(f"You must load object in edit_mode=True")
@@ -53,6 +56,7 @@ def edit_op(func):
 
 
 def check_qid_exists(func):
+    @wraps(func)
     def wrapper_check_qid(obj, *args, **kwargs):
         if len(args) > 0:
             qid = args[0]

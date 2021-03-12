@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class EntitySymbols:
+    """Entity Symbols class for managing entity metadata."""
+
     def __init__(
         self,
         alias2qids: Dict[str, list],
@@ -347,7 +349,7 @@ class EntitySymbols:
         """Gets the alias from the numeric index.
 
         Args:
-            alias: alias numeric index
+            alias_idx: alias numeric index
 
         Returns: alias string
         """
@@ -363,6 +365,16 @@ class EntitySymbols:
 
     @edit_op
     def set_score(self, qid: str, mention: str, score: float):
+        """Changes the mention QID score and resorts candidates so highest
+        scoring is first.
+
+        Args:
+            qid: QID
+            mention: mention
+            score: score
+
+        Returns:
+        """
         if mention not in self._alias2qids:
             raise ValueError(f"The mention {mention} is not in our mapping")
         qids_only = list(map(lambda x: x[0], self._alias2qids[mention]))
@@ -380,6 +392,18 @@ class EntitySymbols:
 
     @edit_op
     def add_mention(self, qid: str, mention: str, score: float):
+        """Add mention to QID with the associated score. The mention already
+        exists, error thrown to call ``set_score`` instead. If there are
+        already max candidates to that mention, the last candidate of the
+        mention is removed in place of QID.
+
+        Args:
+            qid: QID
+            mention: mention
+            score: score
+
+        Returns:
+        """
         # If mention is in mapping, make sure the qid is not
         if mention in self._alias2qids:
             if qid in set(map(lambda x: x[0], self._alias2qids[mention])):
@@ -420,6 +444,14 @@ class EntitySymbols:
 
     @edit_op
     def remove_mention(self, qid, mention):
+        """Remove the mention from those associated with the QID.
+
+        Args:
+            qid: QID
+            mention: mention to remove
+
+        Returns:
+        """
         # Make sure the mention and qid pair is already in the mapping
         if mention not in self._alias2qids:
             return
@@ -453,6 +485,15 @@ class EntitySymbols:
 
     @edit_op
     def add_entity(self, qid, mentions, title):
+        """Add entity QID to our mappings with its mentions and title.
+
+        Args:
+            qid: QID
+            mentions: List of tuples [mention, score]
+            title: title
+
+        Returns:
+        """
         assert (
             qid not in self._qid2eid
         ), "Something went wrong with the qid check that this entity doesn't exist"
@@ -475,6 +516,14 @@ class EntitySymbols:
 
     @edit_op
     def reidentify_entity(self, old_qid, new_qid):
+        """Rename ``old_qid`` to ``new_qid``.
+
+        Args:
+            old_qid: old QID
+            new_qid: new QID
+
+        Returns:
+        """
         assert (
             old_qid in self._qid2eid and new_qid not in self._qid2eid
         ), f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} failed"
@@ -501,6 +550,13 @@ class EntitySymbols:
 
     @edit_op
     def prune_to_entities(self, entities_to_keep):
+        """Remove all entities except those in ``entities_to_keep``.
+
+        Args:
+            entities_to_keep: Set of entities to keep
+
+        Returns:
+        """
         # Update qid based dictionaries
         self._qid2title = {
             k: v for k, v in self._qid2title.items() if k in entities_to_keep
@@ -534,11 +590,25 @@ class EntitySymbols:
 
     @edit_op
     def get_mentions(self, qid):
+        """Gets the mentions for the QID.
+
+        Args:
+            qid: QID
+
+        Returns: List of mentions
+        """
         # qid2aliases is only created in edit mode to allow for removal of mentions associated with a qid
         return self._qid2aliases[qid]
 
     @edit_op
     def get_mentions_with_scores(self, qid):
+        """Gets the mentions and the associated score for the QID.
+
+        Args:
+            qid: QID
+
+        Returns: List of tuples [mention, score]
+        """
         mentions = self._qid2aliases[qid]
         res = []
         for men in mentions:

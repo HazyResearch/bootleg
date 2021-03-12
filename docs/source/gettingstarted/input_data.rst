@@ -8,20 +8,13 @@ Bootleg should output that Lincoln refers to Lincoln IL and Logan County to Loga
 
 This disambiguation occurs in two parts. The first, described here, is mention extraction and candidate generation, where phrases in the input text are extracted to be disambiguation. For example, in the sentence above, the phrases "Lincoln" and "Logan County" should be extracted. Each phrase to be disambiguated is called a mention (or alias). Instead of disambiguating against all entities in Wikipedia, Bootleg uses predefined candidate maps that provide a small subset of possible entity candidates for each mention. The second step, described in `Bootleg Model`_, is the disambiguation using Bootleg's neural model.
 
-To understand how we do mention extraction and candidate generation, we first need to describe the metadata we have associated with an entity. Then we will describe how we perform mention extraction. Finally, we will provide details on the input data provided to Bootleg. Take a look at our `tutorials <https://github.com/HazyResearch/bootleg/tree/master/tutorials>`_ to see it in action.
+To understand how we do mention extraction and candidate generation, we first need to describe the profile data we have associated with an entity. Then we will describe how we perform mention extraction. Finally, we will provide details on the input data provided to Bootleg. Take a look at our `tutorials <https://github.com/HazyResearch/bootleg/tree/master/tutorials>`_ to see it in action.
 
-Entity Metadata
-------------------
-Bootleg uses Wikipedia and Wikidata to collect a variety of metadata files associated with an entity. These are located in ``wiki_entity_data``. Specifically, there are 4 files, described below.
+Entity Data
+--------------------
+Bootleg uses Wikipedia and Wikidata to collect and generate a entity database of metadata associated with an entity. This is all located in ``entity_db`` and contains mappings from entities to structural data and possible mention. We describe the entity profiles in more details and how to generate them on our `entity profile <entity_profile.html>`_ page. For reference, we have an `EntityProfile <../apidocs/bootleg.symbols.html#module-bootleg.symbols.entity_profile>`_ class that loads and manages this metadata.
 
-* ``qid2eid.json``: This is a mapping from entity id (we refer to this as QID) to an entity index used internally to extract embeddings. Note that these entity ids start at 1 (0 index is reserved for a "not in candidate list" entity). We use Wikidata QIDs in our tutorials and documentation but any string identifier will work.
-* ``qid2title.json``: This is a mapping from entity QID to entity Wikipedia title.
-* ``alias2qids.json``: This is a mapping from possible mentions (or aliases) to a list possible candidates. We restrict our candidate lists to be a predefined max length, typically 30. Each item in the list is a pair of [QID, QID score] values. The QID score is used for sorting candidates before filtering to the top 30. The scores are otherwise not used in Bootleg. This mapping is mined from both Wikipedia and Wikidata (reach out with a github issue if you want to know more).
-* ``config.json``: This gives metadata associated with the entity data. Specifically, the maximum number of candidates, the maximum number of words in any alias, and the time the save was created.
-
-Internally, we have an `EntitySymbols <../apidocs/bootleg.symbols.html#module-bootleg.symbols.entity_symbols>`_ class that loads and manages this metadata.
-
-As our ``alias2qid.json`` save gives us our candidates for each mention, we now need to describe how we generate mentions.
+As our profile data does give us mentions that are associated with each entity, we now need to describe how we generate mentions.
 
 Mention Extraction
 ------------------
@@ -39,7 +32,7 @@ We output a jsonl with
 * ``aliases``: list of extracted mentions.
 * ``spans``: list of word offsets [inclusive, exclusive) for each alias.
 
-Input Format
+Textual Input
 ------------------
 Once we have mentions and candidates, we are ready to run our Bootleg model. The raw input format is in ``jsonl`` format where each line is a json object. We have one json per sentence in our training data with the following files
 

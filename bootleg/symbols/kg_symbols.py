@@ -12,6 +12,8 @@ from bootleg.utils import utils
 
 
 class KGSymbols:
+    """KG Symbols class for managing KG metadata."""
+
     def __init__(
         self,
         qid2relations: Dict[str, Dict[str, List[str]]],
@@ -67,7 +69,7 @@ class KGSymbols:
             contents=self._qid2relations,
         )
         # For backwards compatability with model, dump the adjacency matrix, too
-        with open(os.path.join(save_dir, f"{prefix}qid2qid_adj.txt"), "w") as out_f:
+        with open(os.path.join(save_dir, f"{prefix}kg_adj.txt"), "w") as out_f:
             for qid in self._qid2relations:
                 for rel in self._qid2relations[qid]:
                     for qid2 in self._qid2relations[qid][rel]:
@@ -81,6 +83,7 @@ class KGSymbols:
             load_dir: directory to load from
             prefix: prefix to add to beginning to file
             edit_mode: edit mode
+            verbose: verbose flag
 
         Returns: TypeSymbols
         """
@@ -92,12 +95,32 @@ class KGSymbols:
         return cls(qid2relations, max_connections, edit_mode, verbose)
 
     def get_connections_by_relation(self, qid, relation):
+        """Returns list of other_qids connected to ``qid`` by relation.
+
+        Args:
+            qid: QID
+            relation: relation
+
+        Returns: List
+        """
         return self._qid2relations[qid].get(relation, {})
 
     def get_all_connections(self, qid):
+        """Returns dictionary of relation -> list of other_qids connected to
+        ``qid`` by relation.
+
+        Args:
+            qid: QID
+
+        Returns: Dict
+        """
         return self._qid2relations[qid]
 
     def get_all_relations(self):
+        """Get all relations in our KG mapping.
+
+        Returns: Set
+        """
         return self._all_relations
 
     def is_connected(self, qid1, qid2):
@@ -119,6 +142,17 @@ class KGSymbols:
     # ============================================================
     @edit_op
     def add_relation(self, qid, relation, qid2):
+        """Adds a relationship triple to our mapping. If the QID already has
+        max connection through ``relation``, the last ``other_qid`` is removed
+        and replaced by ``qid2``.
+
+        Args:
+            qid: head entity QID
+            relation: relation
+            qid2: tail entity QID
+
+        Returns:
+        """
         if relation not in self._all_relations:
             raise ValueError(
                 f"Tried adding {relation} to qid {qid}. We do not support new relations."
@@ -143,6 +177,15 @@ class KGSymbols:
 
     @edit_op
     def remove_relation(self, qid, relation, qid2):
+        """Removes a relation triple from our mapping.
+
+        Args:
+            qid: head entity QID
+            relation: relation
+            qid2: tail entity QID
+
+        Returns:
+        """
         if relation not in self._qid2relations[qid]:
             return
         if qid2 not in self._qid2relations[qid][relation]:
@@ -158,6 +201,14 @@ class KGSymbols:
 
     @edit_op
     def add_entity(self, qid, relation_dict):
+        """Adds a new entity to our relation mapping.
+
+        Args:
+            qid: QID
+            relation_dict: dictionary of relation -> list of connected other_qids by relation
+
+        Returns:
+        """
         for relation in relation_dict:
             if relation not in self._all_relations:
                 raise ValueError(
@@ -178,6 +229,14 @@ class KGSymbols:
 
     @edit_op
     def reidentify_entity(self, old_qid, new_qid):
+        """Rename ``old_qid`` to ``new_qid``.
+
+        Args:
+            old_qid: old QID
+            new_qid: new QID
+
+        Returns:
+        """
         assert (
             old_qid in self._qid2relations and new_qid not in self._qid2relations
         ), f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} failed where {old_qid in self._qid2relations} and {new_qid not in self._qid2relations}"
@@ -212,6 +271,13 @@ class KGSymbols:
 
     @edit_op
     def prune_to_entities(self, entities_to_keep):
+        """Remove all entities except those in ``entities_to_keep``.
+
+        Args:
+            entities_to_keep: Set of entities to keep
+
+        Returns:
+        """
         # Update qid2relations
         self._qid2relations = {
             k: v for k, v in self._qid2relations.items() if k in entities_to_keep

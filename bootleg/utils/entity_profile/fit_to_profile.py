@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import ujson
 import ujson as json
+import yaml
 from tqdm import tqdm
 
 from bootleg.symbols.entity_profile import EntityProfile
@@ -21,6 +22,7 @@ from bootleg.utils import utils
 
 ENTITY_EMB_KEYS = ["module_pool", "learned", "learned_entity_embedding.weight"]
 ENTITY_REG_KEYS = ["module_pool", "learned", "eid2reg"]
+ENTITY_TOPK_KEYS = ["module_pool", "learned", "eid2topkeid"]
 
 
 def parse_args():
@@ -53,10 +55,22 @@ def parse_args():
         help="Which model to load. If empty, we just generate the entity mappings",
     )
     parser.add_argument(
+        "--model_config",
+        type=str,
+        default=None,
+        help="If you'd like us to also modify the run config to use the new profile/model, pass in the path here",
+    )
+    parser.add_argument(
         "--save_model_path",
         type=str,
         required=True,
         help="Where to save the model.",
+    )
+    parser.add_argument(
+        "--save_model_config",
+        type=str,
+        default=None,
+        help="Where to save the config if it was passed in.",
     )
     args = parser.parse_args()
     return args
@@ -161,6 +175,19 @@ def refit_weights(
     vector_for_new_ent,
     state_dict,
 ):
+    """Refits the entity embeddings between the two models using the different
+    entity profiles.
+
+    Args:
+        np_same_ents: new profile mapped entities that are the same
+        neweid2oldeid: new profile EID to old profile EID
+        train_entity_profile: original entity profile
+        new_entity_profile: new entity profile
+        vector_for_new_ent: vector for initialization (default None)
+        state_dict: original model state dict
+
+    Returns: new state dict
+    """
     entity_weights = get_nested_item(state_dict, ENTITY_EMB_KEYS)
     try:
         entity_reg = get_nested_item(state_dict, ENTITY_REG_KEYS)
@@ -209,16 +236,18 @@ def refit_weights(
     newent_index = np.array(newent_index)
     print(
         "OG",
-        new_entity_weight.shape[0],
+        new_entity_weight.shape[0] - 1,  # Drop 1 for the -1 for the last row of zeros
         "SHARED",
         len(shared_newindex),
         "NEW",
         len(newent_index),
     )
     # Copy over the old weights
-    new_entity_weight[shared_newindex, :] = entity_weights[shared_oldindex, :]
+    if len(shared_newindex) > 0:
+        new_entity_weight[shared_newindex, :] = entity_weights[shared_oldindex, :]
     # Assign new entities
-    new_entity_weight[newent_index, :] = vector_for_new_ent
+    if len(newent_index) > 0:
+        new_entity_weight[newent_index, :] = vector_for_new_ent
     new_entity_weight = torch.from_numpy(new_entity_weight).float()
     # Last row is pad row of all zeros
     assert torch.equal(
@@ -231,17 +260,49 @@ def refit_weights(
             (new_entity_profile.get_num_entities_with_pad_and_nocand())
         )
         # Copy over the old weights
-        new_entity_reg[shared_newindex] = entity_reg[shared_oldindex]
-        # Assign default value in the middle for these new entities. If finetuned, it shouldn't hurt performance.
-        new_entity_reg[newent_index] = 0.5
+        if len(shared_newindex) > 0:
+            new_entity_reg[shared_newindex] = entity_reg[shared_oldindex]
+        if len(newent_index) > 0:
+            # Assign default value in the middle for these new entities. If finetuned, it shouldn't hurt performance.
+            new_entity_reg[newent_index] = 0.5
         new_entity_reg = torch.from_numpy(new_entity_reg).float()
         state_dict = set_nested_item(state_dict, ENTITY_REG_KEYS, new_entity_reg)
     return state_dict
 
 
-def main():
-    args = parse_args()
+def modify_config(old_config_path, new_config_path, model_save_path, new_entity_path):
+    """Modifies the old config with the new profile and model for running.
+
+    Args:
+        old_config_path: old config path
+        new_config_path: new config path
+        model_save_path: model path to load
+        new_entity_path: path to new profile
+
+    Returns:
+    """
+    with open(old_config_path) as file:
+        old_config = yaml.load(file, Loader=yaml.FullLoader)
+
+    if "emmental" not in old_config:
+        old_config["emmental"] = {}
+    old_config["emmental"]["model_path"] = model_save_path
+
+    old_config["data_config"]["entity_dir"] = new_entity_path
+    old_config["data_config"]["emb_dir"] = new_entity_path
+
+    with open(new_config_path, "w") as file:
+        yaml.dump(old_config, file)
+    print(f"Dumped config to {new_config_path}")
+
+
+def fit_profiles(args):
     print(json.dumps(vars(args), indent=4))
+
+    if args.model_config is not None:
+        assert (
+            args.save_model_config is not None
+        ), f"If you pass in a model config, you must pass in a model save config path"
 
     print(f"Loading train entity profile from {args.train_entity_profile}")
     train_entity_profile = EntityProfile.load_from_cache(
@@ -269,6 +330,15 @@ def main():
     ), f"The lengths of oldeid2neweid and neweid2oldeid don't match"
     state_dict, model_state_dict = load_statedict(args.model_path)
 
+    # We do not support modifying a topK model. Only the original model.
+    try:
+        topk_keys = get_nested_item(model_state_dict, ENTITY_TOPK_KEYS)
+        raise NotImplementedError(
+            f"We don't support fitting a topK mini model. Instead, call `fit_to_profile` on the full Bootleg model. Then call utils.entity_profile.compress_topk_entity_embeddings to create your own mini model."
+        )
+    except:
+        pass
+
     try:
         weight_shape = get_nested_item(model_state_dict, ENTITY_EMB_KEYS).shape[1]
     except:
@@ -292,6 +362,15 @@ def main():
     print(f"Saving model at {args.save_model_path}")
     torch.save(state_dict, args.save_model_path)
 
+    if args.model_config is not None:
+        modify_config(
+            args.model_config,
+            args.save_model_config,
+            args.save_model_path,
+            args.new_entity_profile,
+        )
+
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    fit_profiles(args)
