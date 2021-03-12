@@ -968,6 +968,7 @@ def write_data_labels(
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
         utils.create_single_item_trie(sental2embid, out_file=trie_file)
+
         # Chunk file for parallel writing
         # We do not use TemporaryFolders as the temp dir may not have enough space for large files
         create_ex_indir = os.path.join(cache_folder, "_bootleg_eval_temp_indir")
