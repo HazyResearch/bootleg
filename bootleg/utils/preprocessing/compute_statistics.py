@@ -222,7 +222,7 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
 
 def main():
     args = parse_args()
-    logging.info(json.dumps(args, indent=4))
+    logging.info(json.dumps(vars(args), indent=4))
     entity_symbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(args.data_dir, args.entity_symbols_dir)
     )

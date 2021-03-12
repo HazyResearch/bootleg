@@ -36,8 +36,10 @@ At the end, the directory structure should be
   <DOWNLOAD_DIRECTORY>
     wiki_data/
         prep/
-    wiki_entity_data/
+    entity_db/
         entity_mappings/
+        type_mappings/
+        kg_mappings/
         prep/
 
 2. Setting up Distributed Training

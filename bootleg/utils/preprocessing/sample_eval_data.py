@@ -143,7 +143,7 @@ def get_slice_stats_hlp(args):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = int(0.8 * multiprocessing.cpu_count())
 
     in_file = os.path.join(args.data_dir, args.file)

@@ -676,7 +676,7 @@ class TestLearnedEmbedding(unittest.TestCase):
 
     def test_static_embedding(self):
         emb = torch.randn(self.entity_symbols.num_entities_with_pad_and_nocand, 150)
-        torch.save(emb, self.static_emb)
+        torch.save((self.entity_symbols.get_qid2eid(), emb), self.static_emb)
 
         self.args.data_config.ent_embeddings[0]["args"]["emb_file"] = self.static_emb
         del self.args.data_config.ent_embeddings[0]["args"]["learned_embedding_size"]
@@ -691,6 +691,9 @@ class TestLearnedEmbedding(unittest.TestCase):
             dropout1d_perc=0.0,
             dropout2d_perc=0.0,
         )
+        # The first and last rows will be zero as no entities have those eids
+        emb[0] = torch.zeros(emb.shape[1])
+        emb[-1] = torch.zeros(emb.shape[1])
         np.testing.assert_array_equal(emb.numpy(), learned_emb.entity2static)
 
 

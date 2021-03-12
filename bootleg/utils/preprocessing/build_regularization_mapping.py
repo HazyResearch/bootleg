@@ -119,7 +119,7 @@ def build_reg_csv(qid_cnt, es):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = min(args.processes, int(0.8 * multiprocessing.cpu_count()))
     print("Loading entity symbols")
     entity_symbols = EntitySymbols.load_from_cache(

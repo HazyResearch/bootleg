@@ -16,18 +16,13 @@ ent_embeddings:
 
 import argparse
 import os
-import random
-import shutil
 
-import numpy as np
 import torch
 import ujson
 from tqdm import tqdm
 from transformers import BertModel, BertTokenizer
 
-from bootleg.symbols.constants import CLS_BERT, SEP_BERT
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.utils import model_utils
 
 MAX_LEN = 512
 BERT_DIM = 768
@@ -70,6 +65,7 @@ def parse_args():
     )
     parser.add_argument("--batch_size", type=int, default=2056)
     parser.add_argument("--cpu", action="store_true")
+    parser.add_argument("--output_method", default="pt", choices=["pt", "json"])
 
     args = parser.parse_args()
     return args
@@ -118,7 +114,7 @@ def build_title_table(cpu, batch_size, model, tokenizer, entity_symbols):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
@@ -142,11 +138,20 @@ def main():
     entity2avgtitle = build_title_table(
         args.cpu, args.batch_size, model, tokenizer, entity_symbols
     )
-
     save_fold = os.path.dirname(args.save_file)
-    if not os.path.exists(save_fold):
-        os.makedirs(save_fold)
-    torch.save(f=args.save_file, obj=entity2avgtitle)
+    if len(save_fold) > 0:
+        if not os.path.exists(save_fold):
+            os.makedirs(save_fold)
+    if args.output_method == "pt":
+        save_obj = (entity_symbols.get_qid2eid(), entity2avgtitle)
+        torch.save(obj=save_obj, f=args.save_file)
+    else:
+        res = {}
+        for qid in tqdm(entity_symbols.get_all_qids(), desc="Building final json"):
+            eid = entity_symbols.get_eid(qid)
+            res[qid] = entity2avgtitle[eid].tolist()
+        with open(args.save_file, "w") as out_f:
+            ujson.dump(res, out_f)
     print(f"Done!")
 
 

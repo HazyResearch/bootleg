@@ -112,6 +112,22 @@ class EntityProfileTest(unittest.TestCase):
         self.assertDictEqual(gold_type_systems, type_systems)
         self.assertDictEqual(gold_qid2relations, qid2relations)
 
+        # Test loading/saving from jsonl
+        ep = EntityProfile.load_from_jsonl(self.profile_file, edit_mode=True)
+        ep.save_to_jsonl(self.profile_file)
+        read_in_data = [ujson.loads(l) for l in open(self.profile_file)]
+
+        assert len(read_in_data) == len(data)
+
+        for qid_obj in data:
+            found_other_obj = None
+            for possible_match in read_in_data:
+                if qid_obj["entity_id"] == possible_match["entity_id"]:
+                    found_other_obj = possible_match
+                    break
+            assert found_other_obj is not None
+            self.assertDictEqual(qid_obj, found_other_obj)
+
     def test_profile_load_typeerror(self):
         data = [
             {
@@ -480,7 +496,7 @@ class EntityProfileTest(unittest.TestCase):
                         "load_class": "KGIndices",
                         "batch_on_the_fly": True,
                         "normalize": False,
-                        "args": {"kg_adj": f"{KG_SUBFOLDER}/qid2qid_adj.txt"},
+                        "args": {"kg_adj": f"{KG_SUBFOLDER}/kg_adj.txt"},
                     },
                 ],
                 "train_dataset": {"file": "train.jsonl"},

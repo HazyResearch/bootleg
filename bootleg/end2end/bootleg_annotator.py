@@ -76,13 +76,13 @@ def create_config(model_path, data_path, model_name):
     )
 
     # set the path for the entity db and candidate map
-    config_args["data_config"]["entity_dir"] = str(data_path / "wiki_entity_data")
-    config_args["data_config"]["alias_cand_map"] = "alias2qids_wiki_filt.json"
+    config_args["data_config"]["entity_dir"] = str(data_path / "entity_db")
+    config_args["data_config"]["alias_cand_map"] = "alias2qids.json"
 
     # set the embedding paths
-    config_args["data_config"]["emb_dir"] = str(data_path / "emb_data")
+    config_args["data_config"]["emb_dir"] = str(data_path / "entity_db")
     config_args["data_config"]["word_embedding"]["cache_dir"] = str(
-        data_path / "emb_data" / "pretrained_bert_models"
+        data_path / "pretrained_bert_models"
     )
 
     # set log path
@@ -117,27 +117,15 @@ def create_sources(model_path, data_path, model_name):
         tar.extractall(model_path)
         tar.close()
 
-    if not (data_path / "emb_data").exists():
-        print(f"{data_path / 'emb_data'} not found. Downloading..")
+    if not (data_path / "entity_db").exists():
+        print(f"{data_path / 'entity_db'} not found. Downloading..")
         urllib.request.urlretrieve(
-            "https://bootleg-data.s3.amazonaws.com/data/latest/emb_data.tar.gz",
-            filename=str(data_path / "emb_data.tar.gz"),
+            "https://bootleg-data.s3.amazonaws.com/data/latest/entity_db.tar.gz",
+            filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
         print(f"Downloaded. Decompressing...")
-        tar = tarfile.open(str(data_path / "emb_data.tar.gz"), "r:gz")
-        tar.extractall(data_path)
-        tar.close()
-
-    if not (data_path / "wiki_entity_data").exists():
-        print(f"{data_path / 'wiki_entity_data'} not found. Downloading..")
-        urllib.request.urlretrieve(
-            "https://bootleg-data.s3.amazonaws.com/data/latest/wiki_entity_data.tar.gz",
-            filename=str(data_path / "wiki_entity_data.tar.gz"),
-            reporthook=DownloadProgressBar(),
-        )
-        print(f"Downloaded. Decompressing...")
-        tar = tarfile.open(str(data_path / "wiki_entity_data.tar.gz"), "r:gz")
+        tar = tarfile.open(str(data_path / "entity_db.tar.gz"), "r:gz")
         tar.extractall(data_path)
         tar.close()
 
@@ -273,7 +261,7 @@ class BootlegAnnotator(object):
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
         if cand_map is None:
-            alias_map = self.entity_db._alias2qids
+            alias_map = self.entity_db.get_alias2qids()
         else:
             logger.debug(f"Loading candidate map")
             alias_map = ujson.load(open(cand_map))

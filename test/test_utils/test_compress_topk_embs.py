@@ -19,20 +19,17 @@ class TestTopKEmbsCompression(unittest.TestCase):
         perc_emb_drop = 0.8
 
         gold_qid2topk_eid = {"Q1": 2, "Q2": 1, "Q3": 2, "Q4": 2}
-        gold_qid2topk_reg = {"Q1": 0.95, "Q2": 0.05, "Q3": 0.95, "Q4": 0.95}
         gold_old2new_eid = {0: 0, -1: -1, 2: 1, 3: 2}
         gold_new_toes_eid = 2
         gold_num_topk_entities = 2
 
         (
             qid2topk_eid,
-            qid2topk_reg,
             old2new_eid,
             new_toes_eid,
             num_topk_entities,
         ) = filter_qids(perc_emb_drop, entity_db, qid2count)
         self.assertEqual(gold_qid2topk_eid, qid2topk_eid)
-        self.assertEqual(gold_qid2topk_reg, qid2topk_reg)
         self.assertEqual(gold_old2new_eid, old2new_eid)
         self.assertEqual(gold_new_toes_eid, new_toes_eid)
         self.assertEqual(gold_num_topk_entities, num_topk_entities)

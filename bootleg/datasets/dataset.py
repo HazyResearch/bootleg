@@ -205,7 +205,7 @@ def read_in_types(data_config):
     # We assume types are indexed from 1. So, 6 types will have indices 1 - 6. Max type will get 6.
     assert (
         len(all_type_ids) == data_config.type_prediction.num_types
-    ), f"{data_config.type_prediction.num_types} from args.data_config.type_prediction.num_types must match our computed number {max_type}"
+    ), f"{data_config.type_prediction.num_types} from args.data_config.type_prediction.num_types must match our computed number {len(all_type_ids)}"
     return eid2type
 
 
