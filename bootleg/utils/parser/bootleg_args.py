@@ -72,7 +72,11 @@ config_args = {
         ),
         "alias_cand_map": (
             "alias2qids.json",
-            "name of alias candidate map, should be saved in entity_dir/entity_map_dir",
+            "name of alias candidate map file, should be saved in entity_dir/entity_map_dir",
+        ),
+        "alias_idx_map": (
+            "alias2id.json",
+            "name of alias index map file, should be saved in entity_dir/entity_map_dir",
         ),
         "emb_dir": ("embs", "where embeddings are stored"),
         "max_seq_len": (100, "max token length sentences"),

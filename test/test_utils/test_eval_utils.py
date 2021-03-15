@@ -37,6 +37,7 @@ class EntitySymbolsSubclass(EntitySymbols):
         self.num_entities = len(self._qid2eid)
         self.num_entities_with_pad_and_nocand = self.num_entities + 2
         self.alias_cand_map_file = "alias2qids.json"
+        self.alias_idx_file = "alias2qids.json"
 
 
 class EvalUtils(unittest.TestCase):
@@ -375,7 +376,7 @@ class EvalUtils(unittest.TestCase):
             )
 
         # Try with multiprocessing
-        num_processes = 2
+        num_processes = 5
         eval_utils.merge_subsentences(
             num_processes,
             sent_idx2num_mentions,
@@ -416,10 +417,12 @@ class EvalUtils(unittest.TestCase):
         entity_dir = "test/entity_db"
         entity_map_dir = "entity_mappings"
         alias_cand_map = "alias2qids.json"
+        alias_idx_map = "alias2id.json"
         data_config = DottedDict(
             entity_dir=entity_dir,
             entity_map_dir=entity_map_dir,
             alias_cand_map=alias_cand_map,
+            alias_idx_map=alias_idx_map,
         )
         entity_symbols = EntitySymbolsSubclass()
         entity_symbols.save(save_dir=os.path.join(entity_dir, entity_map_dir))
@@ -563,6 +566,7 @@ class EvalUtils(unittest.TestCase):
 
         write_data_labels(
             num_processes=num_processes,
+            result_alias_offset=0,
             merged_entity_emb_file=merged_entity_emb_file.name,
             merged_storage_type=merged_storage_type,
             sent_idx2row=sent_idx2rows,
@@ -605,6 +609,7 @@ class EvalUtils(unittest.TestCase):
 
         write_data_labels(
             num_processes=num_processes,
+            result_alias_offset=0,
             merged_entity_emb_file=merged_entity_emb_file.name,
             merged_storage_type=merged_storage_type,
             sent_idx2row=sent_idx2rows,

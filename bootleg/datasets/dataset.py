@@ -170,6 +170,7 @@ def read_in_types(data_config):
     entitysymbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
         alias_cand_map_file=data_config.alias_cand_map,
+        alias_idx_file=data_config.alias_idx_map,
     )
     with open(vocab_file, "r") as in_f:
         vocab = ujson.load(in_f)
@@ -430,7 +431,7 @@ def create_examples_single(
             qids_arr = [[qids[idx] for idx in idxs] for idxs in idxs_arr]
             # write out results to json lines file
             for subsent_idx in range(len(idxs_arr)):
-                # This contains, pre eval dataset filtering, the mapping of aliases seen by model to the ones to be scores. We need this mapping
+                # This contains the mapping of aliases seen by model to the ones to be scored, pre false anchor dataset filtering. We need this mapping
                 # during eval to create on "prediction" per alias, True or False anchor.
                 train_aliases_to_predict_arr = aliases_to_predict_per_split[
                     subsent_idx
@@ -474,6 +475,7 @@ def convert_examples_to_features_and_save_initializer(
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
         alias_cand_map_file=data_config.alias_cand_map,
+        alias_idx_file=data_config.alias_idx_map,
     )
     global mmap_file_global
     mmap_file_global = np.memmap(save_dataset_name, dtype=X_storage, mode="r+")
@@ -636,8 +638,12 @@ def convert_examples_to_features_and_save_single(
     ):
         example = InputExample.from_dict(ujson.loads(in_line))
         example_idx = save_file_offset + idx
-        train_aliases_to_predict_arr = example.train_aliases_to_predict_arr
-        aliases_to_predict = example.aliases_to_predict
+        train_aliases_to_predict_arr = (
+            example.train_aliases_to_predict_arr
+        )  # Stores all aliases to be scored for all anchor labels (gold or not)
+        aliases_to_predict = (
+            example.aliases_to_predict
+        )  # Stores all aliases to be scored for all anchor labels (if train) and for true anchors (if eval)
         spans = example.spans
         word_indices = tokenizer.convert_tokens_to_ids(example.phrase_tokens)
         aliases = example.aliases
@@ -653,11 +659,11 @@ def convert_examples_to_features_and_save_single(
         example_aliases_locs_start = np.ones(max_aliases) * PAD_ID
         example_aliases_locs_end = np.ones(max_aliases) * PAD_ID
         example_alias_list_pos = np.ones(max_aliases) * PAD_ID
-        # this stores the true entities we use to compute losses; some aliases don't meet filter criteria for testslices
+        # this stores the true entities we use to compute loss - (all anchors for train and true anchors for dev/test)
         example_true_cand_positions_for_loss = np.ones(max_aliases) * PAD_ID
         # this stores the true entity ids - used for building type data
         example_true_eids_for_loss = np.ones(max_aliases) * PAD_ID
-        # this stores the true entities for all aliases seen by model, whether or not they are scored by model
+        # this stores the true entities for all aliases seen by model - all anchors for both train and eval
         example_true_cand_positions_for_train = np.ones(max_aliases) * PAD_ID
         # used to keep track of original alias index in the list
         for idx, (alias, span_idx, qid, alias_pos) in enumerate(

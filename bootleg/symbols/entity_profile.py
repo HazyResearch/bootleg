@@ -61,34 +61,43 @@ class EntityProfile:
         self._entity_symbols.save(save_dir / ENTITY_SUBFOLDER)
         for type_sys in self._type_systems:
             self._type_systems[type_sys].save(save_dir / TYPE_SUBFOLDER / type_sys)
-        self._kg_symbols.save(save_dir / KG_SUBFOLDER)
+        if self._kg_symbols is not None:
+            self._kg_symbols.save(save_dir / KG_SUBFOLDER)
 
     @classmethod
     def load_from_cache(
-        cls, load_dir, edit_mode=False, verbose=False, type_systems=None
+        cls,
+        load_dir,
+        edit_mode=False,
+        verbose=False,
+        no_kg=False,
+        no_type=False,
+        type_systems_to_load=None,
     ):
         """Loaded a pre-saved profile.
 
         Args:
             load_dir: load directory
-            edit_mode: edit mode flag
-            verbose: verbose flag
-            type_systems: list of type systems to load (useful if wanting to only look at one)
+            edit_mode: edit mode flag, default False
+            verbose: verbose flag, default False
+            no_kg: load kg or not flag, default False
+            no_type: load types or not flag, default False. If True, this will ignore type_systems_to_load.
+            type_systems_to_load: list of type systems to load, default is None which means all types systems
 
         Returns: entity profile object
         """
         # Check type system input
         load_dir = Path(load_dir)
         type_subfolder = load_dir / TYPE_SUBFOLDER
-        if type_systems is not None:
-            if not isinstance(type_systems, list):
+        if type_systems_to_load is not None:
+            if not isinstance(type_systems_to_load, list):
                 raise ValueError(
                     f"`type_systems` must be a list of subfolders in {type_subfolder}"
                 )
-            for sys in type_systems:
-                if sys not in list(type_subfolder.iterdir()):
+            for sys in type_systems_to_load:
+                if sys not in list([p.name for p in type_subfolder.iterdir()]):
                     raise ValueError(
-                        f"`type_systems` must be a list of subfolders in {type_subfolder}"
+                        f"`type_systems` must be a list of subfolders in {type_subfolder}. {sys} is not one."
                     )
 
         if verbose:
@@ -98,9 +107,17 @@ class EntityProfile:
             edit_mode=edit_mode,
             verbose=verbose,
         )
+        if no_type:
+            print(
+                f"Not loading type information. We will act as if there is no types associated with any entity and will not modify the types in any way, even if calling `add`."
+            )
         type_sys_dict = {}
         for fold in type_subfolder.iterdir():
-            if (type_systems is None or fold in type_systems) and fold.is_dir():
+            if (
+                (not no_type)
+                and (type_systems_to_load is None or fold.name in type_systems_to_load)
+                and (fold.is_dir())
+            ):
                 if verbose:
                     print(f"Loading Type Symbols from {fold}")
                 type_sys_dict[fold.name] = TypeSymbols.load_from_cache(
@@ -110,11 +127,17 @@ class EntityProfile:
                 )
         if verbose:
             print(f"Loading KG Symbols")
-        kg_symbols = KGSymbols.load_from_cache(
-            load_dir / KG_SUBFOLDER,
-            edit_mode=edit_mode,
-            verbose=verbose,
-        )
+        if no_kg:
+            print(
+                f"Not loading KG information. We will act as if there is not KG connections between entities. We will not modify the KG information in any way, even if calling `add`."
+            )
+        kg_symbols = None
+        if not no_kg:
+            kg_symbols = KGSymbols.load_from_cache(
+                load_dir / KG_SUBFOLDER,
+                edit_mode=edit_mode,
+                verbose=verbose,
+            )
         return cls(entity_symbols, type_sys_dict, kg_symbols, edit_mode, verbose)
 
     @classmethod
@@ -418,6 +441,8 @@ class EntityProfile:
 
         Returns: List
         """
+        if self._kg_symbols is None:
+            return []
         return self._kg_symbols.get_connections_by_relation(qid, relation)
 
     @check_qid_exists
@@ -430,6 +455,8 @@ class EntityProfile:
 
         Returns: Dict
         """
+        if self._kg_symbols is None:
+            return {}
         return self._kg_symbols.get_all_connections(qid)
 
     @check_qid_exists
@@ -442,6 +469,8 @@ class EntityProfile:
 
         Returns: boolean
         """
+        if self._kg_symbols is None:
+            return False
         self._kg_symbols.is_connected(qid, qid2)
 
     # ============================================================
@@ -537,7 +566,10 @@ class EntityProfile:
                 raise ValueError(
                     f"For each value in relations, it must be a JSON with keys relation and object"
                 )
-            if rel_pair["relation"] not in self._kg_symbols.get_all_relations():
+            if (
+                self._kg_symbols is not None
+                and rel_pair["relation"] not in self._kg_symbols.get_all_relations()
+            ):
                 raise ValueError(
                     f"Error {entity_obj}. When adding a new entity, you must use the same set of relations. We don't support new relations."
                 )
@@ -549,11 +581,8 @@ class EntityProfile:
             self._type_systems[type_sys].add_entity(
                 ent.entity_id, ent.types.get(type_sys, [])
             )
-        self._kg_symbols.add_entity(ent.entity_id, parsed_rels)
-        # Warn user once about needing to update the model
-        # msg = f"When adding an entity, you MUST call XXX refit the model to this profile. You MUST reprep your data. Set data_config.overwrite_preprocessed_data to be True. These messages will now be surpressed."
-        # logger.warning(msg)
-        # warnings.filterwarnings("ignore", message=msg)
+        if self._kg_symbols is not None:
+            self._kg_symbols.add_entity(ent.entity_id, parsed_rels)
 
     @edit_op
     @check_qid_exists
@@ -574,7 +603,8 @@ class EntityProfile:
         self._entity_symbols.reidentify_entity(qid, new_qid)
         for type_sys in self._type_systems:
             self._type_systems[type_sys].reidentify_entity(qid, new_qid)
-        self._kg_symbols.reidentify_entity(qid, new_qid)
+        if self._kg_symbols is not None:
+            self._kg_symbols.reidentify_entity(qid, new_qid)
 
     @edit_op
     def update_entity(self, entity_obj):
@@ -622,15 +652,16 @@ class EntityProfile:
             for typename in ent.types[type_sys]:
                 self._type_systems[type_sys].add_type(ent.entity_id, typename)
         # Update KG
-        for rel in self._kg_symbols.get_relations(ent.entity_id):
-            for qid2 in self._kg_symbols.get_connections_by_relation(
-                ent.entity_id, rel
-            ):
-                self._kg_symbols.remove_kg(ent.entity_id, rel, qid2)
-        for rel_pair in ent.relations:
-            self._kg_symbols.add_kg(
-                ent.entity_id, rel_pair["relation"], rel_pair["object"]
-            )
+        if self._kg_symbols is not None:
+            for rel in self._kg_symbols.get_relations(ent.entity_id):
+                for qid2 in self._kg_symbols.get_connections_by_relation(
+                    ent.entity_id, rel
+                ):
+                    self._kg_symbols.remove_kg(ent.entity_id, rel, qid2)
+            for rel_pair in ent.relations:
+                self._kg_symbols.add_kg(
+                    ent.entity_id, rel_pair["relation"], rel_pair["object"]
+                )
 
     @edit_op
     def prune_to_entities(self, entities_to_keep):
@@ -657,7 +688,8 @@ class EntityProfile:
             self._type_systems[type_sys].prune_to_entities(entities_to_keep)
         if self.verbose:
             print(f"Pruning kg data")
-        self._kg_symbols.prune_to_entities(entities_to_keep)
+        if self._kg_symbols is not None:
+            self._kg_symbols.prune_to_entities(entities_to_keep)
 
     @edit_op
     @check_qid_exists
@@ -689,7 +721,8 @@ class EntityProfile:
 
         Returns:
         """
-        self._kg_symbols.add_relation(qid, relation, qid2)
+        if self._kg_symbols is not None:
+            self._kg_symbols.add_relation(qid, relation, qid2)
 
     @edit_op
     @check_qid_exists
@@ -735,7 +768,8 @@ class EntityProfile:
 
         Returns:
         """
-        self._kg_symbols.remove_relation(qid, relation, qid2)
+        if self._kg_symbols is not None:
+            self._kg_symbols.remove_relation(qid, relation, qid2)
 
     @edit_op
     @check_qid_exists

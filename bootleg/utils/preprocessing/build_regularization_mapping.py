@@ -53,6 +53,12 @@ def parse_args():
         help="Path to alias candidate map",
     )
     parser.add_argument(
+        "--alias_idx_map",
+        type=str,
+        default="alias2id.json",
+        help="Path to alias candidate map",
+    )
+    parser.add_argument(
         "--data_dir",
         type=str,
         default="/dfs/scratch0/lorr1/projects/bootleg-data/data/tacred_title_0122",
@@ -125,6 +131,7 @@ def main():
     entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
+        alias_idx_file=args.alias_idx_map,
     )
 
     in_file = os.path.join(args.data_dir, args.train_file)
