@@ -37,7 +37,9 @@ class TestTopKEmbsCompression(unittest.TestCase):
     def test_filter_embs(self):
         entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
         entity_db = EntitySymbols.load_from_cache(
-            load_dir=entity_dump_dir, alias_cand_map_file="alias2qids.json"
+            load_dir=entity_dump_dir,
+            alias_cand_map_file="alias2qids.json",
+            alias_idx_file="alias2id.json",
         )
         num_topk_entities = 2
         old2new_eid = {0: 0, -1: -1, 2: 1, 3: 2}

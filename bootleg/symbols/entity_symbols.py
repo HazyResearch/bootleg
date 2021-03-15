@@ -25,11 +25,13 @@ class EntitySymbols:
         alias2id: Optional[Dict[str, int]] = None,
         max_candidates: int = 30,
         alias_cand_map_file: str = "alias2qids.json",
+        alias_idx_file: str = "alias2id.json",
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
         # We support different candidate mappings for the same set of entities
         self.alias_cand_map_file = alias_cand_map_file
+        self.alias_idx_file = alias_idx_file
         self.max_candidates = max_candidates
         self.edit_mode = edit_mode
         self.verbose = verbose
@@ -118,7 +120,8 @@ class EntitySymbols:
             filename=os.path.join(save_dir, "qid2eid.json"), contents=self._qid2eid
         )
         utils.dump_json_file(
-            filename=os.path.join(save_dir, "alias2id.json"), contents=self._alias2id
+            filename=os.path.join(save_dir, self.alias_idx_file),
+            contents=self._alias2id,
         )
 
     @classmethod
@@ -126,6 +129,7 @@ class EntitySymbols:
         cls,
         load_dir,
         alias_cand_map_file="alias2qids.json",
+        alias_idx_file="alias2id.json",
         edit_mode=False,
         verbose=False,
     ):
@@ -134,6 +138,7 @@ class EntitySymbols:
         Args:
             load_dir: directory to load from
             alias_cand_map_file: alias2qid file
+            alias_idx_file: alias2id file
             edit_mode: edit mode flag
             verbose: verbose flag
 
@@ -151,7 +156,7 @@ class EntitySymbols:
             filename=os.path.join(load_dir, "qid2eid.json")
         )
         alias2id: Dict[str, int] = utils.load_json_file(
-            filename=os.path.join(load_dir, "alias2id.json")
+            filename=os.path.join(load_dir, alias_idx_file)
         )
         return cls(
             alias2qids,
@@ -160,6 +165,7 @@ class EntitySymbols:
             alias2id,
             max_candidates,
             alias_cand_map_file,
+            alias_idx_file,
             edit_mode,
             verbose,
         )

@@ -52,6 +52,12 @@ def parse_args():
         help="Path to alias candidate map",
     )
     parser.add_argument(
+        "--alias_idx_map",
+        type=str,
+        default="alias2id.json",
+        help="Path to alias candidate map",
+    )
+    parser.add_argument(
         "--bert_model", type=str, default="bert-base-cased", help="Bert model"
     )
     parser.add_argument(
@@ -118,6 +124,7 @@ def main():
     entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
+        alias_idx_file=args.alias_idx_map,
     )
     print("DO LOWERCASE IS", "uncased" in args.bert_model)
     tokenizer = BertTokenizer.from_pretrained(

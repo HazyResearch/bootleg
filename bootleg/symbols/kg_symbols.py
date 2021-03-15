@@ -103,7 +103,7 @@ class KGSymbols:
 
         Returns: List
         """
-        return self._qid2relations[qid].get(relation, {})
+        return self._qid2relations[qid].get(relation, [])
 
     def get_all_connections(self, qid):
         """Returns dictionary of relation -> list of other_qids connected to

@@ -128,7 +128,7 @@ class EntityProfileTest(unittest.TestCase):
             assert found_other_obj is not None
             self.assertDictEqual(qid_obj, found_other_obj)
 
-    def test_profile_load_typeerror(self):
+    def test_profile_load_jsonl_errors(self):
         data = [
             {
                 "entity_id": 123,
@@ -146,7 +146,89 @@ class EntityProfileTest(unittest.TestCase):
             EntityProfile._read_profile_file(self.profile_file)
         assert type(context.exception) is ValidationError
 
-    def test_qid_check(self):
+    def test_profile_dump_load(self):
+        data = [
+            {
+                "entity_id": "Q123",
+                "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+                "title": "Dog",
+                "types": {"hyena": ["animal"], "wiki": ["dog"]},
+                "relations": [
+                    {"relation": "sibling", "object": "Q345"},
+                    {"relation": "sibling", "object": "Q567"},
+                ],
+            },
+            {
+                "entity_id": "Q345",
+                "mentions": [["cat", 10.0], ["catt", 7.0], ["animal", 3.0]],
+                "title": "Cat",
+                "types": {"hyena": ["animal"], "wiki": ["cat"]},
+                "relations": [{"relation": "sibling", "object": "Q123"}],
+            },
+        ]
+        self.write_data(self.profile_file, data)
+        entity_profile = EntityProfile.load_from_jsonl(
+            self.profile_file, max_candidates=5, edit_mode=True
+        )
+        entity_profile.save(self.save_dir2)
+
+        # Test load correctly
+        entity_profile2 = EntityProfile.load_from_cache(self.save_dir2)
+
+        self.assertSetEqual(
+            set(entity_profile.get_all_qids()), set(entity_profile2.get_all_qids())
+        )
+        self.assertSetEqual(
+            set(entity_profile.get_all_typesystems()),
+            set(entity_profile2.get_all_typesystems()),
+        )
+        for type_sys in entity_profile.get_all_typesystems():
+            self.assertSetEqual(
+                set(entity_profile.get_all_types(type_sys)),
+                set(entity_profile2.get_all_types(type_sys)),
+            )
+        for qid in entity_profile.get_all_qids():
+            self.assertSetEqual(
+                set(entity_profile.get_all_connections(qid)),
+                set(entity_profile2.get_all_connections(qid)),
+            )
+
+        # Test load with no types or kgs
+        entity_profile2 = EntityProfile.load_from_cache(
+            self.save_dir2, no_type=True, no_kg=True
+        )
+
+        self.assertSetEqual(
+            set(entity_profile.get_all_qids()), set(entity_profile2.get_all_qids())
+        )
+        assert len(entity_profile2.get_all_typesystems()) == 0
+        self.assertIsNone(entity_profile2._kg_symbols)
+
+        # Testing that the functions still work despite not loading them
+        assert len(entity_profile2.get_all_connections("Q123")) == 0
+
+        # Test load with no types or kgs
+        entity_profile2 = EntityProfile.load_from_cache(
+            self.save_dir2, no_kg=True, type_systems_to_load=["wiki"]
+        )
+
+        self.assertSetEqual(
+            set(entity_profile.get_all_qids()), set(entity_profile2.get_all_qids())
+        )
+        assert entity_profile2.get_all_typesystems() == ["wiki"]
+        self.assertSetEqual(
+            set(entity_profile.get_all_types("wiki")),
+            set(entity_profile2.get_all_types("wiki")),
+        )
+        self.assertIsNone(entity_profile2._kg_symbols)
+
+        # Assert error loading type system that is not there
+        with self.assertRaises(ValueError) as context:
+            entity_profile2.get_all_types("hyena")
+        assert type(context.exception) is ValueError
+        assert "type system hyena is not one" in str(context.exception)
+
+    def test_checks(self):
         data = [
             {
                 "entity_id": "Q123",
@@ -223,6 +305,7 @@ class EntityProfileTest(unittest.TestCase):
         entity_profile = EntityProfile.load_from_jsonl(
             self.profile_file, max_candidates=3, edit_mode=True
         )
+        entity_profile.save(self.save_dir2)
 
         # Test bad format
         with self.assertRaises(ValueError) as context:
@@ -317,6 +400,23 @@ class EntityProfileTest(unittest.TestCase):
             entity_profile.get_connections_by_relation("Q789", "sibling"), ["Q123"]
         )
 
+        # Check that no_kg still works with load_from_cache
+        entity_profile2 = EntityProfile.load_from_cache(
+            self.save_dir2, no_kg=True, edit_mode=True
+        )
+        entity_profile2.add_entity(new_entity)
+        self.assertTrue(entity_profile2.qid_exists("Q789"))
+        self.assertEqual(entity_profile2.get_title("Q789"), "Snake")
+        self.assertListEqual(
+            entity_profile2.get_mentions_with_scores("Q789"),
+            [["snake", 10.0], ["animal", 3.0]],
+        )
+        self.assertListEqual(entity_profile2.get_types("Q789", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile2.get_types("Q789", "wiki"), [])
+        self.assertListEqual(
+            entity_profile2.get_connections_by_relation("Q789", "sibling"), []
+        )
+
     def test_reindentify_entity(self):
         data = [
             {
@@ -341,6 +441,7 @@ class EntityProfileTest(unittest.TestCase):
         entity_profile = EntityProfile.load_from_jsonl(
             self.profile_file, max_candidates=5, edit_mode=True
         )
+        entity_profile.save(self.save_dir2)
 
         with self.assertRaises(ValueError) as context:
             entity_profile.reidentify_entity("Q123", "Q345")
@@ -364,6 +465,25 @@ class EntityProfileTest(unittest.TestCase):
         self.assertListEqual(
             entity_profile.get_connections_by_relation("Q911", "sibling"),
             ["Q345", "Q567"],
+        )
+
+        # Check that no_kg still works with load_from_cache
+        entity_profile2 = EntityProfile.load_from_cache(
+            self.save_dir2, no_kg=True, edit_mode=True
+        )
+        entity_profile2.reidentify_entity("Q123", "Q911")
+        self.assertTrue(entity_profile2.qid_exists("Q911"))
+        self.assertFalse(entity_profile2.qid_exists("Q123"))
+        self.assertEqual(entity_profile2.get_title("Q911"), "Dog")
+        self.assertListEqual(
+            entity_profile2.get_mentions_with_scores("Q911"),
+            [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+        )
+        self.assertListEqual(entity_profile2.get_types("Q911", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile2.get_types("Q911", "wiki"), ["dog"])
+        self.assertListEqual(
+            entity_profile2.get_connections_by_relation("Q911", "sibling"),
+            [],
         )
 
     def test_prune_to_entities(self):
@@ -390,11 +510,44 @@ class EntityProfileTest(unittest.TestCase):
         entity_profile = EntityProfile.load_from_jsonl(
             self.profile_file, max_candidates=5, edit_mode=True
         )
+        entity_profile.save(self.save_dir2)
 
         with self.assertRaises(ValueError) as context:
             entity_profile.prune_to_entities({"Q123", "Q567"})
         assert type(context.exception) is ValueError
         assert "The entity Q567 does not exist" in str(context.exception)
+
+        entity_profile.prune_to_entities({"Q123"})
+        self.assertTrue(entity_profile.qid_exists("Q123"))
+        self.assertFalse(entity_profile.qid_exists("Q345"))
+        self.assertListEqual(
+            entity_profile.get_mentions_with_scores("Q123"),
+            [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+        )
+        self.assertListEqual(entity_profile.get_types("Q123", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile.get_types("Q123", "wiki"), ["dog"])
+        self.assertListEqual(
+            entity_profile.get_connections_by_relation("Q123", "sibling"),
+            [],
+        )
+
+        # Check that no_kg still works with load_from_cache
+        entity_profile2 = EntityProfile.load_from_cache(
+            self.save_dir2, no_kg=True, edit_mode=True
+        )
+        entity_profile2.prune_to_entities({"Q123"})
+        self.assertTrue(entity_profile2.qid_exists("Q123"))
+        self.assertFalse(entity_profile2.qid_exists("Q345"))
+        self.assertListEqual(
+            entity_profile2.get_mentions_with_scores("Q123"),
+            [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+        )
+        self.assertListEqual(entity_profile2.get_types("Q123", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile2.get_types("Q123", "wiki"), ["dog"])
+        self.assertListEqual(
+            entity_profile2.get_connections_by_relation("Q123", "sibling"),
+            [],
+        )
 
     def test_end2end(self):
         # ======================

@@ -213,6 +213,7 @@ def run_model(mode, config, run_config_path=None):
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
         alias_cand_map_file=config.data_config.alias_cand_map,
+        alias_idx_file=config.data_config.alias_idx_map,
     )
     # Create tasks
     tasks = [NED_TASK]
@@ -285,6 +286,10 @@ def run_model(mode, config, run_config_path=None):
     if config["model_config"]["model_path"] is not None:
         model.load(config["model_config"]["model_path"])
 
+    # Barrier
+    if config["learner_config"]["local_rank"] == 0:
+        torch.distributed.barrier()
+
     # Train model
     if mode == "train":
         emmental_learner = EmmentalLearner()
@@ -343,6 +348,7 @@ def run_model(mode, config, run_config_path=None):
         # Will keep track of sentences dumped already. These will only be ones with mentions
         all_dumped_sentences = set()
         number_dumped_batches = 0
+        total_mentions_seen = 0
         all_result_files = []
         all_out_emb_files = []
         # Iterating over batches of predictions
@@ -354,8 +360,14 @@ def run_model(mode, config, run_config_path=None):
                 sentidx2num_mentions,
             )
         ):
-            result_file, out_emb_file, final_sent_idxs = eval_utils.disambig_dump_preds(
+            (
+                result_file,
+                out_emb_file,
+                final_sent_idxs,
+                mentions_seen,
+            ) = eval_utils.disambig_dump_preds(
                 res_i,
+                total_mentions_seen,
                 config,
                 res_dict,
                 sentidx2num_mentions,
@@ -368,6 +380,7 @@ def run_model(mode, config, run_config_path=None):
             all_dumped_sentences.update(final_sent_idxs)
             all_result_files.append(result_file)
             all_out_emb_files.append(out_emb_file)
+            total_mentions_seen += mentions_seen
             number_dumped_batches += 1
 
         # Dump the sentences that had no mentions and were not already dumped
@@ -392,6 +405,7 @@ def run_model(mode, config, run_config_path=None):
             sental2embid={},
             alias_cand_map=entity_symbols.get_alias2qids(),
             qid2eid=entity_symbols.get_qid2eid(),
+            result_alias_offset=total_mentions_seen,
             train_in_cands=config.data_config.train_in_candidates,
             max_cands=entity_symbols.max_candidates,
             dump_embs=dump_embs,

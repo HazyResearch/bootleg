@@ -229,6 +229,7 @@ class BootlegAnnotator(object):
                 self.config.data_config.entity_map_dir,
             ),
             alias_cand_map_file=self.config.data_config.alias_cand_map,
+            alias_idx_file=self.config.data_config.alias_idx_map,
         )
         logger.debug("Reading word tokenizers")
         self.tokenizer = BertTokenizer.from_pretrained(
