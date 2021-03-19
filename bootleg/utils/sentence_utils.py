@@ -1,10 +1,9 @@
-import logging
 from collections import defaultdict
 from math import ceil
 
-from transformers.tokenization_utils import _is_control, _is_whitespace
+from transformers.tokenization_utils import _is_control
 
-from bootleg.symbols.constants import *
+from bootleg.symbols.constants import CLS_BERT, PAD, PAD_BERT, SEP_BERT
 
 
 def determine_windowsX(
@@ -61,8 +60,8 @@ def determine_windowsX(
         while alias_idx + 1 < len(spans):
             # Stop if adding another alias would prevent retaining mincontext to the left of window_first_alias
             # We +1 to the mincontext because the ending span is exclusive
-            # E.g., if sentence was ["alias", "##1", "alias", "##2", "alias", "##3", "##5"] with spans [0,2], [2,4], [4,7]
-            # To have mincontext = 1 around the start of all aliases, we would need the final sentence to be [0:6] (6 is exclusive)
+            # E.g., if sentence is ["alias", "##1", "alias", "##2", "alias", "##3", "##5"] spans [0,2], [2,4], [4,7]
+            # To have mincontext = 1 around the start of all aliases, we need final sentence of [0:6] (6 is exclusive)
             # Therefore the condition is start span (i.e., 4) plus mincontext (i.e., 1) plus 1 (i.e., total of 6)
             if (
                 min(spans[alias_idx + 1][0] + mincontext + 1, len(sentence))
@@ -81,8 +80,8 @@ def determine_windowsX(
         # print("first", window_first_alias, "second", window_last_alias, "spans", spans)
         center = (spans[window_first_alias][0] + spans[window_last_alias][0]) // 2
         # print("Center", center)
-        # As the window_offset is inclusive while endpos is exclusive we make sure endpos gets +1 more than offset (e.g. if maxlen is 6,
-        # offset gets -2 while endpos gets +3). This ensure balance on both sides.
+        # As the window_offset is inclusive while endpos is exclusive we make sure endpos gets +1 more than offset
+        # (e.g. if maxlen is 6, offset gets -2 while endpos gets +3). This ensure balance on both sides.
         window_offset = max(center - ((maxlen - 1) // 2), 0)
         window_endpos = min(center + int(ceil(maxlen / 2)), len(sentence))
         # print("Start offset", window_offset, "start end", window_endpos)
@@ -259,8 +258,9 @@ def split_sentence(
         tokenizer: input tokenizer
         sanity_check: whether to sanity check the above conditions
 
-    Returns: list of window mention indices, list of window mention indices (relative to window_span_idxs[i], starting at zero),
-             list of tokenized sentences, list of token positions (relative to tokenized entire sentence)
+    Returns: list of window mention indices, list of window mention indices
+             (relative to window_span_idxs[i], starting at zero), list of tokenized sentences,
+             list of token positions (relative to tokenized entire sentence)
     """
     sentence, aliases2see, maxlen, old_spans = (
         phrase,
@@ -279,18 +279,22 @@ def split_sentence(
 
     spans = []
     for sp in old_spans:
-        assert (
-            sp[0] < sp[1]
-        ), f"We assume all mentions are at least length 1, but you have span {sp} where the right index is not greater than the left with phrase ***{phrase}***. Each span is in [0, length of sentence={old_len}], both inclusive"
+        assert sp[0] < sp[1], (
+            f"We assume all mentions are at least length 1, but you have span {sp} where the right index is not "
+            f"greater than the left with phrase ***{phrase}***. Each span is in "
+            f"[0, length of sentence={old_len}], both inclusive"
+        )
         assert (
             sp[0] >= 0 and sp[1] >= 0 and sp[1] <= old_len and sp[0] <= old_len
         ), f"The span of {sp} with {phrase} was not between [0, length of sentence={old_len}], both inclusive"
-        # We should have the right side be old_to_new[sp[1]][0], but due do tokenization occasionally removing rare unicode characters, this way ensures the right span is greater than the left
-        # because, in that case, we will have old_to_new[sp[1]-1][-1] == old_to_new[sp[0]][0] (see test case in test_sentence_utils.py)
+        # We should have the right side be old_to_new[sp[1]][0], but due do tokenization occasionally removing rare
+        # unicode characters, this way ensures the right span is greater than the left because, in that case,
+        # we will have old_to_new[sp[1]-1][-1] == old_to_new[sp[0]][0] (see test case in test_sentence_utils.py)
         spans.append([old_to_new[sp[0]][0], old_to_new[sp[1] - 1][-1] + 1])
-        assert (
-            spans[-1][0] < spans[-1][1]
-        ), f"Adjusted spans for old span {sp} and phrase ***{phrase}*** have the right side not greater than the left side. This might be due to a spans being on a unicode character removed by tokenization."
+        assert spans[-1][0] < spans[-1][1], (
+            f"Adjusted spans for old span {sp} and phrase ***{phrase}*** have the right side not greater than "
+            f"the left side. This might be due to a spans being on a unicode character removed by tokenization."
+        )
 
     (
         window_span_idxs,
@@ -352,9 +356,10 @@ def split_sentence(
                 if is_bert:
                     # Adjust so the end token is over the [CLS]
                     adjusted_endpos -= 1
-            assert (
-                span_offset - split_offset >= 0
-            ), f"The first span of {span_offset - split_offset} less than 0. Something went wrong in the span adjustment"
+            assert span_offset - split_offset >= 0, (
+                f"The first span of {span_offset - split_offset} less than 0. "
+                f"Something went wrong in the span adjustment"
+            )
             window_spans[-1].append([span_offset - split_offset, adjusted_endpos])
             current_alias_idx += 1
 
@@ -375,11 +380,12 @@ def get_old_to_new_word_idx_mapping(sentence, tokenizer):
 
     For example:
         phrase: 'Alexander få Baldwin III (born April 3, 1958, in Massapequa, Long Island, New York, USA).'
-        tokenized sentence: ['Alexander', 'f', '##å', 'Baldwin', 'III', '(', 'born', 'April', '3', ',', '1958', ',', 'in', 'Mass', '##ap',
-                             '##e', '##qua', ',', 'Long', 'Island', ',', 'New', 'York', ',', 'USA', ')']
+        tokenized sentence: ['Alexander', 'f', '##å', 'Baldwin', 'III', '(', 'born', 'April', '3', ',', '1958',
+                             ',', 'in', 'Mass', '##ap', '##e', '##qua', ',', 'Long', 'Island', ',',
+                             'New', 'York', ',', 'USA', ')']
 
-    Output: {0: [0], 1: [1, 2], 2: [3], 3: [4], 4: [5, 6], 5: [7], 6: [8, 9], 7: [10, 11], 8: [12], 9: [13, 14, 15, 16, 17], 10: [18], 11: [19, 20],
-             12: [21], 13: [22, 23], 14: [24, 25]}
+    Output: {0: [0], 1: [1, 2], 2: [3], 3: [4], 4: [5, 6], 5: [7], 6: [8, 9], 7: [10, 11], 8: [12],
+             9: [13, 14, 15, 16, 17], 10: [18], 11: [19, 20], 12: [21], 13: [22, 23], 14: [24, 25]}
 
     We use this to convert spans from original sentence splitting to new sentence splitting.
 
@@ -401,7 +407,8 @@ def get_old_to_new_word_idx_mapping(sentence, tokenizer):
             # This will allow tokenizers that use spaces to know it's a middle word
             old_word = " " + old_word
         tokenized_word = [t for t in tokenizer.tokenize(old_word) if len(t) > 0]
-        # due to https://github.com/huggingface/transformers/commit/21ed3a6b993eba06e7f4cf7720f4a07cc8a0d4c2, certain characters are cleaned and removed
+        # due to https://github.com/huggingface/transformers/commit/21ed3a6b993eba06e7f4cf7720f4a07cc8a0d4c2,
+        # certain characters are cleaned and removed
         # if this is the case, we need to adjust the spans so the token is eaten
         # print("OLD", old_w, old_word, "TOK", tokenized_word, "NEW W", new_w, "+", len(tokenized_word))
         if len(tokenized_word) <= 0:
@@ -429,10 +436,14 @@ def get_old_to_new_word_idx_mapping(sentence, tokenizer):
     old_to_new = dict(old_to_new)
     # Verify that each word from both sentences are in the mappings
     len_tokenized_sentence = len(final_tokenized_sentence)
+    if final_tokenized_sentence != tokenizer.tokenize(sentence):
+        import pdb
+
+        pdb.set_trace()
     assert final_tokenized_sentence == tokenizer.tokenize(sentence)
     assert len_tokenized_sentence + lost_words >= len(
         old_split
-    ), f"For some reason tokenize has compressed words that weren't lost {old_split} versus {tokenizer.tokenize(sentence)}"
+    ), f"Tokenize has compressed words that weren't lost {old_split} versus {tokenizer.tokenize(sentence)}"
     assert all(len(val) > 0 for val in old_to_new.values()), f"{old_to_new}, {sentence}"
     assert set(range(len_tokenized_sentence)) == set(
         [v for val in old_to_new.values() for v in val]

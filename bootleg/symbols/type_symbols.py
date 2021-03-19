@@ -1,10 +1,8 @@
 """Type symbols class."""
 
 import os
-from datetime import datetime
 from typing import Dict, List, Optional
 
-import ujson as json
 from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op

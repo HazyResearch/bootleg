@@ -194,7 +194,8 @@ class DataSlice(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        # Test 1: even though this sentence was split into multiple parts, the slices remain intact as an entire sentence
+        # Test 1: even though this sentence was split into multiple parts, the slices remain intact
+        # as an entire sentence
         max_seq_len = 5
         max_aliases = 2
         self.args.data_config.max_aliases = max_aliases
@@ -270,8 +271,8 @@ class DataSlice(unittest.TestCase):
         assert_slice_data_equal(gold_data, dataset.data)
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
-        # Test3: when we add another sentence that has fewer aliases, they should be padded to the largest that exist in a sentence, even if it's
-        # greater than max aliases
+        # Test3: when we add another sentence that has fewer aliases, they should be padded to the largest
+        # that exist in a sentence, even if it's greater than max aliases
 
         max_seq_len = 5
         max_aliases = 2
@@ -627,8 +628,8 @@ class DataSlice(unittest.TestCase):
         assert_slice_data_equal(gold_data, dataset.data)
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
-        # Test 1: the FALSE golds will be dropped, leaving one alias to score. However, as we have to have at least 2 aliases to predict
-        # for memmap to store as an array, we have two in our slice as a minimum.
+        # Test 1: the FALSE golds will be dropped, leaving one alias to score. However, as we have
+        # to have at least 2 aliases to predict for memmap to store as an array, we have two in our slice as a minimum.
         max_seq_len = 5
         max_aliases = 2
         self.args.data_config.max_aliases = max_aliases
@@ -870,7 +871,7 @@ class DataSlice(unittest.TestCase):
         try:
             assert_slice_data_equal(gold_data, dataset.data)
             self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
-        except AssertionError as e:
+        except AssertionError:
             assert_slice_data_equal(gold_data_rev_order, dataset.data)
             self.assertDictEqual(
                 gold_sent_to_row_id_dict_rev_order, dataset.sent_to_row_id_dict

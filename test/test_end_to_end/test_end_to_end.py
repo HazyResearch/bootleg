@@ -56,7 +56,7 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
         assert os.path.exists(out_emb_file)
 
@@ -79,9 +79,9 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
-        assert set([f for l in results for f in l["ctx_emb_ids"]]) == set(
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
             range(51)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
@@ -108,9 +108,9 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
-        assert set([f for l in results for f in l["ctx_emb_ids"]]) == set(
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
             range(51)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
@@ -144,9 +144,9 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
-        assert set([f for l in results for f in l["ctx_emb_ids"]]) == set(
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
             range(51)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
@@ -184,9 +184,9 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
-        assert set([f for l in results for f in l["ctx_emb_ids"]]) == set(
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
             range(51)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
@@ -217,9 +217,9 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
-        results = [ujson.loads(l) for l in open(result_file)]
+        results = [ujson.loads(li) for li in open(result_file)]
         assert 18 == len(results)  # 18 total sentences
-        assert set([f for l in results for f in l["ctx_emb_ids"]]) == set(
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
             range(51)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)

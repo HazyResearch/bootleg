@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import pathlib
+import shutil
 import time
 import unicodedata
 from importlib import import_module
@@ -10,6 +12,10 @@ import marisa_trie
 import ujson
 import yaml
 from tqdm import tqdm
+
+from bootleg import log_rank_0_info
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_dir(d):
@@ -187,7 +193,7 @@ def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
         num_lines: number of lines in each chunk
         prefix: prefix for output files in out_dir
 
-    Returns: total number of lines read, dictionary of output file path -> number of lines in that file (useful for tqdms)
+    Returns: total number of lines read, dictionary of output file path -> number of lines in that file (for tqdms)
     """
     ensure_dir(out_dir)
     out_files = {}
@@ -260,7 +266,8 @@ def import_class(prefix_string, base_string):
     This can be used in conjunciton with
         `getattr(mod, load_class)(...)`
     to initialize the base_string class
-    Ex: import_class("bootleg.embeddings", "LearnedEntityEmb") will return bootleg.embeddings module and "LearnedEntityEmb"
+    Ex: import_class("bootleg.embeddings", "LearnedEntityEmb") will return
+    bootleg.embeddings module and "LearnedEntityEmb"
 
     Args:
         prefix_string: prefix path
@@ -310,3 +317,28 @@ def get_lnrm(s, strip, lower):
     # will remove if there are any duplicate white spaces e.g. "the  alias    is here"
     lnrm = " ".join(lnrm.split())
     return lnrm
+
+
+def try_rmtree(rm_dir):
+    """In the case a resource is open, rmtree will fail. This retries to rmtree
+    after 1 second waits for 5 times.
+
+    Args:
+        rm_dir: directory to remove
+
+    Returns:
+    """
+    num_retries = 0
+    max_retries = 5
+    while num_retries < max_retries:
+        try:
+            shutil.rmtree(rm_dir)
+            break
+        except OSError:
+            time.sleep(1)
+            num_retries += 1
+            if num_retries >= max_retries:
+                log_rank_0_info(
+                    logger,
+                    f"{rm_dir} was not able to be deleted. This is okay but will have to manually be removed.",
+                )

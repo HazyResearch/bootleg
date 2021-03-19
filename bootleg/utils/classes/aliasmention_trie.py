@@ -1,10 +1,8 @@
 import json
 import os
-from functools import partial
 from typing import Any, Callable, Dict, List, Tuple
 
 import marisa_trie
-import numpy as np
 import ujson
 from tqdm import tqdm
 
@@ -72,7 +70,8 @@ class AliasCandRecordTrie:
             self._loaded_from_dir = None
 
     def dump(self, save_dir):
-        # memmapped files bahve badly if you try to overwrite them in memory, which is what we'd be doing if load_dir == save_dir
+        # memmapped files bahve badly if you try to overwrite them in memory,
+        # which is what we'd be doing if load_dir == save_dir
         if self._loaded_from_dir is None or self._loaded_from_dir != save_dir:
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir, exist_ok=True)
@@ -115,7 +114,8 @@ class AliasCandRecordTrie:
         assert key in record_trie
         value = record_trie[key]
         # Record trie allows keys to have multiple values and returns a list of values for each key.
-        # As we make the value for each key a list already (to control order/not have to sort again), we need to assert there is only a single value
+        # As we make the value for each key a list already (to control order/not have to sort again),
+        # we need to assert there is only a single value
         assert len(value) == 1
         value = value[0]
         return_value = inverse_qid_cand_with_score(value=value, itos=self._itos)

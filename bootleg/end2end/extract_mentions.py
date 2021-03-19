@@ -4,7 +4,6 @@ import argparse
 import logging
 import multiprocessing
 import os
-import re
 import string
 import time
 from collections import defaultdict
@@ -114,13 +113,13 @@ def get_all_aliases(alias2qidcands, verbose):
 
 
 def get_new_to_old_dict(split_sentence):
-    """
-    Returns a mapped dictionary from new tokenized words with Spacy to old (Spacy sometimes splits words with - and other punc).
+    """Returns a mapped dictionary from new tokenized words with Spacy to old.
+
+    (Spacy sometimes splits words with - and other punc).
     Args:
         split_sentence: list of words in sentence
 
     Returns: Dict of new word id -> old word id
-
     """
     old_w = 0
     new_w = 0
@@ -149,7 +148,8 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
     Returns: list of aliases, list of span offsets
     """
     used_aliases = []
-    # Remove multiple spaces and replace with single - tokenization eats multiple spaces but ngrams doesn't which can cause parse issues
+    # Remove multiple spaces and replace with single - tokenization eats multiple spaces but
+    # ngrams doesn't which can cause parse issues
     sentence = " ".join(sentence.strip().split())
 
     doc = nlp(sentence)
@@ -252,9 +252,10 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
             # print("FINAL GRAM", final_gram)
             if final_gram is not None:
                 keep = True
-                # We start from the largest n-grams and go down in size. This prevents us from adding an alias that is a subset of another.
-                # For example: "Tell me about the mother on how I met you mother" will find "the mother" as alias and "mother". We want to
-                # only take "the mother" and not "mother" as it's likely more descriptive of the real entity.
+                # We start from the largest n-grams and go down in size. This prevents us from adding an alias that
+                # is a subset of another. For example: "Tell me about the mother on how I met you mother" will find
+                # "the mother" as alias and "mother". We want to only take "the mother" and not "mother" as it's
+                # likely more descriptive of the real entity.
                 for u_al in used_aliases:
                     u_j_st = u_al[1]
                     u_j_end = u_al[2]

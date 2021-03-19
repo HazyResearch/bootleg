@@ -14,11 +14,12 @@ import ujson
 from tqdm import tqdm
 
 import emmental
-from bootleg import log_rank_0_debug, log_rank_0_info
+from bootleg import log_rank_0_debug
 from bootleg.symbols.constants import PRED_LAYER, UNK_AL
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
+from bootleg.utils.utils import try_rmtree
 from emmental.utils.utils import array_to_numpy, prob_to_pred
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ def map_aliases_to_candidates(
     """Get list of QID candidates for each alias.
 
     Args:
-        train_in_candidates: whether the model has a NC entity or not (does it assume all gold QIDs are in the candidate lists)
+        train_in_candidates: whether the model has a NC entity or not (assumes all gold QIDs are in candidate lists)
         alias_cand_map: alias -> candidate qids in dict or AliasCandRecordTrie format
         aliases: list of aliases
 
@@ -155,13 +156,15 @@ def write_disambig_metrics_to_csv(file_path, dictionary):
 
     Returns:
     """
-    # Only saving NED, ignore Type. dictionary has keys such as "NED/Bootleg/dev/unif_HD/total_men" which corresponds to
-    # task/dataset/split/slice/metric, and the value is the associated value for that metric as calculated on the dataset.
-    # Sort keys to ensure that the rest of the code below remains in the correct order across slices
+    # Only saving NED, ignore Type. dictionary has keys such as "NED/Bootleg/dev/unif_HD/total_men" which
+    # corresponds to task/dataset/split/slice/metric, and the value is the associated value for that metric as
+    # calculated on the dataset. Sort keys to ensure that the rest of the code below remains in the correct order
+    # across slices
     all_keys = [x for x in sorted(dictionary.keys()) if x.startswith(NED_TASK)]
 
-    # This line uses endswith("total_men") because we are just trying to get 1 copy of each task/dataset/split/slice combo. We are not
-    # actually using the total_men information in this line below (could've used acc_boot instead, etc.)
+    # This line uses endswith("total_men") because we are just trying to get 1 copy of each task/dataset/split/slice
+    # combo. We are not actually using the total_men information in this line below (could've used acc_boot instead,
+    # etc.)
     task, dataset, split, slices = list(
         zip(*[x.split("/")[:4] for x in all_keys if x.endswith("total_men")])
     )
@@ -190,7 +193,7 @@ def write_disambig_metrics_to_csv(file_path, dictionary):
     df.to_csv(file_path, index=False)
 
 
-def get_sent_idx2num_mentions(data_file):
+def get_sent_idx2num_mens(data_file):
     """Gets the map from sentence index to number of mentions and to data. Used
     for calculating offsets and chunking file.
 
@@ -199,19 +202,20 @@ def get_sent_idx2num_mentions(data_file):
 
     Returns: Dict of sentence index -> number of mention per sentence, Dict of sentence index -> input line
     """
-    sent_idx2num_mentions = {}
+    sent_idx2num_mens = {}
     sent_idx2row = {}
     total_num_mentions = 0
     with open(data_file) as f:
         for line in f:
             line = ujson.loads(line)
-            # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of aliases)
+            # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of
+            # aliases)
             assert (
-                line["sent_idx_unq"] not in sent_idx2num_mentions
+                line["sent_idx_unq"] not in sent_idx2num_mens
             ), f'Sentence indices must be unique. {line["sent_idx_unq"]} already seen.'
             sent_idx2row[str(line["sent_idx_unq"])] = line
             # Save as string for Marisa Tri later
-            sent_idx2num_mentions[str(line["sent_idx_unq"])] = len(line["aliases"])
+            sent_idx2num_mens[str(line["sent_idx_unq"])] = len(line["aliases"])
             # We include false aliases for debugging (and alias_pos includes them)
             total_num_mentions += len(line["aliases"])
             # print("INSIDE SENT MAP", str(line["sent_idx_unq"]), total_num_mentions)
@@ -219,7 +223,7 @@ def get_sent_idx2num_mentions(data_file):
     log_rank_0_debug(
         logger, f"Total number of mentions across all sentences: {total_num_mentions}"
     )
-    return sent_idx2num_mentions, sent_idx2row
+    return sent_idx2num_mens, sent_idx2row
 
 
 # Modified from
@@ -230,7 +234,7 @@ def batched_pred_iter(
     model,
     dataloader,
     eval_accumulation_steps,
-    sent_idx2num_mentions,
+    sent_idx2num_mens,
 ):
     """Predict from dataloader taking into account eval accumulation steps.
     Will yield a new prediction set after each set accumulation steps for
@@ -239,14 +243,14 @@ def batched_pred_iter(
     If a sentence or batch doesn't have any mentions, it will not be returned by this method.
 
     Recall that we split up sentences that are too long to feed to the model.
-    We use the sent_idx2num_mentions dict to ensure we have full sentences evaluated before
+    We use the sent_idx2num_mens dict to ensure we have full sentences evaluated before
     returning, otherwise we'll have incomplete sentences to merge together when dumping.
 
     Args:
       model: model
       dataloader: The dataloader to predict
       eval_accumulation_steps: Number of eval steps to run before returning
-      sent_idx2num_mentions: list of sent index to number of mentions
+      sent_idx2num_mens: list of sent index to number of mentions
 
     Returns:
       Iterator over result dict.
@@ -261,12 +265,12 @@ def batched_pred_iter(
         final_gold_d = defaultdict(list)
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
-        # print("FINALIZE", cur_sentidx_nummen, [sent_idx2num_mentions[str(k)] for k in cur_sentidx_nummen])
+        # print("FINALIZE", cur_sentidx_nummen, [sent_idx2num_mens[str(k)] for k in cur_sentidx_nummen])
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
-                len(cur_mention_set) <= sent_idx2num_mentions[str(sent_idx)]
-            ), f"Too many mentions for {sent_idx}: {cur_mention_set} VS {sent_idx2num_mentions[str(sent_idx)]}"
-            if len(cur_mention_set) == sent_idx2num_mentions[str(sent_idx)]:
+                len(cur_mention_set) <= sent_idx2num_mens[str(sent_idx)]
+            ), f"Too many mentions for {sent_idx}: {cur_mention_set} VS {sent_idx2num_mens[str(sent_idx)]}"
+            if len(cur_mention_set) == sent_idx2num_mens[str(sent_idx)]:
                 sentidxs_finalized.append(sent_idx)
                 for task_name in uid_d:
                     final_uid_d[task_name].extend(uid_d[task_name][sent_idx])
@@ -278,7 +282,8 @@ def batched_pred_iter(
                             final_out_d[task_name][action_name].extend(
                                 out_d[task_name][action_name][sent_idx]
                             )
-        # If batch size is close to 1 and accumulation step was close to 1, we may get to where there are no complete sentences
+        # If batch size is close to 1 and accumulation step was close to 1,
+        # we may get to where there are no complete sentences
         if len(sentidxs_finalized) == 0:
             return {}, sentidxs_finalized
         res = {
@@ -305,7 +310,8 @@ def batched_pred_iter(
     out_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     # list of all finalized and yielded sentences
     all_finalized_sentences = []
-    # Storing currently stored sent idx -> unique mentions seed (for sentences that aren't complete, we'll hold until they are)
+    # Storing currently stored sent idx -> unique mentions seed (for sentences that aren't complete,
+    # we'll hold until they are)
     cur_sentidx2_nummentions = dict()
     num_eval_steps = 0
 
@@ -351,13 +357,15 @@ def batched_pred_iter(
                     #     ]
                     # )
                     # ============================
-                    # Index 0 -> sent_idx, Index 1 -> subsent_idx, Index 2 -> List of aliases positions (-1 means no mention in train example)
+                    # Index 0 -> sent_idx, Index 1 -> subsent_idx, Index 2 -> List of aliases positions
+                    # (-1 means no mention in train example)
                     sent_idx = uid_bdict[task_name][ex_idx][0]
                     # Only incredment for NED TASK
                     if task_name == NED_TASK:
-                        # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means skip) for scoring
-                        # This will be different than the mentions seen by the model as we window sentences and a mention may be seen
-                        # multiple times but only scored once. This includes for True and False anchors - we dump all anchors for analysis
+                        # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
+                        # skip) for scoring. This will be different than the mentions seen by the model as we window
+                        # sentences and a mention may be seen multiple times but only scored once. This includes for
+                        # True and False anchors - we dump all anchors for analysis
                         alias_pos_for_eval = out_bdict[task_name][
                             "_input__for_dump_gold_cand_K_idx_train"
                         ][ex_idx]
@@ -431,11 +439,11 @@ def batched_pred_iter(
     assert (
         len(cur_sentidx2_nummentions) == 0
     ), f"After eval, some sentences had left over mentions {cur_sentidx2_nummentions}"
-    assert set(all_finalized_sentences).intersection(
-        sent_idx2num_mentions.keys()
-    ) == set([k for k, v in sent_idx2num_mentions.items() if v > 0]), (
+    assert set(all_finalized_sentences).intersection(sent_idx2num_mens.keys()) == set(
+        [k for k, v in sent_idx2num_mens.items() if v > 0]
+    ), (
         f"Some sentences are left over "
-        f"{[s for s in sent_idx2num_mentions if s not in set(all_finalized_sentences) and sent_idx2num_mentions[s] > 0]}"
+        f"{[s for s in sent_idx2num_mens if s not in set(all_finalized_sentences) and sent_idx2num_mens[s] > 0]}"
     )
     return None
 
@@ -452,7 +460,7 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
     """
     try:
         AliasCandRecordTrie(load_dir=save_folder)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         log_rank_0_debug(
             logger,
             "Creating the alias candidate trie for faster parallel processing. "
@@ -496,7 +504,7 @@ def disambig_dump_preds(
     result_alias_offset,
     config,
     res_dict,
-    sent_idx2num_mentions,
+    sent_idx2num_mens,
     sent_idx2row,
     save_folder,
     entity_symbols,
@@ -507,10 +515,10 @@ def disambig_dump_preds(
 
     Args:
         result_idx: batch index of the result arrays
-        result_alias_offset: overall offset of the starting example (i.e., the number of previous mentions already written)
+        result_alias_offset: overall offset of the starting example (i.e., the number of previous mens already written)
         config: model config
         res_dict: result dictionary from Emmental predict
-        sent_idx2num_mentions: Dict sentence idx to number of mentions
+        sent_idx2num_mens: Dict sentence idx to number of mentions
         sent_idx2row: Dict sentence idx to row of eval data
         save_folder: folder to save results
         entity_symbols: entity symbols
@@ -549,7 +557,8 @@ def disambig_dump_preds(
         assert task_name in res_dict[k], f"{task_name} not in res_dict for key {k}"
         disambig_res_dict[k] = res_dict[k][task_name]
 
-    # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence indices for overflowing sentences)
+    # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
+    # indices for overflowing sentences)
     unmerged_entity_emb_file = os.path.join(save_folder, f"entity_embs.pt")
     merged_entity_emb_file = os.path.join(save_folder, f"entity_embs_unmerged.pt")
     emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
@@ -631,8 +640,8 @@ def disambig_dump_preds(
     ]
     all_sent_idx = set()
     for i, (uid, gold, probs, model_pred) in enumerate(zip(*for_iteration)):
-        # disambig_res_dict["output"] is dict with keys ['_input__alias_orig_list_pos', 'bootleg_pred_1', '_input__sent_idx',
-        # '_input__for_dump_gold_cand_K_idx_train', '_input__subsent_idx', 0, 1]
+        # disambig_res_dict["output"] is dict with keys ['_input__alias_orig_list_pos',
+        # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train', '_input__subsent_idx', 0, 1]
         sent_idx = disambig_res_dict["outputs"]["_input__sent_idx"][i]
         # print("INSIDE LOOP", sent_idx, "AT", i)
         subsent_idx = disambig_res_dict["outputs"]["_input__subsent_idx"][i]
@@ -677,8 +686,8 @@ def disambig_dump_preds(
     #         pdb.set_trace()
     #     assert si != -1, f"{i} {mmap_file[i]}"
     # Store all predicted sentences to filter the sentence mapping by
-    subset_sent_idx2num_mentions = {
-        k: v for k, v in sent_idx2num_mentions.items() if k in all_sent_idx
+    subset_sent_idx2num_mens = {
+        k: v for k, v in sent_idx2num_mens.items() if k in all_sent_idx
     }
     # print("ALL SEEN", all_sent_idx)
     subsent_sent_idx2row = {k: v for k, v in sent_idx2row.items() if k in all_sent_idx}
@@ -686,7 +695,7 @@ def disambig_dump_preds(
     log_rank_0_debug(logger, f"Writing predictions to {result_file}...")
     merge_subsentences(
         num_processes=num_processes,
-        subset_sent_idx2num_mentions=subset_sent_idx2num_mentions,
+        subset_sent_idx2num_mens=subset_sent_idx2num_mens,
         cache_folder=cache_dir,
         to_save_file=merged_entity_emb_file,
         to_save_storage=merged_storage_type,
@@ -727,29 +736,15 @@ def disambig_dump_preds(
     filt_emb_data = None
 
     # Cleanup cache - sometimes the file in cache_dir is still open so we need to retry to delete it
-    num_retries = 0
-    max_retries = 5
-    while num_retries < max_retries:
-        try:
-            shutil.rmtree(cache_dir)
-            break
-        except OSError as e:
-            time.sleep(1)
-            num_retries += 1
-            if num_retries >= max_retries:
-                log_rank_0_info(
-                    logger,
-                    f"{cache_dir} was not able to be deleted. This is okay but will have to manually be removed.",
-                )
+    try_rmtree(cache_dir)
 
     log_rank_0_debug(logger, f"Wrote predictions for {result_idx} to {result_file}")
     return result_file, out_emb_file, all_sent_idx, total_mentions_seen
 
 
-#
 def merge_subsentences(
     num_processes,
-    subset_sent_idx2num_mentions,
+    subset_sent_idx2num_mens,
     cache_folder,
     to_save_file,
     to_save_storage,
@@ -764,7 +759,7 @@ def merge_subsentences(
 
     Args:
         num_processes: number of processes
-        subset_sent_idx2num_mentions: Dict of sentence index to number of mentions for this batch
+        subset_sent_idx2num_mens: Dict of sentence index to number of mentions for this batch
         cache_folder: cache directory
         to_save_file: memmap file to save results to
         to_save_storage: save file storage type
@@ -777,7 +772,7 @@ def merge_subsentences(
     # Compute sent idx to offset so we know where to fill in mentions
     cur_offset = 0
     sentidx2offset = {}
-    for k, v in subset_sent_idx2num_mentions.items():
+    for k, v in subset_sent_idx2num_mens.items():
         sentidx2offset[k] = cur_offset
         cur_offset += v
         # print("Sent Idx, Num Mens, Offset", k, v, cur_offset)
@@ -810,7 +805,7 @@ def merge_subsentences(
         )
     else:
         # Get trie for sentence start map
-        trie_folder = os.path.join(cache_folder, "bootleg_sent_idx2num_mentions")
+        trie_folder = os.path.join(cache_folder, "bootleg_sent_idx2num_mens")
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
         utils.create_single_item_trie(sentidx2offset, out_file=trie_file)
@@ -908,7 +903,8 @@ def merge_subsentences_single(
     sentidx2offset,
 ):
     """
-    merge_subsentences single process. Will flatted out the results from `full_pred_data` so each line of `filt_emb_data` is one alias prediction.
+    merge_subsentences single process. Will flatted out the results from `full_pred_data` so each line of
+     `filt_emb_data` is one alias prediction.
     Args:
         M: number aliases
         K: number candidates
@@ -937,10 +933,12 @@ def merge_subsentences_single(
         for i, (true_val, alias_orig_pos) in enumerate(
             zip(row["final_loss_true"], row["alias_list_pos"])
         ):
-            # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for padded mentions or sub-sentence mentions
+            # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for
+            # padded mentions or sub-sentence mentions
             if true_val != -1:
                 # print(
-                #     "INSIDE MERGE", "I", i, "SENT", sent_idx, "TRUE", true_val, "ALIAS ORIG POS", alias_orig_pos, "START SENT IDX", sent_start_idx, "EMB ID", sent_start_idx + alias_orig_pos
+                #     "INSIDE MERGE", "I", i, "SENT", sent_idx, "TRUE", true_val, "ALIAS ORIG POS", alias_orig_pos,
+                #     "START SENT IDX", sent_start_idx, "EMB ID", sent_start_idx + alias_orig_pos
                 # )
                 # id in condensed embedding
                 emb_id = sent_start_idx + alias_orig_pos
@@ -1061,7 +1059,6 @@ def write_data_labels(
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
         utils.create_single_item_trie(sental2embid, out_file=trie_file)
-
         # Chunk file for parallel writing
         # We do not use TemporaryFolders as the temp dir may not have enough space for large files
         create_ex_indir = os.path.join(cache_folder, "_bootleg_eval_temp_indir")

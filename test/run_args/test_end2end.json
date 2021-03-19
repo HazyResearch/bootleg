@@ -1,6 +1,6 @@
 {
     "emmental": {
-        "n_epochs": 20,
+        "n_epochs": 40,
         "seed": 1234
     },
     "run_config": {

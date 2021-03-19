@@ -11,7 +11,6 @@ import ujson
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import eval_utils
-from bootleg.utils.classes.dotted_dict import DottedDict
 from bootleg.utils.eval_utils import check_and_create_alias_cand_trie, write_data_labels
 from bootleg.utils.utils import create_single_item_trie
 
@@ -416,20 +415,11 @@ class EvalUtils(unittest.TestCase):
 
         entity_dir = "test/entity_db"
         entity_map_dir = "entity_mappings"
-        alias_cand_map = "alias2qids.json"
-        alias_idx_map = "alias2id.json"
-        data_config = DottedDict(
-            entity_dir=entity_dir,
-            entity_map_dir=entity_map_dir,
-            alias_cand_map=alias_cand_map,
-            alias_idx_map=alias_idx_map,
-        )
+
         entity_symbols = EntitySymbolsSubclass()
         entity_symbols.save(save_dir=os.path.join(entity_dir, entity_map_dir))
 
-        num_examples = 3
         total_num_mentions = 7
-        M = 3
         K = 2
         hidden_size = 2
 
@@ -594,7 +584,8 @@ class EvalUtils(unittest.TestCase):
             self.assertDictEqual(
                 gold_lines_sent_idx_map[sent_idx],
                 all_lines_sent_idx_map[sent_idx],
-                f"{ujson.dumps(gold_lines_sent_idx_map[sent_idx], indent=4)} VS {ujson.dumps(all_lines_sent_idx_map[sent_idx], indent=4)}",
+                f"{ujson.dumps(gold_lines_sent_idx_map[sent_idx], indent=4)} VS "
+                f"{ujson.dumps(all_lines_sent_idx_map[sent_idx], indent=4)}",
             )
 
         # TRY MULTIPROCESSING
@@ -638,7 +629,8 @@ class EvalUtils(unittest.TestCase):
             self.assertDictEqual(
                 gold_lines_sent_idx_map[sent_idx],
                 all_lines_sent_idx_map[sent_idx],
-                f"{ujson.dumps(gold_lines_sent_idx_map[sent_idx], indent=4)} VS {ujson.dumps(all_lines_sent_idx_map[sent_idx], indent=4)}",
+                f"{ujson.dumps(gold_lines_sent_idx_map[sent_idx], indent=4)} VS "
+                f"{ujson.dumps(all_lines_sent_idx_map[sent_idx], indent=4)}",
             )
 
         # clean up

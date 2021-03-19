@@ -4,11 +4,8 @@ import unittest
 from pathlib import Path
 
 import torch
-import ujson
-from pydantic import ValidationError
 
 from bootleg.layers.alias_to_ent_encoder import AliasEntityTable
-from bootleg.symbols.entity_profile import EntityProfile
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.symbols.kg_symbols import KGSymbols
 from bootleg.symbols.type_symbols import TypeSymbols
@@ -554,10 +551,6 @@ class KGSymbolsTest(unittest.TestCase):
 
 
 class EntitySymbolTest(unittest.TestCase):
-    def setUp(self):
-        entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
-        self.entity_symbols = EntitySymbols.load_from_cache(load_dir=entity_dump_dir)
-
     def test_create_entities(self):
         truealias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
@@ -597,6 +590,23 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertIsNone(entity_symbols._qid2aliases)
 
+        # Test load from dump
+        temp_save_dir = "test/data/entity_loader_test"
+        entity_symbols.save(temp_save_dir)
+        entity_symbols = EntitySymbols.load_from_cache(temp_save_dir)
+
+        self.assertEqual(entity_symbols.max_candidates, 3)
+        self.assertEqual(entity_symbols.max_eid, 4)
+        self.assertEqual(entity_symbols.max_alid, 3)
+        self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
+        self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
+        self.assertDictEqual(tri_as_dict, truealiastrie)
+        self.assertDictEqual(entity_symbols._alias2id, truealias2id)
+        self.assertIsNone(entity_symbols._qid2aliases)
+        shutil.rmtree(temp_save_dir)
+
+        # Test edit mode
         entity_symbols = EntitySymbols(
             max_candidates=3,
             alias2qids=truealias2qids,
@@ -612,10 +622,10 @@ class EntitySymbolTest(unittest.TestCase):
 
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
 
-    def test_load_entites_keep_noncandidate(self):
+    def test_getters(self):
         truealias2qids = {
-            "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
             "alias1": [["Q1", 10.0], ["Q4", 6]],
+            "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
             "alias3": [["Q1", 30.0]],
             "alias4": [["Q4", 20], ["Q3", 15.0], ["Q2", 1]],
         }
@@ -627,46 +637,31 @@ class EntitySymbolTest(unittest.TestCase):
             "Q4": "nonalias4",
         }
 
-        # the non-candidate class is included in entity_dump
-        trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+        entity_symbols = EntitySymbols(
+            max_candidates=3,
+            alias2qids=truealias2qids,
+            qid2title=trueqid2title,
+        )
 
-        truealiastrie = {"multi word alias2": 0, "alias1": 1, "alias3": 2, "alias4": 3}
-
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-
-        tri_as_dict = {}
-        for k in self.entity_symbols._alias_trie:
-            tri_as_dict[k] = self.entity_symbols._alias_trie[k]
-
-        self.assertEqual(self.entity_symbols.max_candidates, 3)
-        self.assertEqual(self.entity_symbols.max_eid, 4)
-        self.assertEqual(self.entity_symbols.max_alid, 3)
-        self.assertDictEqual(self.entity_symbols._alias2qids, truealias2qids)
-        self.assertDictEqual(self.entity_symbols._qid2title, trueqid2title)
-        self.assertDictEqual(self.entity_symbols._qid2eid, trueqid2eid)
-        self.assertDictEqual(tri_as_dict, truealiastrie)
-        self.assertDictEqual(self.entity_symbols._alias2id, truealias2id)
-
-    def test_getters(self):
-        self.assertEqual(self.entity_symbols.get_qid(1), "Q1")
+        self.assertEqual(entity_symbols.get_qid(1), "Q1")
         self.assertSetEqual(
-            set(self.entity_symbols.get_all_aliases()),
+            set(entity_symbols.get_all_aliases()),
             {"alias1", "multi word alias2", "alias3", "alias4"},
         )
-        self.assertEqual(self.entity_symbols.get_eid("Q3"), 3)
-        self.assertListEqual(self.entity_symbols.get_qid_cands("alias1"), ["Q1", "Q4"])
+        self.assertEqual(entity_symbols.get_eid("Q3"), 3)
+        self.assertListEqual(entity_symbols.get_qid_cands("alias1"), ["Q1", "Q4"])
         self.assertListEqual(
-            self.entity_symbols.get_qid_cands("alias1", max_cand_pad=True),
+            entity_symbols.get_qid_cands("alias1", max_cand_pad=True),
             ["Q1", "Q4", "-1"],
         )
         self.assertListEqual(
-            self.entity_symbols.get_eid_cands("alias1", max_cand_pad=True), [1, 4, -1]
+            entity_symbols.get_eid_cands("alias1", max_cand_pad=True), [1, 4, -1]
         )
-        self.assertEqual(self.entity_symbols.get_title("Q1"), "alias1")
-        self.assertEqual(self.entity_symbols.get_alias_idx("alias1"), 0)
-        self.assertEqual(self.entity_symbols.get_alias_from_idx(1), "alias3")
-        self.assertEqual(self.entity_symbols.alias_exists("alias3"), True)
-        self.assertEqual(self.entity_symbols.alias_exists("alias5"), False)
+        self.assertEqual(entity_symbols.get_title("Q1"), "alias1")
+        self.assertEqual(entity_symbols.get_alias_idx("alias1"), 0)
+        self.assertEqual(entity_symbols.get_alias_from_idx(1), "alias3")
+        self.assertEqual(entity_symbols.alias_exists("alias3"), True)
+        self.assertEqual(entity_symbols.alias_exists("alias5"), False)
 
     def test_add_remove_mention(self):
         alias2qids = {
@@ -1191,6 +1186,19 @@ class AliasTableTest(unittest.TestCase):
                 [0, 1, -1, -1],
                 [0, 4, 3, 2],
                 [0, 2, 1, 4],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
+                [0, 4, 3, 2],
                 [-1, -1, -1, -1],
             ]
         )
@@ -1206,7 +1214,26 @@ class AliasTableTest(unittest.TestCase):
         )
 
         gold_alias2entity_table = torch.tensor(
-            [[1, 4, -1], [1, -1, -1], [4, 3, 2], [2, 1, 4], [-1, -1, -1]]
+            [
+                [1, 4, -1],
+                [1, -1, -1],
+                [4, 3, 2],
+                [2, 1, 4],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [4, 3, 2],
+                [-1, -1, -1],
+            ]
         )
         assert torch.equal(
             gold_alias2entity_table.long(),

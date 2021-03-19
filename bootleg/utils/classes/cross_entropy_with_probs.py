@@ -1,4 +1,5 @@
-# Taken from https://raw.githubusercontent.com/snorkel-team/snorkel/master/snorkel/classification/loss.py and modified to have ignore index
+# Taken from https://raw.githubusercontent.com/snorkel-team/snorkel/master/snorkel/classification/loss.py
+# and modified to have ignore index
 from typing import List, Mapping, Optional
 
 import torch

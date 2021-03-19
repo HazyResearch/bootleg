@@ -1,7 +1,8 @@
 """Builds our hierarchical regularization where an entity is regularization
 proportional to the power of its popularity in the training data.
 
-The output of this is a csv file with columns QID and regulatization. This is then used in the config for an Entity Embedding.
+The output of this is a csv file with columns QID and regulatization.
+This is then used in the config for an Entity Embedding.
 
 ent_embeddings:
    - key: learned
@@ -16,9 +17,6 @@ ent_embeddings:
 import argparse
 import multiprocessing
 import os
-import random
-import shutil
-import sys
 from collections import defaultdict
 
 import numpy as np

@@ -9,7 +9,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from bootleg import log_rank_0_debug
-from bootleg.utils import data_utils, model_utils, utils
+from bootleg.utils import data_utils, utils
 from bootleg.utils.embedding_utils import get_max_candidates
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ class AliasEntityTable(nn.Module):
             num_cands_K=self.K,
         )
         # self.alias2entity_table = model_utils.move_to_device(self.alias2entity_table)
-        # Small check that loading was done correctly. This isn't a catch all, but will catch is the same or something went wrong.
+        # Small check that loading was done correctly. This isn't a catch all,
+        # but will catch is the same or something went wrong.
         assert torch.equal(
             self.alias2entity_table[-1],
             torch.ones_like(self.alias2entity_table[-1]) * -1,
@@ -65,7 +66,6 @@ class AliasEntityTable(nn.Module):
         # we pass num_aliases_with_pad and num_cands_K to remove the dependence on entity_symbols
         # when the alias table is already prepped
         data_shape = (num_aliases_with_pad, num_cands_K)
-        total_size = data_shape[0] * data_shape[1]
         # dependent on train_in_candidates flag
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         alias_str = os.path.splitext(data_config.alias_cand_map.replace("/", "_"))[0]

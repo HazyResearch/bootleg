@@ -4,7 +4,6 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import ujson as json
 from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
@@ -166,9 +165,10 @@ class KGSymbols:
         if len(self._qid2relations[qid][relation]) >= self.max_connections:
             qid_to_remove = self._qid2relations[qid][relation][-1]
             self.remove_relation(qid, relation, qid_to_remove)
-            assert (
-                len(self._qid2relations[qid][relation]) < self.max_connections
-            ), f"Something went wrong and we still have more that {self.max_connections} relations when removing {qid}, {relation}, {qid2}"
+            assert len(self._qid2relations[qid][relation]) < self.max_connections, (
+                f"Something went wrong and we still have more that {self.max_connections} "
+                f"relations when removing {qid}, {relation}, {qid2}"
+            )
         self._qid2relations[qid][relation].append(qid2)
         if qid2 not in self._obj2head:
             self._obj2head[qid2] = set()
@@ -237,9 +237,10 @@ class KGSymbols:
 
         Returns:
         """
-        assert (
-            old_qid in self._qid2relations and new_qid not in self._qid2relations
-        ), f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} failed where {old_qid in self._qid2relations} and {new_qid not in self._qid2relations}"
+        assert old_qid in self._qid2relations and new_qid not in self._qid2relations, (
+            f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} "
+            f"failed where {old_qid in self._qid2relations} and {new_qid not in self._qid2relations}"
+        )
         # Update all object qids (aka subjects-object pairs where the object is the old qid)
         for subj_qid in self._obj2head.get(old_qid, {}):
             for rel in self._qid2relations[subj_qid]:
@@ -247,7 +248,7 @@ class KGSymbols:
                     for j in range(len(self._qid2relations[subj_qid][rel])):
                         if self._qid2relations[subj_qid][rel][j] == old_qid:
                             self._qid2relations[subj_qid][rel][j] = new_qid
-        # Update all subject qids - take the set union in case a subject has the same object with different relationships
+        # Update all subject qids - take the set union in case a subject has the same object with different relations
         for obj_qid in set().union(
             *[
                 set(self._qid2relations[old_qid][rel])

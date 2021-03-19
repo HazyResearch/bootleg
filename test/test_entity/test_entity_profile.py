@@ -10,12 +10,7 @@ from pydantic import ValidationError
 
 import emmental
 from bootleg.run import run_model
-from bootleg.symbols.entity_profile import (
-    ENTITY_SUBFOLDER,
-    KG_SUBFOLDER,
-    TYPE_SUBFOLDER,
-    EntityProfile,
-)
+from bootleg.symbols.entity_profile import KG_SUBFOLDER, TYPE_SUBFOLDER, EntityProfile
 from bootleg.utils.parser import parser_utils
 
 
@@ -115,7 +110,7 @@ class EntityProfileTest(unittest.TestCase):
         # Test loading/saving from jsonl
         ep = EntityProfile.load_from_jsonl(self.profile_file, edit_mode=True)
         ep.save_to_jsonl(self.profile_file)
-        read_in_data = [ujson.loads(l) for l in open(self.profile_file)]
+        read_in_data = [ujson.loads(li) for li in open(self.profile_file)]
 
         assert len(read_in_data) == len(data)
 
@@ -701,7 +696,8 @@ class EntityProfileTest(unittest.TestCase):
         # ======================
         # PART 4: VERIFY CHANGES IN THE MODEL WERE AS EXPECTED
         # ======================
-        # Check that type mappings are different in the right way...we remove "dog" from EID 1 and added "cat". "dog" is not longer a type.
+        # Check that type mappings are different in the right way...we remove "dog"
+        # from EID 1 and added "cat". "dog" is not longer a type.
         eid2typeids_table1, type2row_dict1, num_types_with_unk1 = torch.load(
             self.save_dir / "prep" / "type_table_type_mappings_wiki_qid2typeids_2.pt"
         )

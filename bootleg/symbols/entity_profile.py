@@ -1,5 +1,4 @@
 import logging
-import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -109,7 +108,8 @@ class EntityProfile:
         )
         if no_type:
             print(
-                f"Not loading type information. We will act as if there is no types associated with any entity and will not modify the types in any way, even if calling `add`."
+                f"Not loading type information. We will act as if there is no types associated with any entity "
+                f"and will not modify the types in any way, even if calling `add`."
             )
         type_sys_dict = {}
         for fold in type_subfolder.iterdir():
@@ -129,7 +129,8 @@ class EntityProfile:
             print(f"Loading KG Symbols")
         if no_kg:
             print(
-                f"Not loading KG information. We will act as if there is not KG connections between entities. We will not modify the KG information in any way, even if calling `add`."
+                f"Not loading KG information. We will act as if there is not KG connections between entities. "
+                f"We will not modify the KG information in any way, even if calling `add`."
             )
         kg_symbols = None
         if not no_kg:
@@ -535,7 +536,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as you are replacing the entity information in bulk."
+                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                f"you are replacing the entity information in bulk."
             )
         try:
             ent = EntityObj(
@@ -557,7 +559,8 @@ class EntityProfile:
         for type_sys in ent.types:
             if type_sys not in self._type_systems:
                 raise ValueError(
-                    f"Error {entity_obj}. When adding a new entity, you must use the same type system. We don't support new type systems."
+                    f"Error {entity_obj}. When adding a new entity, you must use the same type system. "
+                    f"We don't support new type systems."
                 )
         # Add kg relations QID -> relation -> list of object QIDs
         parsed_rels = {}
@@ -571,7 +574,8 @@ class EntityProfile:
                 and rel_pair["relation"] not in self._kg_symbols.get_all_relations()
             ):
                 raise ValueError(
-                    f"Error {entity_obj}. When adding a new entity, you must use the same set of relations. We don't support new relations."
+                    f"Error {entity_obj}. When adding a new entity, you must use the same set of relations. "
+                    f"We don't support new relations."
                 )
             if rel_pair["relation"] not in parsed_rels:
                 parsed_rels[rel_pair["relation"]] = []
@@ -622,7 +626,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as you are replacing the entity information in bulk."
+                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                f"you are replacing the entity information in bulk."
             )
         if not self._entity_symbols.qid_exists(entity_obj["entity_id"]):
             raise ValueError(f"The entity {entity_obj['entity_id']} is not in our dump")

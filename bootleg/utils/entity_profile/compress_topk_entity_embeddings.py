@@ -14,8 +14,9 @@ This can be used for out TopKEntityEmb::
            perc_emb_drop: 0.95 # This MUST match the percent given to this method
            qid2topk_eid: <path to output json file>
 
-If using this to update an already trained model, you **must** have the learned embedding key be ``learned`` for this method to work. If not, you can
- simply change the value of ``learned`` to whatever the right key is in the ``ENTITY_EMB_KEYS``, ``ENTITY_EID_KEYS``, ``ENTITY_REG_KEYS`` values set
+If using this to update an already trained model, you **must** have the learned embedding
+key be ``learned`` for this method to work. If not, you can simply change the value of ``learned`` to
+whatever the right key is in the ``ENTITY_EMB_KEYS``, ``ENTITY_EID_KEYS``, ``ENTITY_REG_KEYS`` values set
  in this file below.
 
  After this runs, you need to change the LearnedEntityEmb config by
@@ -217,9 +218,10 @@ def filter_qids(perc_emb_drop, entity_db, qid2count):
     assert 0 not in old2new_eid
     old2new_eid[0] = 0
     old2new_eid[-1] = -1
-    assert (
-        new_eid_idx == new_toes_eid
-    ), f"{new_eid_idx} is not {new_toes_eid} {to_drop} {old_toes_eid} {perc_emb_drop} {len(qid2count_list)} {num_topk_entities}"
+    assert new_eid_idx == new_toes_eid, (
+        f"{new_eid_idx} is not {new_toes_eid} {to_drop} {old_toes_eid} "
+        f"{perc_emb_drop} {len(qid2count_list)} {num_topk_entities}"
+    )
     assert len(qid2topk_eid) == entity_db.num_entities
     return qid2topk_eid, old2new_eid, new_toes_eid, num_topk_entities
 
@@ -246,9 +248,10 @@ def filter_embs(
     Returns: updated model state dict with updated entity embedding mapping
     """
     entity_weights = get_nested_item(state_dict, ENTITY_EMB_KEYS)
-    assert (
-        entity_weights.shape[0] == entity_db_old.num_entities_with_pad_and_nocand
-    ), f"{entity_db_old.num_entities_with_pad_and_nocand} does not match entity weights shape of {entity_weights.shape[0]}"
+    assert entity_weights.shape[0] == entity_db_old.num_entities_with_pad_and_nocand, (
+        f"{entity_db_old.num_entities_with_pad_and_nocand} does not "
+        f"match entity weights shape of {entity_weights.shape[0]}"
+    )
     # +2 is for pad and unk
     entity_weights_new = torch.zeros(new_num_topk_entities + 2, entity_weights.shape[1])
 
@@ -348,7 +351,8 @@ def compress_topk_embeddings(args):
         )
         # Generate the new old2new_eid weight vector to save in model_state_dict
         oldeid2topkeid = torch.arange(0, entity_db.num_entities_with_pad_and_nocand)
-        # The +2 is to account for pads and unks. The -1 is as there are issues with -1 in the indexing for entity embeddings. So we must manually make it the last entry
+        # The +2 is to account for pads and unks. The -1 is as there are issues with -1 in the indexing
+        # for entity embeddings. So we must manually make it the last entry
         oldeid2topkeid[-1] = new_num_topk_entities + 2 - 1
         for qid, new_eid in tqdm(qid2topk_eid.items(), desc="Setting new ids"):
             old_eid = entity_db.get_eid(qid)
@@ -365,7 +369,8 @@ def compress_topk_embeddings(args):
             model_state_dict = set_nested_item(model_state_dict, ENTITY_REG_KEYS, None)
         except:
             print(
-                f"Could not remove regularization. If your model was trained with regularization mapping on the learned entity embedding, this should not happen."
+                f"Could not remove regularization. If your model was trained with regularization mapping on "
+                f"the learned entity embedding, this should not happen."
             )
         print(model_state_dict["module_pool"]["learned"].keys())
         state_dict["model"] = model_state_dict

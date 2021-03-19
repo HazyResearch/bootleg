@@ -1,14 +1,16 @@
 """Prediction heads."""
 import logging
 
-from bootleg.layers.helper_modules import *
-from bootleg.symbols.constants import *
+import torch
+
+from bootleg.layers.helper_modules import MLP
+from bootleg.symbols.constants import DISAMBIG, FINAL_LOSS
 from bootleg.utils import model_utils
 
 logger = logging.getLogger(__name__)
 
 
-class PredictionLayer(nn.Module):
+class PredictionLayer(torch.nn.Module):
     """Prediction layer.
 
     Generates batch x M x K matrix of scores for each mention and
@@ -36,7 +38,8 @@ class PredictionLayer(nn.Module):
             context_matrix_dict: Dict of output embedding matrices, e.g., from KG modules (B x M x K x H)
             final_score: Final output scores (B x M x K) (default None)
 
-        Returns: Dict of Dict with final scores added (B x M x K), final output embedding (B x M x K x H), tensor of is_training Bool
+        Returns: Dict of Dict with final scores added (B x M x K), final output embedding (B x M x K x H),
+                tensor of is_training Bool
         """
         score = model_utils.max_score_context_matrix(
             context_matrix_dict, self.prediction_head
@@ -59,7 +62,7 @@ class PredictionLayer(nn.Module):
         }
 
 
-class NoopPredictionLayer(nn.Module):
+class NoopPredictionLayer(torch.nn.Module):
     """Noop prediciton layer.
 
     Used for BERT NED base model. Must pass the self.training bool forward to loss function.
@@ -80,7 +83,8 @@ class NoopPredictionLayer(nn.Module):
             context_matrix_dict: Dict of output embedding matrices, e.g., from KG modules (B x M x K x H)
             final_score: Final output scores (B x M x K) (default None)
 
-        Returns: Dict of Dict with final scores added (B x M x K), final output embedding (B x M x K x H), tensor of is_training Bool
+        Returns: Dict of Dict with final scores added (B x M x K), final output embedding (B x M x K x H),
+                 tensor of is_training Bool
         """
         assert len(context_matrix_dict.values()) == 1
         final_entity_embs = list(context_matrix_dict.values())[0]

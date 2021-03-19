@@ -6,7 +6,6 @@
 """
 
 import argparse
-import os
 from collections import OrderedDict
 
 import numpy as np
@@ -14,11 +13,8 @@ import torch
 import ujson
 import ujson as json
 import yaml
-from tqdm import tqdm
 
 from bootleg.symbols.entity_profile import EntityProfile
-from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.utils import utils
 
 ENTITY_EMB_KEYS = ["module_pool", "learned", "learned_entity_embedding.weight"]
 ENTITY_REG_KEYS = ["module_pool", "learned", "eid2reg"]
@@ -197,7 +193,10 @@ def refit_weights(
     assert (
         entity_weights.shape[0]
         == train_entity_profile.get_num_entities_with_pad_and_nocand()
-    ), f"{train_entity_profile.get_num_entities_with_pad_and_nocand()} does not match entity weights shape of {entity_weights.shape[0]}"
+    ), (
+        f"{train_entity_profile.get_num_entities_with_pad_and_nocand()} does not "
+        f"match entity weights shape of {entity_weights.shape[0]}"
+    )
     # Last row is pad row of all zeros
     assert torch.equal(
         entity_weights[-1], torch.zeros(entity_weights.shape[1])
@@ -217,7 +216,8 @@ def refit_weights(
     }
     # shared_newindex: the new index set of the shared entities
     # shared_oldindex: the old index set of the shared entities
-    # The 0 represents the NC entity embedding. We always want to copy this over so we add it to both (i.e., 0 row maps to 0 row)
+    # The 0 represents the NC entity embedding. We always want to copy
+    # this over so we add it to both (i.e., 0 row maps to 0 row)
     shared_newindex = [0]
     shared_oldindex = [0]
     newent_index = []
@@ -332,9 +332,10 @@ def fit_profiles(args):
 
     # We do not support modifying a topK model. Only the original model.
     try:
-        topk_keys = get_nested_item(model_state_dict, ENTITY_TOPK_KEYS)
+        get_nested_item(model_state_dict, ENTITY_TOPK_KEYS)
         raise NotImplementedError(
-            f"We don't support fitting a topK mini model. Instead, call `fit_to_profile` on the full Bootleg model. Then call utils.entity_profile.compress_topk_entity_embeddings to create your own mini model."
+            f"We don't support fitting a topK mini model. Instead, call `fit_to_profile` on the full Bootleg model. "
+            f"Then call utils.entity_profile.compress_topk_entity_embeddings to create your own mini model."
         )
     except:
         pass

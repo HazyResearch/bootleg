@@ -21,7 +21,8 @@ SEND_THROUGH_BERT = "send_through_bert"
 KG_BIAS_LOAD_CLASS = "KGIndices"
 REL_INDICES_KEY = "adj_index"
 REL_EMB_INDICES_KEY = "adj_emb_index"
-# Final context matrix outputted backbone; in slice_heads, if context_matric_main doesn't exist in the context dictionary, we generate it
+# Final context matrix outputted backbone; in slice_heads,
+# if context_matric_main doesn't exist in the context dictionary, we generate it
 # by taking the average of the context dict values
 MAIN_CONTEXT_MATRIX = "context_matrix_main"
 
@@ -43,6 +44,7 @@ ANCHOR_KEY = "gold"
 # used for tasks
 BERT_MODEL_NAME = "bert"
 PRED_LAYER = "pred_layer"
+
 
 # profile constants/utils wrappers
 def edit_op(func):
