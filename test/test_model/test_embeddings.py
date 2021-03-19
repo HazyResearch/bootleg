@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from transformers import BertTokenizer
 
+import emmental
 from bootleg.embeddings import (
     EntityEmb,
     KGAdjEmb,
@@ -18,7 +19,6 @@ from bootleg.embeddings import (
     TitleEmb,
     TopKEntityEmb,
     TypeEmb,
-    emmental,
 )
 from bootleg.layers.embedding_payload import EmbeddingPayload, EmbeddingPayloadBase
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -45,7 +45,8 @@ class NoopTakeFirst(nn.Module):
         return input[0]
 
 
-# Embedding class that does not declare a normalize attribute. We check that the normalize attribute is instantiated and need
+# Embedding class that does not declare a normalize attribute. We check that the normalize
+# attribute is instantiated and need
 # to test that this feature works.
 class EntityEmbNoNorm(EntityEmb):
     def __init__(
@@ -286,8 +287,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
         # Check defaults
         assert module_pool["learned1"].normalize is True
         assert module_pool["learned2"].dropout1d_perc == 0.0
@@ -416,8 +417,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
 
     def test_adding_title(self):
         self.args.data_config.ent_embeddings.append(
@@ -535,8 +536,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
 
 
 class TestLearnedEmbedding(unittest.TestCase):
@@ -638,8 +639,8 @@ class TestLearnedEmbedding(unittest.TestCase):
             ["Q4", "0.2"],
         ]
         with open(self.regularization_csv, "w") as out_f:
-            for l in regularization_data:
-                out_f.write(f"{','.join(l)}\n")
+            for li in regularization_data:
+                out_f.write(f"{','.join(li)}\n")
         self.args.data_config.ent_embeddings[0]["args"][
             "regularize_mapping"
         ] = self.regularization_csv
@@ -863,8 +864,8 @@ class TestTypeEmbedding(unittest.TestCase):
             [8, 0.7],
         ]
         with open(self.regularization_csv, "w") as out_f:
-            for l in regularization_data:
-                out_f.write(f"{','.join(map(str, l))}\n")
+            for li in regularization_data:
+                out_f.write(f"{','.join(map(str, li))}\n")
 
         num_types_with_pad_and_unk = 11
         type2row_dict = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
@@ -904,8 +905,8 @@ class TestKGEmbedding(unittest.TestCase):
     def test_load_kg_adj(self):
         kg_data = [["Q1", "Q2"], ["Q3", "Q2"]]
         with open(self.kg_adj, "w") as out_f:
-            for l in kg_data:
-                out_f.write(f"{' '.join(l)}\n")
+            for li in kg_data:
+                out_f.write(f"{' '.join(li)}\n")
 
         adj_out = KGAdjEmb.build_kg_adj(
             kg_adj_file=self.kg_adj,
@@ -932,8 +933,8 @@ class TestKGEmbedding(unittest.TestCase):
     def test_load_kg_adj_indices_txt(self):
         kg_data = [["Q1", "Q2"], ["Q3", "Q2"]]
         with open(self.kg_adj, "w") as out_f:
-            for l in kg_data:
-                out_f.write(f"{' '.join(l)}\n")
+            for li in kg_data:
+                out_f.write(f"{' '.join(li)}\n")
 
         adj_out = KGIndices.build_kg_adj(
             kg_adj_file=self.kg_adj,

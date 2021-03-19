@@ -1,4 +1,3 @@
-import glob
 import logging
 import multiprocessing
 import os
@@ -24,7 +23,8 @@ from emmental.data import EmmentalDataset
 
 warnings.filterwarnings(
     "ignore",
-    message="Could not import the lzma module. Your installed Python is incomplete. Attempting to use lzma compression will result in a RuntimeError.",
+    message="Could not import the lzma module. Your installed Python is incomplete. "
+    "Attempting to use lzma compression will result in a RuntimeError.",
 )
 warnings.filterwarnings(
     "ignore",
@@ -204,9 +204,10 @@ def read_in_types(data_config):
             else:
                 eid2type[str(eid)] = 0
     # We assume types are indexed from 1. So, 6 types will have indices 1 - 6. Max type will get 6.
-    assert (
-        len(all_type_ids) == data_config.type_prediction.num_types
-    ), f"{data_config.type_prediction.num_types} from args.data_config.type_prediction.num_types must match our computed number {len(all_type_ids)}"
+    assert len(all_type_ids) == data_config.type_prediction.num_types, (
+        f"{data_config.type_prediction.num_types} from args.data_config.type_prediction.num_types must "
+        f"match our computed number {len(all_type_ids)}"
+    )
     return eid2type
 
 
@@ -329,7 +330,8 @@ def create_examples(
     )
     log_rank_0_debug(
         logger,
-        f"Done with extracting examples in {time.time()-start}. Total lines seen {total_input}. Total lines kept {total_output}.",
+        f"Done with extracting examples in {time.time()-start}. "
+        f"Total lines seen {total_input}. Total lines kept {total_output}.",
     )
     return
 
@@ -406,10 +408,11 @@ def create_examples_single(
             # Ex:
             # If I have 15 aliases and M = 10, then I can split it into two chunks of 10 aliases each
             # idxs_arr = [0,1,2,3,4,5,6,7,8,9] and [5,6,7,8,9,10,11,12,13,14]
-            # However, I do not want to score aliases 5-9 twice. Therefore, aliases_to_predict_per_split represents which ones to score
+            # However, I do not want to score aliases 5-9 twice. Therefore, aliases_to_predict_per_split
+            # represents which ones to score
             # aliases_to_predict_per_split = [0,1,2,3,4,5,6,7] and [3,4,5,6,7,8,9]
-            # These are indexes into the idx_arr (the first aliases to be scored in the second list is idx = 3, representing the 8th aliases in
-            # the original sequence.
+            # These are indexes into the idx_arr (the first aliases to be scored in the second list is idx = 3,
+            # representing the 8th aliases in the original sequence.
             (
                 idxs_arr,
                 aliases_to_predict_per_split,
@@ -431,12 +434,14 @@ def create_examples_single(
             qids_arr = [[qids[idx] for idx in idxs] for idxs in idxs_arr]
             # write out results to json lines file
             for subsent_idx in range(len(idxs_arr)):
-                # This contains the mapping of aliases seen by model to the ones to be scored, pre false anchor dataset filtering. We need this mapping
-                # during eval to create on "prediction" per alias, True or False anchor.
+                # This contains the mapping of aliases seen by model to the ones to be scored, pre false anchor
+                # dataset filtering. We need this mapping during eval to create on "prediction" per alias,
+                # True or False anchor.
                 train_aliases_to_predict_arr = aliases_to_predict_per_split[
                     subsent_idx
                 ][:]
-                # aliases_to_predict_arr is an index into idxs_arr/anchor_arr/aliases_arr. It should only include true anchors if eval dataset
+                # aliases_to_predict_arr is an index into idxs_arr/anchor_arr/aliases_arr.
+                # It should only include true anchors if eval dataset.
                 # During training want to backpropagate on false anchors as well
                 if split != "train":
                     aliases_to_predict_arr = [
@@ -524,7 +529,7 @@ def convert_examples_to_features_and_save(
     total_input = utils.load_json_file(meta_file)["num_mentions"]
     files_and_counts = utils.load_json_file(meta_file)["files_and_counts"]
 
-    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before being opened in r+ mode by workers
+    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before being opened in r+
     memmap_file = np.memmap(
         save_dataset_name, dtype=X_storage, mode="w+", shape=(total_input,), order="C"
     )
@@ -601,7 +606,8 @@ def convert_examples_to_features_and_save(
 
     log_rank_0_debug(
         logger,
-        f"Done with extracting examples in {time.time()-start}. Total lines seen {total_input}. Total lines kept {total_output}",
+        f"Done with extracting examples in {time.time()-start}. "
+        f"Total lines seen {total_input}. Total lines kept {total_output}",
     )
     return
 
@@ -682,46 +688,53 @@ def convert_examples_to_features_and_save_single(
             ), f"Alias {alias} not in alias mapping"
             alias_trie_idx = entitysymbols.get_alias_idx(alias)
             alias_qids = np.array(entitysymbols.get_qid_cands(alias))
-            # When doing eval, we allow for QID to be "Q-1" so we can predict anyways - as this QID isn't in our alias_qids, the assert
-            # below verifies that this will happen only for test/dev
+            # When doing eval, we allow for QID to be "Q-1" so we can predict anyways -
+            # as this QID isn't in our alias_qids, the assert below verifies that this will happen only for test/dev
             eid = -1
             if entitysymbols.qid_exists(qid):
                 eid = entitysymbols.get_eid(qid)
-            if not qid in alias_qids:
+            if qid not in alias_qids:
                 # assert not data_args.train_in_candidates
                 if not train_in_candidates:
                     # set class label to be "not in candidate set"
                     gold_cand_K_idx = 0
                 else:
-                    # if we are not using a NC (no candidate) but are in eval mode, we let the gold candidate not be in the candidate set
-                    # we give in a true index of -2, meaning our model will always get this example incorrect
-                    assert split in [
-                        "test",
-                        "dev",
-                    ], f"Expected split of 'test' or 'dev'. If you are training, the QID must be in the candidate list for data_args.train_in_candidates to be True"
+                    # if we are not using a NC (no candidate) but are in eval mode, we let the gold candidate
+                    # not be in the candidate set we give in a true index of -2, meaning our model will
+                    # always get this example incorrect
+                    assert split in ["test", "dev",], (
+                        f"Expected split of 'test' or 'dev'. If you are training, "
+                        f"the QID must be in the candidate list for data_args.train_in_candidates to be True"
+                    )
                     gold_cand_K_idx = -2
             else:
                 # Here we are getting the correct class label for training.
-                # Our training is "which of the max_entities entity candidates is the right one (class labels 1 to max_entities) or is it none of these (class label 0)".
-                # + (not discard_noncandidate_entities) is to ensure label 0 is reserved for "not in candidate set" class
+                # Our training is "which of the max_entities entity candidates is the right one
+                # (class labels 1 to max_entities) or is it none of these (class label 0)".
+                # + (not discard_noncandidate_entities) is to ensure label 0 is
+                # reserved for "not in candidate set" class
                 gold_cand_K_idx = np.nonzero(alias_qids == qid)[0][0] + (
                     not train_in_candidates
                 )
             assert gold_cand_K_idx < entitysymbols.max_candidates + int(
                 not train_in_candidates
-            ), f"The qid {qid} and alias {alias} is not in the top {entitysymbols.max_candidates} max candidates. The QID must be within max candidates."
+            ), (
+                f"The qid {qid} and alias {alias} is not in the top {entitysymbols.max_candidates} max candidates. "
+                f"The QID must be within max candidates."
+            )
             example_aliases[idx : idx + 1] = alias_trie_idx
             example_aliases_locs_start[idx : idx + 1] = span_start_idx
             # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
             example_aliases_locs_end[idx : idx + 1] = span_end_idx - 1
             example_alias_list_pos[idx : idx + 1] = alias_pos
-            # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence and need to only predict subsets
+            # leave as -1 if it's not an alias we want to predict;
+            # we get these if we split a sentence and need to only predict subsets
             if idx in aliases_to_predict:
                 example_true_cand_positions_for_loss[idx : idx + 1] = gold_cand_K_idx
                 example_true_eids_for_loss[idx : idx + 1] = eid
             if idx in train_aliases_to_predict_arr:
                 example_true_cand_positions_for_train[idx : idx + 1] = gold_cand_K_idx
-        # drop example if we have nothing to predict (no valid aliases) -- make sure this doesn't cause problems when we start using unk aliases...
+        # drop example if we have nothing to predict (no valid aliases)
         if all(example_aliases == PAD_ID):
             logging.error(
                 f"There were 0 aliases in this example {example}. This shouldn't happen."
@@ -860,7 +873,7 @@ def build_and_save_type_features(
     """
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
 
-    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before being opened in r+ mode by workers
+    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before being opened in r+
     memfile = np.memmap(
         save_type_labels_name,
         dtype=Y_type_storage,
@@ -985,7 +998,8 @@ class BootlegDataset(EmmentalDataset):
         dataset_threads: number of threads to use
         split: data split
         is_bert: is the tokenizer a BERT or not
-        batch_on_the_fly_kg_adj: special dictionary for stories KG adjacency information that needs to be prepped in the _get_item_ method
+        batch_on_the_fly_kg_adj: special dictionary for stories KG adjacency information
+                                 that needs to be prepped in the _get_item_ method
 
     Returns:
     """
@@ -1024,7 +1038,7 @@ class BootlegDataset(EmmentalDataset):
                 ("alias_orig_list_pos", "i8", (data_config.max_aliases,)),
             ]
         )
-        # Storage for saving the data. Note that entity_cand_eid and batch_on_the_fly_kg_adj get filled in in the __get_item__ method
+        # Storage for saving the data. entity_cand_eid and batch_on_the_fly_kg_adj get filled in in __get_item__
         self.X_storage, self.Y_storage, self.Y_type_storage = (
             [
                 ("guids", guid_dtype, 1),
@@ -1044,10 +1058,10 @@ class BootlegDataset(EmmentalDataset):
                     "for_dump_gold_cand_K_idx_train",
                     "i8",
                     (data_config.max_aliases,),
-                )  # Which of the K candidates is correct. Only used in dump_pred to stitch sub-sentences together correctly
-                # ("entity_cand_eid", 'i8', data_config.max_aliases*<num_candidates_per_alias>) --- this gets filled in in the __get_item__ method
-                # ("entity_cand_eid_mask", 'i8', data_config.max_aliases*<num_candidates_per_alias>) --- this gets filled in in the __get_item__ method
-                # ("batch_on_the_fly_kg_adj", 'i8', ???) --- this gets filled in in the __get_item__ method. Shape depends on implementing class.
+                )  # Which of the K candidates is correct. Only used in dump_pred to stitch sub-sentences together
+                # ("entity_cand_eid", 'i8', data_config.max_aliases*<num_candidates_per_alias>) (see __get_item__)
+                # ("entity_cand_eid_mask", 'i8', data_config.max_aliases*<num_candidates_per_alias>) (see __get_item__)
+                # ("batch_on_the_fly_kg_adj", 'i8', ???) (see __get_item__). Shape depends on implementing class.
             ],
             [
                 (
@@ -1249,7 +1263,8 @@ class BootlegDataset(EmmentalDataset):
             logger,
             f"Final data initialization time for {split} is {time.time() - global_start}s",
         )
-        # Set spawn back to original/default, which is "fork" or "spawn". This is needed for the Meta.config to be correctly passed in the collate_fn.
+        # Set spawn back to original/default, which is "fork" or "spawn".
+        # This is needed for the Meta.config to be correctly passed in the collate_fn.
         multiprocessing.set_start_method(orig_spawn, force=True)
         super().__init__(name, X_dict=X_dict, Y_dict=Y_dict, uid="guids")
 
@@ -1277,9 +1292,9 @@ class BootlegDataset(EmmentalDataset):
                 "end_span_idx": [],
                 "alias_idx": [],
                 "token_ids": [],
-                "alias_orig_list_pos": [],  # list of original position in the alias list this example is (used to stitch subsentences back together during eval)
+                "alias_orig_list_pos": [],  # list of original position in the alias list this example is (see eval)
                 "gold_eid": [],  # List of gold entity eids (used for building type label table and debugging)
-                "for_dump_gold_cand_K_idx_train": []  # list of gold indices without subsentence masking (used to stitch subsentences back together during eval)
+                "for_dump_gold_cand_K_idx_train": []  # list of gold indices without subsentence masking (see eval)
                 # "entity_cand_eid": [] --- this gets filled in in the __get_item__ method
                 # "entity_cand_eid_mask": [] --- this gets filled in in the __get_item__ method
                 # "batch_on_the_fly_kg_adj": [] --- this gets filled in in the __get_item__ method
@@ -1361,9 +1376,10 @@ class BootlegDataset(EmmentalDataset):
         del state["X_dict"]
         del state["Y_dict"]
         for emb_key in self.batch_on_the_fly_kg_adj:
-            assert (
-                "kg_adj" in self.batch_on_the_fly_kg_adj[emb_key]
-            ), f"Something went wrong with saving state in dataset and self.batch_on_the_fly_kg_adj with {emb_key}. It does not have kg_adj key."
+            assert "kg_adj" in self.batch_on_the_fly_kg_adj[emb_key], (
+                f"Something went wrong with saving state and self.batch_on_the_fly_kg_adj with {emb_key}. "
+                f"It does not have kg_adj key."
+            )
             # We will nullify now and reload later
             self.batch_on_the_fly_kg_adj[emb_key]["kg_adj"] = None
         return state
@@ -1386,13 +1402,17 @@ class BootlegDataset(EmmentalDataset):
                 ), f"{k} is already in Y_dict but this is a key for the types"
                 self.Y_dict[k] = val
         for emb_key in self.batch_on_the_fly_kg_adj:
-            assert (
-                "prep_file" in self.batch_on_the_fly_kg_adj[emb_key]
-            ), f"Something went wrong with loading state in dataset and self.batch_on_the_fly_kg_adj with {emb_key}. It does not have prep_file key."
+            assert "prep_file" in self.batch_on_the_fly_kg_adj[emb_key], (
+                f"Something went wrong with loading state and self.batch_on_the_fly_kg_adj with {emb_key}. "
+                f"It does not have prep_file key."
+            )
             self.batch_on_the_fly_kg_adj[emb_key]["kg_adj"] = scipy.sparse.load_npz(
                 self.batch_on_the_fly_kg_adj[emb_key]["prep_file"]
             )
         return state
 
     def __repr__(self):
-        return f"Bootleg Dataset. Data at {self.save_dataset_name}. Labels at {self.save_labels_name}. Use type pred is {self.add_type_pred}."
+        return (
+            f"Bootleg Dataset. Data at {self.save_dataset_name}. "
+            f"Labels at {self.save_labels_name}. Use type pred is {self.add_type_pred}."
+        )

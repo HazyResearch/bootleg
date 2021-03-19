@@ -180,7 +180,10 @@ class BootlegAnnotator(object):
             "bootleg_cased_mini",
             "bootleg_uncased",
             "bootleg_uncased_mini",
-        }, f"model_name must be one of [bootleg_cased, bootleg_cased_mini, bootleg_uncased_mini, bootleg_uncased]. You have {model_name}."
+        }, (
+            f"model_name must be one of [bootleg_cased, bootleg_cased_mini, "
+            f"bootleg_uncased_mini, bootleg_uncased]. You have {model_name}."
+        )
 
         if not config:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -208,6 +211,11 @@ class BootlegAnnotator(object):
 
         if not device:
             device = 0 if torch.cuda.is_available() else -1
+
+        if self.verbose:
+            self.config.run_config.log_level = "DEBUG"
+        else:
+            self.config.run_config.log_level = "INFO"
 
         self.torch_device = (
             torch.device(device) if device != -1 else torch.device("cpu")
@@ -284,7 +292,8 @@ class BootlegAnnotator(object):
 
         Args:
             text: text to extract mentions from
-            label_func: function that performs extraction (input is (text, alias trie, max alias length) -> output is list of found aliases and found spans
+            label_func: function that performs extraction (input is (text, alias trie, max alias length) ->
+                        output is list of found aliases and found spans
 
         Returns: JSON object of sentence to be used in eval
         """
@@ -405,7 +414,7 @@ class BootlegAnnotator(object):
                 ), f"There are no aliases to predict for an example. This should not happen at this point."
                 assert (
                     len(aliases_arr[sub_idx]) <= self.config.data_config.max_aliases
-                ), f"Each example should have no more that {self.config.data_config.max_aliases} max aliases. {sample} does."
+                ), f"{sample} should have no more than {self.config.data_config.max_aliases} aliases."
 
                 example_aliases = np.ones(self.config.data_config.max_aliases) * PAD_ID
                 example_aliases_locs_start = (
@@ -435,8 +444,10 @@ class BootlegAnnotator(object):
                             true_entity_idx = -2
                     else:
                         # Here we are getting the correct class label for training.
-                        # Our training is "which of the max_entities entity candidates is the right one (class labels 1 to max_entities) or is it none of these (class label 0)".
-                        # + (not discard_noncandidate_entities) is to ensure label 0 is reserved for "not in candidate set" class
+                        # Our training is "which of the max_entities entity candidates is the right one
+                        # (class labels 1 to max_entities) or is it none of these (class label 0)".
+                        # + (not discard_noncandidate_entities) is to ensure label 0 is
+                        # reserved for "not in candidate set" class
                         true_entity_idx = np.nonzero(
                             alias_qids == qids_arr[sub_idx][mention_idx]
                         )[0][0] + (not self.config.data_config.train_in_candidates)
@@ -445,7 +456,8 @@ class BootlegAnnotator(object):
                     # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
                     example_aliases_locs_end[mention_idx] = span_end_idx - 1
                     example_alias_list_pos[mention_idx] = idxs_arr[sub_idx][mention_idx]
-                    # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence and need to only predict subsets
+                    # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence
+                    # and need to only predict subsets
                     if mention_idx in aliases_to_predict_arr:
                         example_true_entities[mention_idx] = true_entity_idx
 
@@ -513,7 +525,6 @@ class BootlegAnnotator(object):
             max_probs_indices = probs.argmax(2)
             for ex_i in range(probs.shape[0]):
                 idx_unq = batch_idx_unq[b_i + ex_i]
-                subsplit_idx = batch_subsplit_idx[b_i + ex_i]
                 entity_cands = eval_utils.map_aliases_to_candidates(
                     self.config.data_config.train_in_candidates,
                     self.config.data_config.max_aliases,
@@ -551,9 +562,10 @@ class BootlegAnnotator(object):
                             total_final_exs += 1
                         else:
                             dropped_by_thresh += 1
-        assert (
-            total_final_exs + dropped_by_thresh == total_start_exs
-        ), f"Something went wrong and we have predicted fewer mentions than extracted. Start {total_start_exs}, Out {total_final_exs}, No cand {dropped_by_thresh}"
+        assert total_final_exs + dropped_by_thresh == total_start_exs, (
+            f"Something went wrong and we have predicted fewer mentions than extracted. "
+            f"Start {total_start_exs}, Out {total_final_exs}, No cand {dropped_by_thresh}"
+        )
         res_dict = {
             "qids": final_pred_cands,
             "probs": final_pred_probs,

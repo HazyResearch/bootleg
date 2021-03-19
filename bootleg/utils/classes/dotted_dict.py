@@ -261,6 +261,6 @@ def is_json(value):
         return False
     try:
         ujson.loads(value)
-    except ValueError as e:
+    except ValueError:
         return False
     return True

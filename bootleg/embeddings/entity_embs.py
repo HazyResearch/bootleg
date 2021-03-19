@@ -81,7 +81,8 @@ class LearnedEntityEmb(EntityEmb):
         ), f"LearnedEntityEmb must have learned_embedding_size in args"
         self.learned_embedding_size = emb_args.learned_embedding_size
 
-        # Set sparsity based on optimizer and fp16. The None optimizer is Bootleg's SparseDenseAdam. If fp16 is True, must use dense.
+        # Set sparsity based on optimizer and fp16. The None optimizer is Bootleg's SparseDenseAdam.
+        # If fp16 is True, must use dense.
         optimiz = main_args.learner_config.optimizer_config.optimizer
         if optimiz in [None, "sparse_adam"] and main_args.learner_config.fp16 is False:
             sparse = True
@@ -413,7 +414,8 @@ class TopKEntityEmb(EntityEmb):
             if "regularize_mapping" in emb_args:
                 log_rank_0_debug(
                     logger,
-                    f"You are using regularization mapping with a topK entity embedding. This means all QIDs that are mapped to the same"
+                    f"You are using regularization mapping with a topK entity embedding. "
+                    f"This means all QIDs that are mapped to the same"
                     f" EID will get the same regularization value.",
                 )
                 if self.dropout1d_perc > 0 or self.dropout2d_perc > 0:
@@ -689,9 +691,10 @@ class StaticEmb(EntityEmb):
             )
             raw_num_ents = entity2staticemb_table_raw.shape[0]
             # +2 handles the PAD and UNK entities
-            assert (
-                entity2staticemb_table_raw.shape[0] == len(qid2eid_map) + 2
-            ), f"The saved static embeddings file had mismatched shapes between qid2eid {len(qid2eid_map)} and weights {entity2staticemb_table.shape[0]}"
+            assert entity2staticemb_table_raw.shape[0] == len(qid2eid_map) + 2, (
+                f"The saved static embeddings file had mismatched shapes between qid2eid {len(qid2eid_map)} and "
+                f"weights {entity2staticemb_table_raw.shape[0]}"
+            )
             entity2staticemb_table = np.zeros(
                 (
                     entity_symbols.num_entities_with_pad_and_nocand,
@@ -712,7 +715,8 @@ class StaticEmb(EntityEmb):
             )
         log_rank_0_debug(
             logger,
-            f"Found {found} ({found/len(entity_symbols.get_all_qids())} percent) of all entities after reading {raw_num_ents} original entities have a static embedding",
+            f"Found {found} ({found/len(entity_symbols.get_all_qids())} percent) of all entities after "
+            f"reading {raw_num_ents} original entities have a static embedding",
         )
         return entity2staticemb_table
 

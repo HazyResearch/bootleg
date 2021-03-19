@@ -22,7 +22,12 @@ from bootleg.tasks import ned_task, type_pred_task
 from bootleg.utils import eval_utils, utils
 from bootleg.utils.model_utils import count_parameters
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
-from bootleg.utils.utils import dump_yaml_file, load_yaml_file, write_to_file
+from bootleg.utils.utils import (
+    dump_yaml_file,
+    load_yaml_file,
+    try_rmtree,
+    write_to_file,
+)
 from emmental.learner import EmmentalLearner
 from emmental.model import EmmentalModel
 
@@ -48,8 +53,9 @@ def parse_cmdline_args():
         "--config_script",
         type=str,
         default="",
-        help="This config should mimic the config_args found in utils/parser/bootleg_args.py with parameters you want to override."
-        "You can also override the parameters from config_script by passing them in directly after config_script. E.g., --train_config.batch_size 5",
+        help="Should mimic the config_args found in utils/parser/bootleg_args.py with parameters you want to override."
+        "You can also override the parameters from config_script by passing them in directly after config_script. "
+        "E.g., --train_config.batch_size 5",
     )
     cli_parser.add_argument(
         "--mode",
@@ -67,7 +73,7 @@ def parse_cmdline_args():
     # you can add other args that will override those in the config_script
     # parse_known_args returns 'args' that are the same as what parse_args() returns
     # and 'unknown' which are args that the parser doesn't recognize but you want to keep.
-    # 'unknown' are what we pass on to our override any args from the second phase of arg parsing from the json config file
+    # 'unknown' are what we pass on to our override any args from the second phase of arg parsing from the json file
     cli_args, unknown = cli_parser.parse_known_args()
     if len(cli_args.config_script) == 0:
         raise ValueError(f"You must pass a config script via --config.")
@@ -338,7 +344,7 @@ def run_model(mode, config, run_config_path=None):
             logger,
             f"Collecting sentence to mention map {os.path.join(config.data_config.data_dir, filename)}",
         )
-        sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mentions(
+        sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
             os.path.join(config.data_config.data_dir, filename)
         )
         log_rank_0_debug(logger, f"Done collecting sentence to mention map")
@@ -389,7 +395,10 @@ def run_model(mode, config, run_config_path=None):
             v == 0
             for k, v in sentidx2num_mentions.items()
             if k not in all_dumped_sentences
-        ), f"Sentences with mentions were not dumped: {[k for k, v in sentidx2num_mentions.items() if k not in all_dumped_sentences]}"
+        ), (
+            f"Sentences with mentions were not dumped: "
+            f"{[k for k, v in sentidx2num_mentions.items() if k not in all_dumped_sentences]}"
+        )
         empty_sentidx2row = {
             k: v for k, v in sent_idx2row.items() if k not in all_dumped_sentences
         }
@@ -442,7 +451,7 @@ def run_model(mode, config, run_config_path=None):
             log_rank_0_info(logger, f"Bootleg embeddings saved at {final_out_emb_file}")
 
         # Cleanup
-        shutil.rmtree(subeval_folder)
+        try_rmtree(subeval_folder)
     return final_result_file, final_out_emb_file
 
 

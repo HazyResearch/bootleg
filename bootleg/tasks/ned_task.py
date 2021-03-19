@@ -1,4 +1,3 @@
-import logging
 import os
 
 import torch
@@ -98,7 +97,9 @@ def create_task(args, entity_symbols=None, slice_datasets=None):
         embedding_task_flows,  # task flows for standard embeddings (e.g., kg, type, entity)
         embedding_module_pool,  # module for standard embeddings
         embedding_module_device_dict,  # module device dict for standard embeddings
-        extra_bert_embedding_layers,  # some embeddings output indices for BERT so we handle these embeddings in our BERT layer (see comments in get_through_bert_embedding_tasks)
+        # some embeddings output indices for BERT so we handle these embeddings in our BERT layer
+        # (see comments in get_through_bert_embedding_tasks)
+        extra_bert_embedding_layers,
         embedding_payload_inputs,  # the layers that are fed into the payload
         embedding_total_sizes,  # total size of all embeddings
     ) = get_embedding_tasks(args, entity_symbols)

@@ -1,0 +1,6 @@
+[flake8]
+exclude = .git
+max-line-length = 120
+ignore = E203, W503, W605, F541, E731, E722, E231
+per-file-ignores =
+    */__init__.py: F401

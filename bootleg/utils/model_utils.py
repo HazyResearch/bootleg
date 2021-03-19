@@ -5,9 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
-from torch.nn.utils.rnn import pad_sequence
 
-from bootleg import log_rank_0_debug, log_rank_0_info
+from bootleg import log_rank_0_debug
 from bootleg.symbols.constants import FINAL_LOSS
 from emmental import Meta
 
@@ -95,7 +94,7 @@ def select_alias_word_sent(alias_pos_in_sent, sent_embedding):
     # gather can't take negative values so we set them to the first word in the sequence
     # we mask these out later
     alias_idx_sent_mask = alias_pos_in_sent == -1
-    # copy the alias_pos_in_sent tensor to avoid overwrite errors and set where alias_post_in_sent == -1 to be 0 because
+    # copy the alias_pos_in_sent tensor to avoid overwrite errors and set where alias_post_in_sent == -1 to be 0;
     # gather can't handle -1 indices
     alias_pos_in_sent_cpy = torch.where(
         alias_pos_in_sent == -1, torch.zeros_like(alias_pos_in_sent), alias_pos_in_sent
@@ -116,7 +115,8 @@ def select_alias_word_sent(alias_pos_in_sent, sent_embedding):
 # Mask of True means keep
 def selective_avg(mask, embeds):
     """
-    Averages the embeddings along the second last dimension (dim = -2), respecting the mask. Mask of True means KEEP in average.
+    Averages the embeddings along the second last dimension (dim = -2), respecting the mask.
+    Mask of True means KEEP in average.
 
     Args:
         mask: mask (batch x M)

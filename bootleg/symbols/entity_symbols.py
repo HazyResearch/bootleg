@@ -1,7 +1,6 @@
 """Entity symbols."""
 import logging
 import os
-import warnings
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -172,7 +171,8 @@ class EntitySymbols:
 
     def _sort_alias_cands(self):
         """
-        Sorts the candidate lists for each alias from largest to smallest score (each candidate is a pair [QID, sort_value])
+        Sorts the candidate lists for each alias from largest to smallest score
+        (each candidate is a pair [QID, sort_value])
         Returns:
 
         """
@@ -414,7 +414,8 @@ class EntitySymbols:
         if mention in self._alias2qids:
             if qid in set(map(lambda x: x[0], self._alias2qids[mention])):
                 logger.warning(
-                    f"The QID {qid} is already associated with {mention}. Use set_score if you want to change the score of an existing mention-qid pair"
+                    f"The QID {qid} is already associated with {mention}. Use set_score if you want to change "
+                    f"the score of an existing mention-qid pair"
                 )
                 return
         # If mention is not in mapping, add it
@@ -427,14 +428,16 @@ class EntitySymbols:
             ), f"{new_al_id} already in self_id2alias"
             self._alias2id[mention] = new_al_id
             self._id2alias[new_al_id] = mention
-            # msg = f"You have added a new mention to the dataset. You MUST reprep you data for this to take effect. Set data_config.overwrite_preprocessed_data to be True. This warning will now be supressed."
+            # msg = f"You have added a new mention to the dataset. You MUST reprep you data for this to take effect.
+            # Set data_config.overwrite_preprocessed_data to be True. This warning will now be supressed."
             # logger.warning(msg)
             # warnings.filterwarnings("ignore", message=msg)
 
         assert (
             mention not in self._qid2aliases[qid]
         ), f"{mention} was a mention for {qid} despite the alias mapping saying otherwise"
-        # If adding will go beyond max candidates, remove the last candidate. Even if the score is higher, the user still wants this mention added.
+        # If adding will go beyond max candidates, remove the last candidate. Even if the score is higher,
+        # the user still wants this mention added.
         if len(self._alias2qids[mention]) >= self.max_candidates:
             qid_to_remove = self._alias2qids[mention][-1][0]
             self.remove_mention(qid_to_remove, mention)
@@ -478,7 +481,9 @@ class EntitySymbols:
             assert (
                 mention not in self._alias2qids and mention not in self._alias2id
             ), f"Removal of no candidates mention {mention} failed"
-            # msg = f"You have removed all candidates for an existing mention, which will now be removed. You MUST reprep you data for this to take effect. Set data_config.overwrite_preprocessed_data to be True. This warning will now be supressed."
+            # msg = f"You have removed all candidates for an existing mention, which will now be removed.
+            # You MUST reprep you data for this to take effect. Set data_config.overwrite_preprocessed_data
+            # to be True. This warning will now be supressed."
             # logger.warning(msg)
             # warnings.filterwarnings("ignore", message=msg)
 

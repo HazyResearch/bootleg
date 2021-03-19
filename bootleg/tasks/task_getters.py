@@ -1,38 +1,19 @@
-# TODO: what to name this
-
-import copy
 import logging
-import os
-from functools import partial
 
-import torch
-import torch.nn.functional as F
 import ujson
 from torch import nn
 
 from bootleg import log_rank_0_debug, log_rank_0_info
-from bootleg.layers.attn_networks import Bootleg, BootlegM2E
-from bootleg.layers.bert_encoder import BertEncoder
-from bootleg.layers.embedding_payload import EmbeddingPayload
-from bootleg.layers.mention_type_prediction import TypePred
-from bootleg.layers.prediction_layer import PredictionLayer
-from bootleg.scorer import BootlegSlicedScorer
 from bootleg.symbols.constants import (
     BERT_MODEL_NAME,
-    DISAMBIG,
     DROPOUT_1D,
     DROPOUT_2D,
-    FINAL_LOSS,
     FREEZE,
     NORMALIZE,
     SEND_THROUGH_BERT,
 )
-from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import NED_TASK, TYPE_PRED_TASK
-from bootleg.utils import embedding_utils, eval_utils
+from bootleg.utils import embedding_utils
 from bootleg.utils.utils import import_class
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 logger = logging.getLogger(__name__)
 
@@ -82,11 +63,12 @@ def get_embedding_tasks(args, entity_symbols):
             DROPOUT_1D: dropout1d_perc,
             DROPOUT_2D: dropout2d_perc,
             NORMALIZE: normalize,
-            SEND_THROUGH_BERT: through_bert,  # Whether the output of this embedding is an index that needs a BERT forward pass (e.g., title embedding)
+            # Whether the output of this embedding is an index that needs a BERT forward pass (e.g., title embedding)
+            SEND_THROUGH_BERT: through_bert,
         }
         log_rank_0_debug(
             logger,
-            f'Embedding "{emb.key}" has params (these can be changed in the config)\n{ujson.dumps(to_print, indent=4)}',
+            f'Embedding "{emb.key}" has params (can be changed in the config)\n{ujson.dumps(to_print, indent=4)}',
         )
 
         mod, load_class = import_class("bootleg.embeddings", emb.load_class)
@@ -109,12 +91,14 @@ def get_embedding_tasks(args, entity_symbols):
         assert emb.key not in total_sizes, f"You have {emb.key} used more than once"
         total_sizes[emb.key] = emb_obj.get_dim()
 
-        # Add in the embeddings that output indices for BERT. Due to how DDP handles multiple calls through one module, we must wrap
-        # all forward passes through BERT inside one module. Therefore, we do not add these embeddings to the standard module_pool and
-        # task_flow but instead will add them to our BertEncoder. This encoder will then call the forward() for the emb_obj and call
-        # postprocess_embedding for any postprocessing.
+        # Add in the embeddings that output indices for BERT. Due to how DDP handles multiple calls through one module,
+        # we must wrap all forward passes through BERT inside one module. Therefore, we do not add these embeddings
+        # to the standard module_pool and task_flow but instead will add them to our BertEncoder.
+        # This encoder will then call the forward() for the emb_obj and call postprocess_embedding for
+        # any postprocessing.
         if through_bert:
-            # The BertEncoder will output the through bert embeddings after it's standard 2 outputs of sentence embedding and sentence mask
+            # The BertEncoder will output the through bert embeddings after it's standard 2 outputs
+            # of sentence embedding and sentence mask
             bert_output_for_payload = (BERT_MODEL_NAME, 2 + num_through_bert_embeddings)
             num_through_bert_embeddings += 1
             embedding_payload_inputs.append(bert_output_for_payload)

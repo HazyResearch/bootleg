@@ -1,6 +1,6 @@
 """Overrides the Emmental parse_args."""
 import argparse
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from typing import Any, Dict, Optional, Tuple
 
 from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict

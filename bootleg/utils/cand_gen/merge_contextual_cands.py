@@ -2,7 +2,7 @@
 This file
 1. Reads in raw wikipedia sentences from /lfs/raiders7/0/lorr1/sentences
 2. Reads in map of WPID-Title-QID from /lfs/raiders7/0/lorr1/title_to_all_ids.jsonl
-3. Computes frequencies for alias-QID mentions over Wikipedia. Keeps only alias-QID mentions which occur at least args.min_frequency times
+3. Computes frequencies for alias-QID over Wikipedia. Keeps only alias-QID mentions which occur > args.min_frequency
 4. Merges alias-QID map with alias-QID map extracted from Wikidata
 2. Saves alias-qid map as alias_to_qid_filter.json to args.data_dir
 
@@ -35,19 +35,19 @@ def get_arg_parser():
     parser.add_argument(
         "--contextual_cand_data",
         type=str,
-        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/ctx_10_exp_noNC/files",
+        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/files",
         help="Where files saved",
     )
     parser.add_argument(
         "--entity_dump",
         type=str,
-        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/ctx_10_exp_noNC/entity_db/entity_mappings",
+        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/entity_db/entity_mappings",
         help="Where files saved",
     )
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/ctx_10_exp_noNC",
+        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203",
         help="Where files saved",
     )
     parser.add_argument(
@@ -272,7 +272,9 @@ def merge_data_hlp(args):
             line["slices"] = new_slices
             f_out.write(ujson.dumps(line) + "\n")
     print(
-        f"Total Seen: {total_seen}, Total Dropped: {total_dropped}, Recall: {(total_seen - total_dropped) / total_seen}, Avg Cand Len: {total_len / (total_seen)} for {input_file}"
+        f"Total Seen: {total_seen}, Total Dropped: {total_dropped}, "
+        f"Recall: {(total_seen - total_dropped) / total_seen}, "
+        f"Avg Cand Len: {total_len / (total_seen)} for {input_file}"
     )
     return new_alias2qids, total_seen, total_dropped
 

@@ -5,7 +5,7 @@
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q2"], "sent_idx_unq": 4, "sentence": "alias1 and multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q2"], "sent_idx_unq": 5, "sentence": "alias1 and multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q2"], "sent_idx_unq": 6, "sentence": "alias1 and multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}
-{"aliases": [], "qids": [], "sent_idx_unq": 7, "sentence": "alias1 or mullti word alias2", "spans": [], "gold": []}
+{"aliases": [], "qids": [], "sent_idx_unq": 7, "sentence": "alias1 or multi word alias2", "spans": [], "gold": []}
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx_unq": 8, "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx_unq": 9, "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}
 {"aliases": ["alias1", "multi word alias2"], "qids": ["Q1", "Q4"], "sent_idx_unq": 10, "sentence": "alias1 or multi word alias2", "spans": [[0, 1], [2, 5]], "gold": [true, true]}

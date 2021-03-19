@@ -91,10 +91,10 @@ class TypeEmb(EntityEmb):
         self.add_attn = None
         # Function for merging multiple types
         if "merge_func" in emb_args:
-            assert emb_args.merge_func in [
-                "average",
-                "addattn",
-            ], f"{key}: You have set the type merge_func to be {emb_args.merge_func} but that is not in the allowable list of [average, addattn]"
+            assert emb_args.merge_func in ["average", "addattn",], (
+                f"{key}: You have set the type merge_func to be {emb_args.merge_func} but"
+                f" that is not in the allowable list of [average, addattn]"
+            )
             if emb_args.merge_func == "addattn":
                 if "attn_hidden_size" in emb_args:
                     attn_hidden_size = emb_args.attn_hidden_size
@@ -145,11 +145,13 @@ class TypeEmb(EntityEmb):
         self.register_buffer("typeid2reg", typeid2reg)
         assert self.eid2typeids_table.shape[1] == emb_args.max_types, (
             f"Something went wrong with loading type file."
-            f" The given max types {emb_args.max_types} does not match that of type table {self.eid2typeids_table.shape[1]}"
+            f" The given max types {emb_args.max_types} does not match that "
+            f"of type table {self.eid2typeids_table.shape[1]}"
         )
         log_rank_0_debug(
             logger,
-            f"{key}: Type embedding with {self.max_types} types with dim {self.orig_dim}. Setting merge_func to be {self.merge_func.__name__} in type emb.",
+            f"{key}: Type embedding with {self.max_types} types with dim {self.orig_dim}. "
+            f"Setting merge_func to be {self.merge_func.__name__} in type emb.",
         )
 
     @classmethod
@@ -161,7 +163,8 @@ class TypeEmb(EntityEmb):
             emb_args: embedding args
             entity_symbols: entity synbols
 
-        Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix, and number of types with unk type
+        Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix,
+                 and number of types with unk type
         """
         type_str = os.path.splitext(emb_args.type_labels.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
@@ -207,7 +210,8 @@ class TypeEmb(EntityEmb):
             max_types: maximum number of types for an entity
             entity_symbols: entity symbols
 
-        Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix, and number of types with unk type
+        Returns: torch tensor from EID to type IDS, type ID to row in type embedding matrix,
+                 and number of types with unk type
         """
         with open(type_vocab) as f:
             vocab = json.load(f)
@@ -311,7 +315,7 @@ class TypeEmb(EntityEmb):
             # default of no mask
             typeid2reg_arr = [0.0] * num_types_with_pad_and_unk
             for row_idx, row in typeid2reg_raw.iterrows():
-                # Happens when we filter QIDs not in our entity save and the max typeid is smaller than the total number
+                # Happens when we filter QIDs not in our entity db and the max typeid is smaller than the total number
                 if int(row["typeid"]) not in type2row_dict:
                     continue
                 typeid = type2row_dict[int(row["typeid"])]
@@ -361,7 +365,7 @@ class TypeEmb(EntityEmb):
         """Using additive attention to average the type embeddings for a
         candidate.
 
-        Important! We must pass in add_attn to avoid bugs with DataParallel not using the add_attn from the correct device
+        Important! We must pass in add_attn to avoid bugs with DP not using the add_attn from the right device
 
         Args:
             batch_type_ids: type ids for a batch

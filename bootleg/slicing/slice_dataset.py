@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.symbols.constants import ANCHOR_KEY, FINAL_LOSS
-from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import data_utils, utils
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,10 @@ class InputExample(object):
         )
 
     def __repr__(self):
-        return f"Sent: {self.sent_idx} Subsent: {self.subslice_idx} Anchors: {self.anchor} Num Alias2Pred: {self.num_alias2pred} Slices: {self.slices}"
+        return (
+            f"Sent: {self.sent_idx} Subsent: {self.subslice_idx} Anchors: {self.anchor} "
+            f"Num Alias2Pred: {self.num_alias2pred} Slices: {self.slices}"
+        )
 
 
 class InputFeatures(object):
@@ -238,7 +240,8 @@ def create_examples(
     )
     log_rank_0_debug(
         logger,
-        f"Done with extracting examples in {time.time()-start}. Total lines seen {total_input}. Total lines kept {total_output}.",
+        f"Done with extracting examples in {time.time()-start}. Total lines seen {total_input}. "
+        f"Total lines kept {total_output}.",
     )
     return
 
@@ -253,9 +256,7 @@ def create_examples_hlp(args):
 def create_examples_single(in_file_name, in_file_lines, out_file_name, constants_dict):
     """Create examples multiprocessing helper."""
     split = constants_dict["split"]
-    train_in_candidates = constants_dict["train_in_candidates"]
     use_weak_label = constants_dict["use_weak_label"]
-    max_aliases = constants_dict["max_aliases"]
     slice_names = constants_dict["slice_names"]
     with open(out_file_name, "w") as out_f:
         total_subsents = 0
@@ -281,8 +282,8 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
                 assert len(aliases) == len(anchor)
                 assert all(isinstance(a, bool) for a in anchor)
                 if split != "train":
-                    # Reindex aliases to predict to be where anchor == True because we only ever want to predict those (it will see all aliases in
-                    # the forward pass but we will only score the True anchors)
+                    # Reindex aliases to predict to be where anchor == True because we only ever want to predict
+                    # those (it will see all aliases in the forward pass but we will only score the True anchors)
                     for slice_name in slices:
                         aliases_to_predict = slices[slice_name]
                         slices[slice_name] = {
@@ -314,7 +315,8 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
                 ), "Cannot toggle off data weak labelling without anchor info"
                 # The number of aliases will be reduced to the number of true anchors
                 num_alias2pred = sum(anchor)
-                # We must correct this mapping because the indexing will change when we remove False anchors (see comment example above)
+                # We must correct this mapping because the indexing will change when we remove False anchors (see
+                # comment example above)
                 slices = data_utils.correct_not_augmented_dict_values(anchor, slices)
             # print("ANCHOR", anchor, "LINE", line, "SLICeS", slices)
             # Remove slices that have no aliases to predict
@@ -324,19 +326,21 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
 
             all_false_anchors = all([anc is False for anc in anchor])
             # For nicer code downstream, we make sure FINAL_LOSS is in here
-            # Only cases where it won't be is if use_weak_labels is True and the split is train (then we may have all false anchors)
+            # Only cases where it won't be is if use_weak_labels is True and the split is train
+            # (then we may have all false anchors)
             if FINAL_LOSS not in slices:
                 assert (
                     all_false_anchors
                 ), f"If {FINAL_LOSS} isn't in slice, it must be that all anchors are False. This is not true"
                 assert (
                     split != "train" or not use_weak_label
-                ), f"As all anchors are false, this must happen if you are evaluating or training and using weak labels"
+                ), f"As all anchors are false, this must happen if you are evaling or training and using weak labels"
             # TODO: optimizer here
             # for i in range(0, num_alias2pred, max_aliases):
             #     subset_slices = {}
             #     for slice_name in list(slices.keys()):
-            #         subset_slices[slice_name] = dict(str(j):slice[slice_name][str(j)] for j in range(i:i+max_aliases))
+            #         subset_slices[slice_name] = dict(str(j):slice[slice_name][str(j)] for
+            #                                                       j in range(i:i+max_aliases))
             #     ex = InputExample(
             #         sent_idx=sent_idx,
             #         subslice_idx=i,
@@ -399,7 +403,8 @@ def convert_examples_to_features_and_save(
     max_alias2pred = utils.load_json_file(meta_file)["max_alias2pred"]
     files_and_counts = utils.load_json_file(meta_file)["files_and_counts"]
 
-    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before being opened in r+ mode by workers
+    # IMPORTANT: for distributed writing to memmap files, you must create them in w+ mode before
+    # being opened in r+ mode by workers
     memmap_file = np.memmap(
         save_dataset_name, dtype=storage, mode="w+", shape=(total_input,), order="C"
     )
@@ -462,7 +467,8 @@ def convert_examples_to_features_and_save(
 
     log_rank_0_debug(
         logger,
-        f"Done with extracting examples in {time.time() - start}. Total lines seen {total_input}. Total lines kept {total_output}",
+        f"Done with extracting examples in {time.time() - start}. Total lines seen {total_input}. "
+        f"Total lines kept {total_output}",
     )
     return
 
@@ -566,8 +572,8 @@ class BootlegSliceDataset:
     """Our dataset class for holding data slices (or subpopulations).
 
     Each mention can be part of 0 or more slices. When running eval, we use
-    the SliceDataset to determine which mentions are part of what slices. Importantly, although the model "sees" all mentions, only GOLD anchor
-    links are evaluated for eval (splits of test/dev).
+    the SliceDataset to determine which mentions are part of what slices. Importantly, although the model
+    "sees" all mentions, only GOLD anchor links are evaluated for eval (splits of test/dev).
 
     Args:
         main_args: main arguments
@@ -696,7 +702,8 @@ class BootlegSliceDataset:
         assert len(self.sent_to_row_id_dict) > 0
         log_rank_0_debug(logger, f"Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
-        # Set spawn back to original/default, which is "fork" or "spawn". This is needed for the Meta.config to be correctly passed in the collate_fn.
+        # Set spawn back to original/default, which is "fork" or "spawn". This is needed for the Meta.config to
+        # be correctly passed in the collate_fn.
         multiprocessing.set_start_method(orig_spawn, force=True)
         log_rank_0_info(
             logger,
@@ -744,7 +751,8 @@ class BootlegSliceDataset:
 
         Args:
             sent_idx: sentence index
-            alias_orig_list_pos: list of alias positions in input data list (due to sentence splitting, aliases may be split up)
+            alias_orig_list_pos: list of alias positions in input data list
+                                 (due to sentence splitting, aliases may be split up)
 
         Returns: Dict of slice name -> 0/1 incidence array
         """

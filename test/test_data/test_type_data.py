@@ -1,6 +1,5 @@
 import os
 import shutil
-import tempfile
 import unittest
 
 import numpy as np
@@ -224,7 +223,8 @@ class DataTypeLoader(unittest.TestCase):
           "Q4": [1]
         }
         """
-        # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences; the types should follow
+        # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences;
+        # the types should follow
         max_seq_len = 7
         max_aliases = 4
         self.args.data_config.max_aliases = max_aliases
@@ -275,8 +275,9 @@ class DataTypeLoader(unittest.TestCase):
           "Q4": [1]
         }
         """
-        # Test 1: this sentence gets split into two with two aliases each (the first alias of second split masked out). The types should
-        # follow this trend. Since split is train, they also ignore the gold.
+        # Test 1: this sentence gets split into two with two aliases each
+        # (the first alias of second split masked out). The types should follow this trend. Since split is train,
+        # they also ignore the gold.
         max_seq_len = 7
         max_aliases = 2
         self.args.data_config.max_aliases = max_aliases
@@ -310,7 +311,8 @@ class DataTypeLoader(unittest.TestCase):
         )
         assert torch.equal(Y_dict["gold_type_id"], dataset.Y_dict["gold_type_id"])
 
-        # Test 2: with the split of "dev", the subsentences should remain unchanged but the true index in Y_dict should be -1
+        # Test 2: with the split of "dev", the subsentences should remain unchanged but the
+        # true index in Y_dict should be -1
         max_seq_len = 7
         max_aliases = 2
         split = "dev"

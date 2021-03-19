@@ -1,5 +1,13 @@
-Unreleased_ 1.0.1dev1
+Unreleased 1.0.2dev0
+---------------------
+
+1.0.1 - 2021-03-22
 -------------------
+
+.. note::
+
+    If upgrading to 1.0.1 from 1.0.0, you will need to re-download our models given the links in the README.md. We altered what keys were saved in the state dict, but the model weights are unchanged.
+
 Added
 ^^^^^^^
 * ``data_config.print_examples_prep`` flag to toggle data example printing during data prep.
@@ -10,6 +18,7 @@ Changed
 ^^^^^^^^
 * Support for not using multiprocessing if use sets ``data_config.dataset_threads`` to be 1.
 * Added better argument parsing to check for arguments that were misspelled or otherwise wouldn't trigger anything.
+* Code is now Flake8 compatible.
 
 Fixed
 ^^^^^^^
@@ -17,7 +26,7 @@ Fixed
 * Fixed logging in BootlegAnnotator.
 * Fixed ``use_exact_path`` argument in Emmental.
 
-1.0.0 - 2020-02-15
+1.0.0 - 2021-02-15
 -------------------
 We did a major rewrite of our entire codebase and moved to using `Emmental <https://github.com/SenWu/Emmental>`_ for training. Emmental allows for each multi-task training, FP16, and support for both DataParallel and DistributedDataParallel.
 

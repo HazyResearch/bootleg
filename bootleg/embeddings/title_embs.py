@@ -7,10 +7,10 @@ import torch
 from tqdm import tqdm
 from transformers import BertTokenizer
 
-from bootleg import log_rank_0_debug, log_rank_0_info
-from bootleg.embeddings import MLP, EntityEmb, model_utils, selective_avg, utils
+from bootleg import log_rank_0_debug
+from bootleg.embeddings import EntityEmb
 from bootleg.symbols.constants import BERT_WORD_DIM, MAX_BERT_TOKEN_LEN
-from bootleg.utils import data_utils
+from bootleg.utils import data_utils, model_utils, utils
 from bootleg.utils.embedding_utils import get_max_candidates
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,12 @@ def load_tokenizer(data_config):
 class TitleEmb(EntityEmb):
     """Title entity embeddings class.
 
-    As the title embedding requires being sent through the BERT encoder to be contextualized, these get added to the BertEncoder class (see
-    bert_encoder.py).
+    As the title embedding requires being sent through the BERT encoder to be contextualized,
+    these get added to the BertEncoder class (see bert_encoder.py).
 
-    This class therefore functions as the pre and postprocessing step to this BERT forward call. Given a batch of entity candidates, the
-    forward is responsable for retrieving the word token ids for each entity. Then, after the forward, it can do any postprocessing on the outs,
-    e.g., projection layer.
+    This class therefore functions as the pre and postprocessing step to this BERT forward call.
+    Given a batch of entity candidates, the forward is responsable for retrieving the word token ids for each entity.
+    Then, after the forward, it can do any postprocessing on the outs, e.g., projection layer.
 
     Add the following to your config to use::
 
@@ -244,7 +244,7 @@ class TitleEmb(EntityEmb):
         Returns: average title embedding
         """
         # subset_mask is downstream Pytorch mask where True means remove. Averages requires True to mean we keep
-        embs = selective_avg(mask=~subset_mask, embeds=title_emb)
+        embs = model_utils.selective_avg(mask=~subset_mask, embeds=title_emb)
         return embs
 
     def get_subset_title_embs(self, title_token_ids, title_mask, title_token_type):
@@ -256,13 +256,16 @@ class TitleEmb(EntityEmb):
             title_mask: token masks
             title_token_type: token type IDs
 
-        Returns: subset token IDs, subset mask, subset token type IDs, index of kept rows in original data (for reconstruction)
+        Returns: subset token IDs, subset mask, subset token type IDs,
+                 index of kept rows in original data (for reconstruction)
         """
         # Bert takes 2-D input so reshape
         flat_title_token_ids = title_token_ids.reshape(-1, title_token_ids.shape[-1])
         flat_mask = title_mask.reshape(-1, title_token_ids.shape[-1])
         flat_token_types = title_token_type.reshape(-1, title_token_ids.shape[-1])
-        # only get the subset of words that you need (ignore 0 mask ids) -- remember, this is BERT mask so 1 means what to pay attention to (all 0s is ignore)
+        # only get the subset of words that you need (ignore 0 mask ids) -- remember,
+        # this is BERT mask so 1 means what to pay attention to (all 0s is ignore)
+
         # subset_idx = flat_mask.sum(-1) != 0
         # subset_title_token_ids = flat_title_token_ids[subset_idx]
         # subset_mask = flat_mask[subset_idx]
@@ -321,22 +324,22 @@ class TitleEmb(EntityEmb):
             batch_size * self.M * self.K, self._dim, device=title_emb.device
         ).fill_(0)
         # print(f"EMTPY", time.time()-st)
-        st = time.time()
+        # st = time.time()
         title_emb = self.title_proj(title_emb)
         # print(f"PROJ", time.time()-st)
-        st = time.time()
+        # st = time.time()
         average_title_emb = self.merge_func(subset_mask, title_emb)
         # print(f"MERGE", time.time()-st)
-        st = time.time()
+        # st = time.time()
         average_title_emb = self.normalize_and_dropout_emb(average_title_emb)
         # print(f"NORM", time.time()-st)
-        st = time.time()
+        # st = time.time()
         final_title_emb = final_title_emb.index_copy_(0, subset_idx, average_title_emb)
         # final_title_emb[subset_idx] = average_title_emb
         # print(f"FILL", time.time()-st)
-        st = time.time()
+        # st = time.time()
         final_title_emb = final_title_emb.reshape(batch_size, self.M, self.K, self._dim)
         # print(f"RESHAPE", time.time()-st)
-        st = time.time()
+        # st = time.time()
         assert list(final_title_emb.shape) == [batch_size, self.M, self.K, self._dim]
         return final_title_emb
