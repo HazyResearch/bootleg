@@ -59,7 +59,8 @@ Once ready to train or run a model with the profile data, simply save it
 
 We have already provided the saved dump at ``data/sample_entity_data``.
 
-See our `entity profile tutorial <https://github.com/HazyResearch/bootleg/tree/master/tutorials/entity_embedding_tutorial.ipynb>`_ for a more complete walkthrough notebook of the API.
+See our `entity profile tutorial <https://github.com/HazyResearch/bootleg/tree/master/tutorials/entity_profile_tutorial
+.ipynb>`_ for a more complete walkthrough notebook of the API.
 
 Training with a Profile
 ------------------------
@@ -109,4 +110,8 @@ Given this metadata, you simply need to specify the type, relation mappings and 
              args:
                kg_adj: kg_mappings/kg_adj.txt
 
-See our `example config <https://github.com/HazyResearch/bootleg/tree/master/configs/tutorial/sample_config.yaml>`_ for a full reference, and see our `entity profile tutorial <https://github.com/HazyResearch/bootleg/tree/master/tutorials/entity_embedding_tutorial.ipynb>`_ for some methods to help modify configs to map to the entity profile correctly.
+See our `example config <https://github.com/HazyResearch/bootleg/tree/master/configs/tutorial/sample_config.yaml>`_
+for a full reference, and see our `entity profile tutorial <https://github
+.com/HazyResearch/bootleg/tree/master/tutorials/entity_profile_tutorial.ipynb>`_ for some methods to help modify
+configs
+to map to the entity profile correctly.
