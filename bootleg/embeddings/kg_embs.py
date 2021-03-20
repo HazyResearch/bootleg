@@ -1,20 +1,17 @@
 """Knowledge graph embeddings."""
 import logging
 import os
-import pickle
 import time
-from collections import defaultdict
 
 import networkx as nx
 import numpy as np
 import scipy.sparse
+import torch
 import ujson as json
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.embeddings import EntityEmb
-from bootleg.layers.helper_modules import *
 from bootleg.utils import data_utils, embedding_utils, utils
-from bootleg.utils.model_utils import selective_avg
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +64,10 @@ class KGAdjEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"kg_adj", "threshold", "log_weight"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "kg_adj" in emb_args, f"KG embedding requires kg_adj to be set in args"
         assert (
             self.normalize is False
@@ -77,8 +78,8 @@ class KGAdjEmb(EntityEmb):
         assert (
             self.dropout2d_perc == 0.0
         ), f"We can't dropout 2d a KGAdjEmb as it has hidden dim 1"
-        # This determines that, when prepping the embeddings, we will query the kg_adj matrix and sum the results - generating
-        # one value per entity candidate
+        # This determines that, when prepping the embeddings, we will query the kg_adj matrix and sum the results -
+        # generating one value per entity candidate
         self.kg_adj_process_func = embedding_utils.prep_kg_feature_sum
         self._dim = 1
 
@@ -122,7 +123,7 @@ class KGAdjEmb(EntityEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(prep_dir, f"kg_adj_file_{file_tag}.npz")
         utils.ensure_dir(os.path.dirname(prep_file))
@@ -288,7 +289,7 @@ class KGWeightedAdjEmb(KGAdjEmb):
 
         Returns: numpy sparce KG adjacency matrix, prep file
         """
-        file_tag = os.path.splitext(emb_args.kg_adj)[0]
+        file_tag = os.path.splitext(emb_args.kg_adj.replace("/", "_"))[0]
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"kg_adj_file_{file_tag}_{threshold}_{log_weight}.npz"
@@ -397,11 +398,12 @@ class KGIndices(KGWeightedAdjEmb):
     """KG indices that is _not_ appended to the entity payload embedding. This
     is used in the KG attention module.
 
-    Forward returns an empty dict. A tensor of batch x M x K x M x K denoting which entity candidates are connected to each other in the KG is stored
-    in batch_on_the_fly (see dataset.py).
+    Forward returns an empty dict. A tensor of batch x M x K x M x K denoting which entity candidates are
+    connected to each other in the KG is stored in batch_on_the_fly (see dataset.py).
 
-    The attn_network looks for this component by the key REL_INDICES_KEY (in constants.py) to pull out this kg component. This _must_ be the key in the embedding
-    list in the config or it will be ignored. If the attn_network class is extended, then the key used must match that in the config.
+    The attn_network looks for this component by the key REL_INDICES_KEY (in constants.py) to pull out
+    this kg component. This _must_ be the key in the embedding list in the config or it will be ignored.
+    If the attn_network class is extended, then the key used must match that in the config.
 
     Args:
         main_args: main args
@@ -438,7 +440,7 @@ class KGIndices(KGWeightedAdjEmb):
         self._dim = 0
         # Weight for the diagonal addition to the KG indices - allows for summing an entity with other connections
         self.kg_bias_weight = torch.nn.Parameter(torch.tensor(2.0))
-        self.kg_softmax = nn.Softmax(dim=2)
+        self.kg_softmax = torch.nn.Softmax(dim=2)
         # This determines that, when prepping the embeddings, we will query the kg_adj matrix - generating
         # M*K values per entity candidate
         self.kg_adj_process_func = embedding_utils.prep_kg_feature_matrix
@@ -468,7 +470,7 @@ class KGIndices(KGWeightedAdjEmb):
         # needs to be size: batch x m x k x hidden_dim
         assert (
             self.key in batch_on_the_fly_data
-        ), f"{self.key} missing from preprocessed data (batch_prep or batch_on_the_fly). It must be there for KGIndices."
+        ), f"{self.key} missing from preprocessed data (batch_on_the_fly). It must be there for KGIndices."
         # preprocess matrix to be ready for bmm
         kg_bias = (
             batch_on_the_fly_data[self.key]

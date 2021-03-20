@@ -105,7 +105,7 @@ def get_counts_hlp(file):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = min(args.processes, int(0.8 * multiprocessing.cpu_count()))
     data_dir = Path(args.data_dir)
     train_dir = data_dir / "train"

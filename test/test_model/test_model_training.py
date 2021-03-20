@@ -51,7 +51,7 @@ class ModelTrainTest(unittest.TestCase):
         self.args = parser_utils.parse_boot_and_emm_args(
             "test/run_args/test_model_training.json"
         )
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
@@ -142,7 +142,7 @@ class ModelTrainTest(unittest.TestCase):
         end_span_idx = torch.ones(batch_size, M)
         batch_on_the_fly_data = {}
 
-        res = model(
+        model(
             sent_emb,
             sent_emb_mask,
             entity_embs,
@@ -201,7 +201,7 @@ class ModelTrainTest(unittest.TestCase):
         end_span_idx = torch.ones(batch_size, M)
         batch_on_the_fly_data = {}
 
-        res = model(
+        model(
             sent_emb,
             sent_emb_mask,
             entity_embs,
@@ -249,7 +249,7 @@ class ModelTrainTest(unittest.TestCase):
         end_span_idx = torch.ones(batch_size, M)
         batch_on_the_fly_data = {}
 
-        res = model(
+        model(
             sent_emb,
             sent_emb_mask,
             entity_embs,
@@ -265,7 +265,8 @@ class ModelTrainTest(unittest.TestCase):
         # we only care about the zeros, put 1's in non-zero values
         # 0's represent padded sequences
 
-        # the last col is 0 to indicate the -1 candidate for alias index 1 will not be added to any other candidate representation in the BMM
+        # the last col is 0 to indicate the -1 candidate for alias index 1 will not be
+        # added to any other candidate representation in the BMM
         expected_weights = torch.tensor(
             [
                 [
@@ -309,7 +310,7 @@ class ModelTrainTest(unittest.TestCase):
         Y[0, 0] = -2
         # Checking that it fails during training
         with pytest.raises(IndexError) as excinfo:
-            res = disambig_loss(intermediate_output_dict, Y, active)
+            disambig_loss(intermediate_output_dict, Y, active)
         assert "-2" in str(excinfo.value)
 
         # Checking that this passes under eval

@@ -12,7 +12,7 @@ seed=${11:-1234}
 encode_first=${12:-0}
 tanh=${13:-0}
 norm=${14:-0}
-ent_emb_path=${15:-dataset/tacred/ent_embedding.npy} 
+ent_emb_path=${15:-dataset/tacred/ent_embedding.npy}
 
 #!/bin/bash
 echo -n "Model [spanbert, lstm]: "

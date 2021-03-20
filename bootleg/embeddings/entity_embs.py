@@ -67,14 +67,24 @@ class LearnedEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"LearnedEntityEmb must have learned_embedding_size in args"
         self.learned_embedding_size = emb_args.learned_embedding_size
 
-        # Set sparsity based on optimizer. The None optimizer is Bootleg's SparseDenseAdam
+        # Set sparsity based on optimizer and fp16. The None optimizer is Bootleg's SparseDenseAdam.
+        # If fp16 is True, must use dense.
         optimiz = main_args.learner_config.optimizer_config.optimizer
-        if optimiz in [None, "sparse_adam"]:
+        if optimiz in [None, "sparse_adam"] and main_args.learner_config.fp16 is False:
             sparse = True
         else:
             sparse = False
@@ -176,7 +186,7 @@ class LearnedEntityEmb(EntityEmb):
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = os.path.splitext(os.path.basename(reg_file))[0]
+        reg_str = os.path.splitext(os.path.basename(reg_file.replace("/", "_")))[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_regularization_mapping_{reg_str}.pt"
@@ -206,8 +216,9 @@ class LearnedEntityEmb(EntityEmb):
             # default of no mask
             eid2reg_arr = [0.0] * entity_symbols.num_entities_with_pad_and_nocand
             for row_idx, row in qid2reg.iterrows():
-                eid = entity_symbols.get_eid(row["qid"])
-                eid2reg_arr[eid] = row["regularization"]
+                if entity_symbols.qid_exists(row["qid"]):
+                    eid = entity_symbols.get_eid(row["qid"])
+                    eid2reg_arr[eid] = row["regularization"]
             eid2reg = torch.tensor(eid2reg_arr)
             torch.save(eid2reg, prep_file)
             log_rank_0_debug(
@@ -295,6 +306,17 @@ class TopKEntityEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {
+            "learned_embedding_size",
+            "perc_emb_drop",
+            "qid2topk_eid",
+            "regularize_mapping",
+            "tail_init",
+            "tail_init_zeros",
+        }
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert (
             "learned_embedding_size" in emb_args
         ), f"TopKEntityEmb must have learned_embedding_size in args"
@@ -392,7 +414,8 @@ class TopKEntityEmb(EntityEmb):
             if "regularize_mapping" in emb_args:
                 log_rank_0_debug(
                     logger,
-                    f"You are using regularization mapping with a topK entity embedding. This means all QIDs that are mapped to the same"
+                    f"You are using regularization mapping with a topK entity embedding. "
+                    f"This means all QIDs that are mapped to the same"
                     f" EID will get the same regularization value.",
                 )
                 if self.dropout1d_perc > 0 or self.dropout2d_perc > 0:
@@ -406,6 +429,7 @@ class TopKEntityEmb(EntityEmb):
                 )
                 eid2reg = self.load_regularization_mapping(
                     main_args.data_config,
+                    entity_symbols,
                     qid2topk_eid,
                     num_topk_entities_with_pad_and_nocand,
                     emb_args.regularize_mapping,
@@ -417,6 +441,7 @@ class TopKEntityEmb(EntityEmb):
     def load_regularization_mapping(
         cls,
         data_config,
+        entity_symbols,
         qid2topk_eid,
         num_entities_with_pad_and_nocand,
         reg_file,
@@ -428,13 +453,14 @@ class TopKEntityEmb(EntityEmb):
 
         Args:
             data_config: data config
+            entity_symbols: entity symbols
             qid2topk_eid: Dict from QID to eid in the topK entity embedding
             num_entities_with_pad_and_nocand: number of entities including pad and null candidate option
             reg_file: regularization csv file
 
         Returns: Tensor where each value is the regularization value for EID
         """
-        reg_str = reg_file.split(".csv")[0]
+        reg_str = reg_file.replace("/", "_").split(".csv")[0]
         prep_dir = data_utils.get_data_prep_dir(data_config)
         prep_file = os.path.join(
             prep_dir, f"entity_topk_regularization_mapping_{reg_str}.pt"
@@ -464,8 +490,9 @@ class TopKEntityEmb(EntityEmb):
             # default of no mask
             eid2reg_arr = [0.0] * num_entities_with_pad_and_nocand
             for row_idx, row in qid2reg.iterrows():
-                eid = qid2topk_eid[row["qid"]]
-                eid2reg_arr[eid] = row["regularization"]
+                if entity_symbols.qid_exists(row["qid"]):
+                    eid = qid2topk_eid[row["qid"]]
+                    eid2reg_arr[eid] = row["regularization"]
             eid2reg = torch.tensor(eid2reg_arr)
             torch.save(eid2reg, prep_file)
             log_rank_0_debug(
@@ -532,6 +559,10 @@ class StaticEmb(EntityEmb):
             dropout1d_perc=dropout1d_perc,
             dropout2d_perc=dropout2d_perc,
         )
+        allowable_keys = {"emb_file", "proj"}
+        correct, bad_key = utils.assert_keys_in_dict(allowable_keys, emb_args)
+        if not correct:
+            raise ValueError(f"The key {bad_key} is not in {allowable_keys}")
         assert "emb_file" in emb_args, f"Must have emb_file in args for StaticEmb"
         self.entity2static = self.prep(
             data_config=main_args.data_config,
@@ -620,6 +651,8 @@ class StaticEmb(EntityEmb):
         Returns: numpy embedding matrix where each row is an emedding
         """
         ending = os.path.splitext(emb_file)[1]
+        found = 0
+        raw_num_ents = 0
         if ending == ".json":
             dct = utils.load_json_file(emb_file)
             val = next(iter(dct.values()))
@@ -640,34 +673,51 @@ class StaticEmb(EntityEmb):
             entity2staticemb_table = np.zeros(
                 (entity_symbols.num_entities_with_pad_and_nocand, embedding_size)
             )
-            found = 0
+            raw_num_ents = len(embeddings)
             for qid in tqdm(entity_symbols.get_all_qids()):
                 if qid in embeddings:
                     found += 1
                     emb = embeddings[qid]
                     eid = entity_symbols.get_eid(qid)
                     entity2staticemb_table[eid, :embedding_size] = emb
-            log_rank_0_debug(
-                logger,
-                f"Found {found/len(entity_symbols.get_all_qids())} percent of all entities have a static embedding",
-            )
         elif ending == ".pt":
             log_rank_0_debug(
                 logger,
                 f"We are readining in the embedding file from a .pt. We assume this is already mapped to eids",
             )
-            entity2staticemb_table = torch.load(emb_file).detach().cpu().numpy()
-            assert (
-                entity2staticemb_table.shape[0]
-                == entity_symbols.num_entities_with_pad_and_nocand
-            ), (
-                f"To load a saved pt file, it must be of shape {entity_symbols.num_entities_with_pad_and_nocand} "
-                f"which is in eid space with the number of entities (including PAD and UNK)"
+            (qid2eid_map, entity2staticemb_table_raw) = torch.load(emb_file)
+            entity2staticemb_table_raw = (
+                entity2staticemb_table_raw.detach().cpu().numpy()
             )
+            raw_num_ents = entity2staticemb_table_raw.shape[0]
+            # +2 handles the PAD and UNK entities
+            assert entity2staticemb_table_raw.shape[0] == len(qid2eid_map) + 2, (
+                f"The saved static embeddings file had mismatched shapes between qid2eid {len(qid2eid_map)} and "
+                f"weights {entity2staticemb_table_raw.shape[0]}"
+            )
+            entity2staticemb_table = np.zeros(
+                (
+                    entity_symbols.num_entities_with_pad_and_nocand,
+                    entity2staticemb_table_raw.shape[1],
+                )
+            )
+            found = 0
+            for qid in tqdm(entity_symbols.get_all_qids()):
+                if qid in qid2eid_map:
+                    found += 1
+                    raw_eid = qid2eid_map[qid]
+                    emb = entity2staticemb_table_raw[raw_eid]
+                    new_eid = entity_symbols.get_eid(qid)
+                    entity2staticemb_table[new_eid, :] = emb
         else:
             raise ValueError(
                 f"We do not support static embeddings from {ending}. We only support .json and .pt"
             )
+        log_rank_0_debug(
+            logger,
+            f"Found {found} ({found/len(entity_symbols.get_all_qids())} percent) of all entities after "
+            f"reading {raw_num_ents} original entities have a static embedding",
+        )
         return entity2staticemb_table
 
     def forward(self, entity_cand_eid, batch_on_the_fly_data):

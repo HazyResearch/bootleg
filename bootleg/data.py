@@ -107,7 +107,8 @@ def get_dataloaders(
             if Meta.config["learner_config"]["local_rank"] != -1:
                 log_rank_0_info(
                     logger,
-                    f"You are using distributed computing for eval. We are not using a distributed sampler. Please use DataParallel and not DDP.",
+                    f"You are using distributed computing for eval. We are not using a distributed sampler. "
+                    f"Please use DataParallel and not DDP.",
                 )
         dataloaders.append(
             EmmentalDataLoader(
@@ -180,7 +181,8 @@ def get_dataloader_embeddings(main_args, entity_symbols):
                 )
                 # Extract its kg adj, we'll use this later
                 # Extract the kg_adj_process_func (how to process the embeddings in __get_item__ or dataset prep)
-                # Extract the prep_file. We use this to load the kg_adj back after saving/loading state using scipy.sparse.load_npz(prep_file)
+                # Extract the prep_file. We use this to load the kg_adj back after
+                # saving/loading state using scipy.sparse.load_npz(prep_file)
                 assert hasattr(
                     kg_class, "kg_adj"
                 ), f"The embedding class {emb.key} does not have a kg_adj attribute and it needs to."
@@ -236,7 +238,8 @@ def bootleg_collate_fn(
                     if isinstance(value, list):
                         X_batch[field_name] += value
                     elif isinstance(value, dict):
-                        # We reinstantiate the field_name here in case there is not kg adj data - this keeps the field_name key intact
+                        # We reinstantiate the field_name here in case there is not kg adj data
+                        # This keeps the field_name key intact
                         if field_name not in X_sub_batch:
                             X_sub_batch[field_name] = defaultdict(list)
                         for sub_field_name, sub_value in value.items():
@@ -259,7 +262,8 @@ def bootleg_collate_fn(
                 if isinstance(value, list):
                     X_batch[field_name] += value
                 elif isinstance(value, dict):
-                    # We reinstantiate the field_name here in case there is not kg adj data - this keeps the field_name key intact
+                    # We reinstantiate the field_name here in case there is not kg adj data
+                    # This keeps the field_name key intact
                     if field_name not in X_sub_batch:
                         X_sub_batch[field_name] = defaultdict(list)
                     for sub_field_name, sub_value in value.items():

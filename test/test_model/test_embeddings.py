@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from transformers import BertTokenizer
 
+import emmental
 from bootleg.embeddings import (
     EntityEmb,
     KGAdjEmb,
@@ -18,7 +19,6 @@ from bootleg.embeddings import (
     TitleEmb,
     TopKEntityEmb,
     TypeEmb,
-    emmental,
 )
 from bootleg.layers.embedding_payload import EmbeddingPayload, EmbeddingPayloadBase
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -45,7 +45,8 @@ class NoopTakeFirst(nn.Module):
         return input[0]
 
 
-# Embedding class that does not declare a normalize attribute. We check that the normalize attribute is instantiated and need
+# Embedding class that does not declare a normalize attribute. We check that the normalize
+# attribute is instantiated and need
 # to test that this feature works.
 class EntityEmbNoNorm(EntityEmb):
     def __init__(
@@ -286,8 +287,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
         # Check defaults
         assert module_pool["learned1"].normalize is True
         assert module_pool["learned2"].dropout1d_perc == 0.0
@@ -416,8 +417,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
 
     def test_adding_title(self):
         self.args.data_config.ent_embeddings.append(
@@ -535,8 +536,8 @@ class TestLoadEmbeddings(unittest.TestCase):
         self.assertDictEqual(module_device_dict, gold_module_device_dict)
         self.assertDictEqual(total_sizes, gold_total_sizes)
         assert len(task_flows) == len(gold_task_flows)
-        for l, r in zip(task_flows, gold_task_flows):
-            self.assertDictEqual(l, r)
+        for li, r in zip(task_flows, gold_task_flows):
+            self.assertDictEqual(li, r)
 
 
 class TestLearnedEmbedding(unittest.TestCase):
@@ -638,8 +639,8 @@ class TestLearnedEmbedding(unittest.TestCase):
             ["Q4", "0.2"],
         ]
         with open(self.regularization_csv, "w") as out_f:
-            for l in regularization_data:
-                out_f.write(f"{','.join(l)}\n")
+            for li in regularization_data:
+                out_f.write(f"{','.join(li)}\n")
         self.args.data_config.ent_embeddings[0]["args"][
             "regularize_mapping"
         ] = self.regularization_csv
@@ -676,9 +677,10 @@ class TestLearnedEmbedding(unittest.TestCase):
 
     def test_static_embedding(self):
         emb = torch.randn(self.entity_symbols.num_entities_with_pad_and_nocand, 150)
-        torch.save(emb, self.static_emb)
+        torch.save((self.entity_symbols.get_qid2eid(), emb), self.static_emb)
 
         self.args.data_config.ent_embeddings[0]["args"]["emb_file"] = self.static_emb
+        del self.args.data_config.ent_embeddings[0]["args"]["learned_embedding_size"]
 
         learned_emb = StaticEmb(
             main_args=self.args,
@@ -690,6 +692,9 @@ class TestLearnedEmbedding(unittest.TestCase):
             dropout1d_perc=0.0,
             dropout2d_perc=0.0,
         )
+        # The first and last rows will be zero as no entities have those eids
+        emb[0] = torch.zeros(emb.shape[1])
+        emb[-1] = torch.zeros(emb.shape[1])
         np.testing.assert_array_equal(emb.numpy(), learned_emb.entity2static)
 
 
@@ -706,6 +711,9 @@ class TestTypeEmbedding(unittest.TestCase):
         self.type_file = os.path.join(
             self.args.data_config.emb_dir, "temp_type_file.json"
         )
+        self.type_vocab_file = os.path.join(
+            self.args.data_config.emb_dir, "temp_type_vocab.json"
+        )
         self.regularization_csv = os.path.join(
             self.args.data_config.data_dir, "test_reg.csv"
         )
@@ -713,6 +721,8 @@ class TestTypeEmbedding(unittest.TestCase):
     def tearDown(self) -> None:
         if os.path.exists(self.type_file):
             os.remove(self.type_file)
+        if os.path.exists(self.type_vocab_file):
+            os.remove(self.type_vocab_file)
         if os.path.exists(self.regularization_csv):
             os.remove(self.regularization_csv)
         dir = os.path.join(
@@ -730,15 +740,30 @@ class TestTypeEmbedding(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_build_type_table(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor(
             [[0, 0, 0], [1, 2, 3], [4, 5, 6], [0, 0, 0], [7, 8, 9], [0, 0, 0]]
         ).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=3, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=3,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)
@@ -746,8 +771,20 @@ class TestTypeEmbedding(unittest.TestCase):
         assert max_labels == 10
 
     def test_build_type_table_pad_types(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor(
             [
@@ -759,9 +796,12 @@ class TestTypeEmbedding(unittest.TestCase):
                 [0, 0, 0, 0],
             ]
         ).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=4, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=4,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)
@@ -769,13 +809,28 @@ class TestTypeEmbedding(unittest.TestCase):
         assert max_labels == 10
 
     def test_build_type_table_too_many_types(self):
-        type_data = {"Q1": [0, 1, 2], "Q2": [3, 4, 5], "Q3": [], "Q4": [6, 7, 8]}
+        type_data = {"Q1": [1, 2, 3], "Q2": [4, 5, 6], "Q3": [], "Q4": [7, 8, 9]}
+        type_vocab = {
+            "T1": 1,
+            "T2": 2,
+            "T3": 3,
+            "T4": 4,
+            "T5": 5,
+            "T6": 6,
+            "T7": 7,
+            "T8": 8,
+            "T9": 9,
+        }
         utils.dump_json_file(self.type_file, type_data)
+        utils.dump_json_file(self.type_vocab_file, type_vocab)
 
         true_type_table = torch.tensor([[0], [1], [4], [0], [7], [0]]).long()
-        true_type2row = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+        true_type2row = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9}
         pred_type_table, type2row, max_labels = TypeEmb.build_type_table(
-            self.type_file, max_types=1, entity_symbols=self.entity_symbols
+            self.type_file,
+            self.type_vocab_file,
+            max_types=1,
+            entity_symbols=self.entity_symbols,
         )
         assert torch.equal(pred_type_table, true_type_table)
         self.assertDictEqual(true_type2row, type2row)
@@ -809,8 +864,8 @@ class TestTypeEmbedding(unittest.TestCase):
             [8, 0.7],
         ]
         with open(self.regularization_csv, "w") as out_f:
-            for l in regularization_data:
-                out_f.write(f"{','.join(map(str, l))}\n")
+            for li in regularization_data:
+                out_f.write(f"{','.join(map(str, li))}\n")
 
         num_types_with_pad_and_unk = 11
         type2row_dict = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
@@ -850,8 +905,8 @@ class TestKGEmbedding(unittest.TestCase):
     def test_load_kg_adj(self):
         kg_data = [["Q1", "Q2"], ["Q3", "Q2"]]
         with open(self.kg_adj, "w") as out_f:
-            for l in kg_data:
-                out_f.write(f"{' '.join(l)}\n")
+            for li in kg_data:
+                out_f.write(f"{' '.join(li)}\n")
 
         adj_out = KGAdjEmb.build_kg_adj(
             kg_adj_file=self.kg_adj,
@@ -878,8 +933,8 @@ class TestKGEmbedding(unittest.TestCase):
     def test_load_kg_adj_indices_txt(self):
         kg_data = [["Q1", "Q2"], ["Q3", "Q2"]]
         with open(self.kg_adj, "w") as out_f:
-            for l in kg_data:
-                out_f.write(f"{' '.join(l)}\n")
+            for li in kg_data:
+                out_f.write(f"{' '.join(li)}\n")
 
         adj_out = KGIndices.build_kg_adj(
             kg_adj_file=self.kg_adj,

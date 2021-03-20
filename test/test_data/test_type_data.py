@@ -1,6 +1,5 @@
 import os
 import shutil
-import tempfile
 import unittest
 
 import numpy as np
@@ -27,7 +26,7 @@ class DataTypeLoader(unittest.TestCase):
             cache_dir="test/data/emb_data/pretrained_bert_models",
         )
         self.is_bert = True
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
@@ -77,7 +76,7 @@ class DataTypeLoader(unittest.TestCase):
         self.assertDictEqual(eid2type, eid2type_gold)
 
     def test_load_type_data_extra_entity(self):
-        # Test that we only add entities in our dump
+        # Test that we only add entities in our save
         """ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
@@ -224,7 +223,8 @@ class DataTypeLoader(unittest.TestCase):
           "Q4": [1]
         }
         """
-        # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences; the types should follow
+        # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences;
+        # the types should follow
         max_seq_len = 7
         max_aliases = 4
         self.args.data_config.max_aliases = max_aliases
@@ -275,8 +275,9 @@ class DataTypeLoader(unittest.TestCase):
           "Q4": [1]
         }
         """
-        # Test 1: this sentence gets split into two with two aliases each (the first alias of second split masked out). The types should
-        # follow this trend. Since split is train, they also ignore the gold.
+        # Test 1: this sentence gets split into two with two aliases each
+        # (the first alias of second split masked out). The types should follow this trend. Since split is train,
+        # they also ignore the gold.
         max_seq_len = 7
         max_aliases = 2
         self.args.data_config.max_aliases = max_aliases
@@ -310,7 +311,8 @@ class DataTypeLoader(unittest.TestCase):
         )
         assert torch.equal(Y_dict["gold_type_id"], dataset.Y_dict["gold_type_id"])
 
-        # Test 2: with the split of "dev", the subsentences should remain unchanged but the true index in Y_dict should be -1
+        # Test 2: with the split of "dev", the subsentences should remain unchanged but the
+        # true index in Y_dict should be -1
         max_seq_len = 7
         max_aliases = 2
         split = "dev"
@@ -344,6 +346,67 @@ class DataTypeLoader(unittest.TestCase):
             split=split,
             is_bert=True,
         )
+        assert torch.equal(Y_dict["gold_type_id"], dataset.Y_dict["gold_type_id"])
+
+    def test_multiprocess_type_data(self):
+        """ENTITY SYMBOLS
+        {
+          "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
+          "alias1":[["Q1",10.0],["Q4",6.0]],
+          "alias3":[["Q1",30.0]],
+          "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
+        }
+        TYPE LABELS
+        {
+          "Q1": [0, 1],
+          "Q2": [2],
+          "Q3": [],
+          "Q4": [1]
+        }
+        """
+        max_seq_len = 7
+        max_aliases = 4
+        self.args.data_config.max_aliases = max_aliases
+        self.args.data_config.max_seq_len = max_seq_len
+        input_data = [
+            {
+                "aliases": ["alias1", "multi word alias2"],
+                "qids": ["Q1", "Q4"],
+                "sent_idx_unq": 0,
+                "sentence": "alias1 or multi word alias2",
+                "spans": [[0, 1], [2, 5]],
+                "gold": [True, True],
+            },
+            {
+                "aliases": ["alias1", "multi word alias2"],
+                "qids": ["Q1", "Q4"],
+                "sent_idx_unq": 1,
+                "sentence": "alias1 or multi word alias2",
+                "spans": [[0, 1], [2, 5]],
+                "gold": [True, True],
+            },
+        ]
+        Y_dict = {
+            "gold_type_id": torch.tensor(
+                [[0 + 1, 1 + 1, -1, -1], [0 + 1, 1 + 1, -1, -1]]
+            ),
+        }
+
+        utils.write_jsonl(self.temp_file_name, input_data)
+        use_weak_label = True
+
+        dataset = BootlegDataset(
+            self.args,
+            name="Bootleg_test",
+            dataset=self.temp_file_name,
+            use_weak_label=use_weak_label,
+            tokenizer=self.tokenizer,
+            entity_symbols=self.entity_symbols,
+            dataset_threads=2,
+            split="train",
+            is_bert=True,
+        )
+        # As the gold is the same for all, the order won't matter
         assert torch.equal(Y_dict["gold_type_id"], dataset.Y_dict["gold_type_id"])
 
 

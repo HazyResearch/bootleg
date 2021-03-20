@@ -55,18 +55,18 @@ We also provide sample `training <https://github.com/HazyResearch/bootleg/tree/m
 
 Entities and Aliases
 ^^^^^^^^^^^^^^^^^^^^
-
+Our `Entity Profile`_ page details how to create the correct metadata for the entities and aliases and the structural files. Here we list the requirements of the mappings and inputs.
 Requirements
 ~~~~~~~~~~~~
 
 
 #. There is a set of entities to consider as candidates for training and evaluation. There are entity ids (i.e. QIDs) and titles available for these entities. For instance, quantifier ids may be Wikidata QIDs or Unified Medical Language System (UMLS) Concept Unique Identifiers (CUI). For this tutorial, we refer to the entitiy ids by QID.
-#. (Recommended) There is a candidate mapping from aliases to entity candidates. The candidates must be in the set of entities above. If this is not provided, we apply a simple mining technique to generate this from the provided training dataset.
+#. There is a candidate mapping from aliases to entity candidates. The candidates must be in the set of entities above. If this is not provided, we apply a simple mining technique to generate this from the provided training dataset.
 
 QID-to-Title Mapping
 ~~~~~~~~~~~~~~~~~~~~
 
-We assume that the set of entity QIDs and their corresponding titles are stored in a JSON file as a dictionary of QID to title pairs. For example,
+We assume that the set of entity QIDs and their corresponding titles are stored in a JSON file as a dictionary of QID to title pairs. Again, this is all generated for you in `Entity Profile`_. For example,
 
 .. code-block:: JSON
 
@@ -77,12 +77,12 @@ We assume that the set of entity QIDs and their corresponding titles are stored 
    }
 
 
-We provide an QID-to-title mapping for the sample Wikipedia dataset in `data/sample_entity_data/entity_mappings/qid2title.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/entity_mappings/qid2title.json>`_.
+The QID-to-title mapping for the sample Wikipedia dataset in `data/sample_entity_data/entity_mappings/qid2title.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/entity_mappings/qid2title.json>`_.
 
 Candidate Mapping
 ~~~~~~~~~~~~~~~~~
 
-If provided, we assume that the candidate mapping is stored in a JSON file as a dictionary of alias to list of [QID, sort_value] pairs, where the sort_value can be any numeric quantity to sort the candidate lists. The sort_value is necessary to choose the candidates when the number of candidates is greater than the maximum allowed (max candidates is a settable parameter). For example (candidates are cut short to display),
+We assume that the candidate mapping is stored in a JSON file as a dictionary of alias to list of [QID, sort_value] pairs, where the sort_value can be any numeric quantity to sort the candidate lists. The sort_value is necessary to choose the candidates when the number of candidates is greater than the maximum allowed (max candidates is a settable parameter). For example (candidates are cut short to display),
 
 .. code-block:: JSON
 
@@ -95,28 +95,10 @@ If provided, we assume that the candidate mapping is stored in a JSON file as a 
 
 We provide an example candidate mapping in `data/sample_entity_data/entity_mappings/alias2qids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/entity_mappings/alias2qids.json>`_. We assume that all aliases are lowercased.
 
-*If a candidate mapping isn't available for the new dataset*, we can run the below command to scrape the training data to generate this mapping. Each alias in the training data is added to the candidate mapping with its true label as a candidate. Note that this technique will perform poorly if the aliases are very different between the training and dev datasets.
-
-.. code-block::
-
-   python3 bootleg/utils/preprocessing/gen_alias_cand_map.py --alias2qids_file data/sample_entity_data/alias2qids.json --train_file data/sample_text_data/train.jsonl
-
-
 Entity Mappings
 ~~~~~~~~~~~~~~~
 
-We use the QID-to-title and candidate mappings to generate additional mappings to indices in internal Bootleg embeddings. We store the full set of mappings in an entity directory. In addition to these mappings, the entity directory will also store preprocessed embedding data associated with the entities (see `Preprocessing the Data <#3-preprocessing-the-data>`_\ ).
-
-To generate the mappings, run the following command from the root directory of the repo:
-
-.. code-block::
-
-   python bootleg/utils/preprocessing/gen_entity_mappings.py --entity_dir data/sample_entity_data/ \
-   --qid2title data/sample_entity_data/entity_mappings/qid2title.json \
-   --alias2qids data/sample_entity_data/entity_mappings/alias2qids.json
-
-
-We assume that each alias can have a maximum of 30 candidates. To change the maximum number of candidates, we can add ``--max_candidates <max_num>`` to the command above. Note that increasing the number of maximum candidates increases the memory required for training and inference.
+Bootleg also requires additional mappings to indices in internal Bootleg embeddings. For example, our mapping for entity QID to internal entity index. These are all also generated and explained in `Entity Profile`_.
 
 Type and Knowledge Graph (KG) Data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -133,16 +115,16 @@ Requirements
 Type Information
 ~~~~~~~~~~~~~~~~
 
-We assume that the type data is provided in a JSON file as a dictionary of pairs of QIDs to a list of type ids. If there are *N* distinct types, the type ids should range from 0 to *N-1*. As multiple types may be associated with an entity, we store the list of type ids with each QID. The maximum number of types considered per an entity is a settable parameter.
+We assume that the type data is provided in a JSON file as a dictionary of pairs of QIDs to a list of type ids. If there are *N* distinct types, the type ids should range from 1 to *N*. As multiple types may be associated with an entity, we store the list of type ids with each QID. The maximum number of types considered per an entity is a settable parameter. These are generated also in `Entity Profile`_.
 
 For instance, if we have a type vocabulary of
 
 .. code-block::
 
    {
-       "place": 0,
-       "person": 1,
-       "city": 2
+       "place": 1,
+       "person": 2,
+       "city": 3
    }
 
 
@@ -151,13 +133,13 @@ then we may have an associated QID-to-type mapping of
 .. code-block::
 
    {
-       "Q60036": [1],
-       "Q218091": [1],
-       "Q23768": [0, 2]
+       "Q60036": [2],
+       "Q218091": [2],
+       "Q23768": [1, 3]
    }
 
 
-An example of the QID-to-type mapping can be found in `data/sample_emb_data/qid2types.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_emb_data/qid2types.json>`_ with the associated type vocabulary in `data/sample_emb_data/type_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_emb_data/type_vocab.json>`_.
+An example of the QID-to-type mapping can be found in `data/sample_entity_data/type_mappings/wiki/qid2typeids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/wiki/qid2typeids.json>`_ with the associated type vocabulary in `data/sample_entity_data/type_mappings/wiki/type_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/wiki/type_vocab.json>`_.
 
 KG Information
 ~~~~~~~~~~~~~~
@@ -174,12 +156,11 @@ We assume that the connectivity information is provided in a simple text file wh
 
 
 
-
-Check out `data/sample_emb_data/kg_conn.txt <https://github.com/HazyResearch/bootleg/tree/master/data/sample_emb_data/kg_conn.txt>`_ as an example of QID connectivity from Wikidata.
+Check out `data/sample_entity_data/kg_mappings/kg_adj.txt <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/kg_mappings/kg_adj.txt>`_ as an example of QID connectivity from Wikidata.
 
 *Relation Data*
 
-We treat relation labels as types and assume the same format as type information. An example of a QID-to-relation mapping can be found in `data/sample_emb_data/qid2relations.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_emb_data/qid2relations.json>`_ with the associated relation vocabulary in `data/sample_emb_data/relation_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_emb_data/relation_vocab.json>`_.
+We treat relation labels as types and assume the same format as type information. An example of a QID-to-relation mapping can be found in `data/sample_entity_data/type_mappings/relations/qid2typeids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/relations/qid2typeids.json>`_ with the associated relation vocabulary in `data/sample_entity_data/type_mappings/relations/type_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/relations/type_vocab.json>`_.
 
 Directory Structure
 ^^^^^^^^^^^^^^^^^^^
@@ -193,18 +174,28 @@ We assume the data above is saved in the following directory structure, where th
        dev.jsonl
        prep/
 
-   emb_data/
-       qid2types.json
-       kg_conn.txt
-       qid2relations.json
-
-   entity_data/
-       entity_mappings/
-           config.json
-           qid2title.json
-           alias2qids.json
-           ...
-       prep/
+   entity_db/
+        type_mappings/
+            wiki/
+                type_vocab.json
+                qid2typenames.json
+                config.json
+                qid2typeids.json
+            relations/
+                qid2typeids.json
+                config.json
+                type_vocab.json
+                qid2typenames.json
+        kg_mappings/
+            config.json
+            qid2relations.json
+            kg_adj.txt
+        entity_mappings/
+            alias2qids.json
+            qid2eid.json
+            qid2title.json
+            alias2id.json
+            config.json
 
 Preparing the Config
 ---------------------
@@ -238,7 +229,7 @@ We define the paths to the directories through the ``data_dir``\ , ``emb_dir``\ 
 .. code-block::
 
    "data_dir": "data/sample_text_data",
-   "emb_dir": "data/sample_emb_data",
+   "emb_dir": "data/sample_entity_data",
    "entity_dir": "data/sample_entity_data",
    "entity_map_dir": "entity_mappings"
 
@@ -261,7 +252,8 @@ As described in the ``README``, Bootleg takes in a set of embeddings to form an 
          load_class: LearnedTypeEmb
          freeze: false
          args:
-           type_labels: qid2types.json
+           type_labels: type_mappings/wiki/qid2typeids.json
+           type_vocab: type_mappings/wiki/type_vocab.json
            max_types: 3
            type_dim: 128
            merge_func: addattn
@@ -279,7 +271,7 @@ Candidates and Aliases
 Candidate Not in List
 ~~~~~~~~~~~~~~~~~~~~~
 
-Bootleg supports two types of candidate lists: (1) assume that the true entity must be in the candidate list, (2) use a NIL or "No Candidate" (NC) as another candidate, and does not require that the true candidate is the candidate list. Not that if using (1), during training, the gold canddiate *must* be in the list or preprocessing with fail. The gold candidate does not have to be in the candidate set for evaluation. To switch between these two modes, we provide the ``train_in_candidates`` parameter (where True indicates (1)).
+Bootleg supports two types of candidate lists: (1) assume that the true entity must be in the candidate list, (2) use a NIL or "No Candidate" (NC) as another candidate, and does not require that the true candidate is the candidate list. Not that if using (1), during training, the gold candidate *must* be in the list or preprocessing with fail. The gold candidate does not have to be in the candidate set for evaluation. To switch between these two modes, we provide the ``train_in_candidates`` parameter (where True indicates (1)).
 
 Maximum Aliases
 ~~~~~~~~~~~~~~~
@@ -340,24 +332,23 @@ If a GPU is not available, we can also get away with training this tiny dataset 
 
    python3 bootleg/run.py --config_script configs/tutorial/sample_config.json --emmental.device -1
 
-At each eval step, we see a json dump of eval metrics. At the beginning end end of the model training, you should see a print out of the log direction. E.g.,
+At each eval step, we see a json save of eval metrics. At the beginning end end of the model training, you should see a print out of the log direction. E.g.,
 
-``Saving metrics to logs/tutorial/2021_02_06/11_43_32/dc290ed5``
+``Saving metrics to logs/turtorial/2021_03_11/20_31_11/02b0bb73``
 
 Inside the log directory, you'll find all checkpoints, the ``emmental.log`` file, ``train_metrics.txt``, and ``train_disambig_metrics.csv``. The latter two files give final eval scores of the model. For example, after 10 epochs, ``train_disambig_metrics.csv`` shows
 
 .. code-block::
 
     task,dataset,split,slice,mentions,mentions_notNC,acc_boot,acc_boot_notNC,acc_pop,acc_pop_notNC
-    NED,Bootleg,dev,final_loss,51,51,0.6274509803921569,0.6274509803921569,0.8431372549019608,0.8431372549019608
-    NED,Bootleg,test,final_loss,51,51,0.6274509803921569,0.6274509803921569,0.8431372549019608,0.8431372549019608
-    NED,Bootleg,train,final_loss,29,29,0.5862068965517241,0.5862068965517241,0.6206896551724138,0.6206896551724138
+    NED,Bootleg,dev,final_loss,70,70,0.8714285714285714,0.8714285714285714,0.8714285714285714,0.8714285714285714
+    NED,Bootleg,test,final_loss,70,70,0.8714285714285714,0.8714285714285714,0.8714285714285714,0.8714285714285714
 
 The fields are
 
 * ``task``: the task name (will be NED for disambiguation metrics).
 * ``dataset``: dataset (if case of multi-modal training)
-* ``slice``: the subset of the dataset evaluated. ``final_loss`` is the slice which includes all mentions in the dataset.
+* ``slice``: the subset of the dataset evaluated. ``final_loss`` is the slice which includes all mentions in the dataset. If you set ``emmental.online_eval`` to be True in the config, training metrics will also be reported and collected.
 * ``mentions``: the number of mentions (aliases) under evaluation.
 * ``mentions_notNC``: the number of mentions (aliases) under evaluation where the gold QID is in the candidate list.
 * ``acc_boot``: the accuracy of Bootleg.
@@ -370,15 +361,15 @@ As our data was very tiny, our model is not doing great, but the train loss is g
 Evaluating the Model
 ---------------------
 
-After the model is trained, we can also run eval to get test scores or to dump predictions. To eval the model on a single GPU, we run:
+After the model is trained, we can also run eval to get test scores or to save predictions. To eval the model on a single GPU, we run:
 
 .. code-block::
 
-   python3 bootleg/run.py --config_script configs/tutorial/sample_config.yaml --mode dump_preds --emmental.model_path logs/tutorial/2021_02_06/11_43_32/dc290ed5/last_model.pth
+   python3 bootleg/run.py --config_script configs/tutorial/sample_config.yaml --mode dump_preds --emmental.model_path logs/turtorial/2021_03_11/20_31_11/02b0bb73/last_model.pth
 
-You can replace ``configs/sample_config.json`` with ``logs/tutorial/2021_02_06/11_43_32/dc290ed5/parsed_config.yaml`` if desired.
+You can replace ``configs/sample_config.json`` with ``llogs/turtorial/2021_03_11/20_31_11/02b0bb73/run_config.yaml`` if desired.
 
-This will generate a label file at ``logs/tutorial/2021_02_06/11_54_33/39a9b111/dev/last_model/bootleg_labels.jsonl`` (path is printed). This can be read it for evaluation and error analysis. Check out the End-to-End Tutorial on our `Tutorials Page <https://github.com/HazyResearch/bootleg/tree/master/tutorials>`_ for seeing how to do this and for evaluating pretrained Bootleg models.
+This will generate a label file at ``logs/turtorial/2021_03_11/20_38_09/c5e204dc/dev/last_model/bootleg_labels.jsonl`` (path is printed). This can be read it for evaluation and error analysis. Check out the End-to-End Tutorial on our `Tutorials Page <https://github.com/HazyResearch/bootleg/tree/master/tutorials>`_ for seeing how to do this and for evaluating pretrained Bootleg models.
 
 Advanced Training
 -----------------
@@ -387,3 +378,4 @@ Bootleg supports distributed training using PyTorch's `Distributed Data Parallel
 
 .. _Input Data: input_data.html
 .. _Bootleg Model: model.html
+.. _Entity Profile: entity_profile.html

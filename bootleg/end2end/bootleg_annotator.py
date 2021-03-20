@@ -76,13 +76,13 @@ def create_config(model_path, data_path, model_name):
     )
 
     # set the path for the entity db and candidate map
-    config_args["data_config"]["entity_dir"] = str(data_path / "wiki_entity_data")
-    config_args["data_config"]["alias_cand_map"] = "alias2qids_wiki_filt.json"
+    config_args["data_config"]["entity_dir"] = str(data_path / "entity_db")
+    config_args["data_config"]["alias_cand_map"] = "alias2qids.json"
 
     # set the embedding paths
-    config_args["data_config"]["emb_dir"] = str(data_path / "emb_data")
+    config_args["data_config"]["emb_dir"] = str(data_path / "entity_db")
     config_args["data_config"]["word_embedding"]["cache_dir"] = str(
-        data_path / "emb_data" / "pretrained_bert_models"
+        data_path / "pretrained_bert_models"
     )
 
     # set log path
@@ -117,27 +117,15 @@ def create_sources(model_path, data_path, model_name):
         tar.extractall(model_path)
         tar.close()
 
-    if not (data_path / "emb_data").exists():
-        print(f"{data_path / 'emb_data'} not found. Downloading..")
+    if not (data_path / "entity_db").exists():
+        print(f"{data_path / 'entity_db'} not found. Downloading..")
         urllib.request.urlretrieve(
-            "https://bootleg-data.s3.amazonaws.com/data/latest/emb_data.tar.gz",
-            filename=str(data_path / "emb_data.tar.gz"),
+            "https://bootleg-data.s3.amazonaws.com/data/latest/entity_db.tar.gz",
+            filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
         print(f"Downloaded. Decompressing...")
-        tar = tarfile.open(str(data_path / "emb_data.tar.gz"), "r:gz")
-        tar.extractall(data_path)
-        tar.close()
-
-    if not (data_path / "wiki_entity_data").exists():
-        print(f"{data_path / 'wiki_entity_data'} not found. Downloading..")
-        urllib.request.urlretrieve(
-            "https://bootleg-data.s3.amazonaws.com/data/latest/wiki_entity_data.tar.gz",
-            filename=str(data_path / "wiki_entity_data.tar.gz"),
-            reporthook=DownloadProgressBar(),
-        )
-        print(f"Downloaded. Decompressing...")
-        tar = tarfile.open(str(data_path / "wiki_entity_data.tar.gz"), "r:gz")
+        tar = tarfile.open(str(data_path / "entity_db.tar.gz"), "r:gz")
         tar.extractall(data_path)
         tar.close()
 
@@ -192,7 +180,10 @@ class BootlegAnnotator(object):
             "bootleg_cased_mini",
             "bootleg_uncased",
             "bootleg_uncased_mini",
-        }, f"model_name must be one of [bootleg_cased, bootleg_cased_mini, bootleg_uncased_mini, bootleg_uncased]. You have {model_name}."
+        }, (
+            f"model_name must be one of [bootleg_cased, bootleg_cased_mini, "
+            f"bootleg_uncased_mini, bootleg_uncased]. You have {model_name}."
+        )
 
         if not config:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -204,26 +195,49 @@ class BootlegAnnotator(object):
             if "emmental" in config:
                 config = parse_boot_and_emm_args(config)
             self.config = config
+            # Ensure some of the critical annotator args are the correct type
+            self.config.data_config.max_aliases = int(
+                self.config.data_config.max_aliases
+            )
+            self.config.run_config.eval_batch_size = int(
+                self.config.run_config.eval_batch_size
+            )
+            self.config.data_config.max_seq_len = int(
+                self.config.data_config.max_seq_len
+            )
+            self.config.data_config.train_in_candidates = bool(
+                self.config.data_config.train_in_candidates
+            )
 
         if not device:
             device = 0 if torch.cuda.is_available() else -1
+
+        if self.verbose:
+            self.config.run_config.log_level = "DEBUG"
+        else:
+            self.config.run_config.log_level = "INFO"
 
         self.torch_device = (
             torch.device(device) if device != -1 else torch.device("cpu")
         )
         self.config.model_config.device = device
 
+        log_level = logging.getLevelName(self.config["run_config"]["log_level"].upper())
         emmental.init(
-            log_dir=self.config["meta_config"]["log_path"], config=self.config
+            log_dir=self.config["meta_config"]["log_path"],
+            config=self.config,
+            use_exact_log_path=self.config["meta_config"]["use_exact_log_path"],
+            level=log_level,
         )
 
         logger.debug("Reading entity database")
-        self.entity_db = EntitySymbols(
+        self.entity_db = EntitySymbols.load_from_cache(
             os.path.join(
                 self.config.data_config.entity_dir,
                 self.config.data_config.entity_map_dir,
             ),
             alias_cand_map_file=self.config.data_config.alias_cand_map,
+            alias_idx_file=self.config.data_config.alias_idx_map,
         )
         logger.debug("Reading word tokenizers")
         self.tokenizer = BertTokenizer.from_pretrained(
@@ -256,7 +270,7 @@ class BootlegAnnotator(object):
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
         if cand_map is None:
-            alias_map = self.entity_db._alias2qids
+            alias_map = self.entity_db.get_alias2qids()
         else:
             logger.debug(f"Loading candidate map")
             alias_map = ujson.load(open(cand_map))
@@ -278,7 +292,8 @@ class BootlegAnnotator(object):
 
         Args:
             text: text to extract mentions from
-            label_func: function that performs extraction (input is (text, alias trie, max alias length) -> output is list of found aliases and found spans
+            label_func: function that performs extraction (input is (text, alias trie, max alias length) ->
+                        output is list of found aliases and found spans
 
         Returns: JSON object of sentence to be used in eval
         """
@@ -330,7 +345,8 @@ class BootlegAnnotator(object):
                 and type(text_list[0]) is str
             ), f"We only accept inputs of strings and lists of strings"
 
-        ebs = self.config.run_config.eval_batch_size
+        ebs = int(self.config.run_config.eval_batch_size)
+        self.config.data_config.max_aliases = int(self.config.data_config.max_aliases)
         total_start_exs = 0
         total_final_exs = 0
         dropped_by_thresh = 0
@@ -398,7 +414,7 @@ class BootlegAnnotator(object):
                 ), f"There are no aliases to predict for an example. This should not happen at this point."
                 assert (
                     len(aliases_arr[sub_idx]) <= self.config.data_config.max_aliases
-                ), f"Each example should have no more that {self.config.data_config.max_aliases} max aliases. {sample} does."
+                ), f"{sample} should have no more than {self.config.data_config.max_aliases} aliases."
 
                 example_aliases = np.ones(self.config.data_config.max_aliases) * PAD_ID
                 example_aliases_locs_start = (
@@ -428,8 +444,10 @@ class BootlegAnnotator(object):
                             true_entity_idx = -2
                     else:
                         # Here we are getting the correct class label for training.
-                        # Our training is "which of the max_entities entity candidates is the right one (class labels 1 to max_entities) or is it none of these (class label 0)".
-                        # + (not discard_noncandidate_entities) is to ensure label 0 is reserved for "not in candidate set" class
+                        # Our training is "which of the max_entities entity candidates is the right one
+                        # (class labels 1 to max_entities) or is it none of these (class label 0)".
+                        # + (not discard_noncandidate_entities) is to ensure label 0 is
+                        # reserved for "not in candidate set" class
                         true_entity_idx = np.nonzero(
                             alias_qids == qids_arr[sub_idx][mention_idx]
                         )[0][0] + (not self.config.data_config.train_in_candidates)
@@ -438,7 +456,8 @@ class BootlegAnnotator(object):
                     # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
                     example_aliases_locs_end[mention_idx] = span_end_idx - 1
                     example_alias_list_pos[mention_idx] = idxs_arr[sub_idx][mention_idx]
-                    # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence and need to only predict subsets
+                    # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence
+                    # and need to only predict subsets
                     if mention_idx in aliases_to_predict_arr:
                         example_true_entities[mention_idx] = true_entity_idx
 
@@ -500,20 +519,18 @@ class BootlegAnnotator(object):
             # ====================================================
             # EVALUATE MODEL OUTPUTS
             # ====================================================
-
             # recover predictions
             probs = prob_bdict[NED_TASK]
             max_probs = probs.max(2)
             max_probs_indices = probs.argmax(2)
-            for ex_i in range(batch_example_aliases.shape[0]):
+            for ex_i in range(probs.shape[0]):
                 idx_unq = batch_idx_unq[b_i + ex_i]
-                subsplit_idx = batch_subsplit_idx[b_i + ex_i]
                 entity_cands = eval_utils.map_aliases_to_candidates(
                     self.config.data_config.train_in_candidates,
-                    self.entity_db,
+                    self.config.data_config.max_aliases,
+                    self.entity_db.get_alias2qids(),
                     batch_aliases_arr[b_i + ex_i],
                 )
-
                 # batch size is 1 so we can reshape
                 probs_ex = probs[ex_i].reshape(
                     self.config.data_config.max_aliases, probs.shape[2]
@@ -545,9 +562,10 @@ class BootlegAnnotator(object):
                             total_final_exs += 1
                         else:
                             dropped_by_thresh += 1
-        assert (
-            total_final_exs + dropped_by_thresh == total_start_exs
-        ), f"Something went wrong and we have predicted fewer mentions than extracted. Start {total_start_exs}, Out {total_final_exs}, No cand {dropped_by_thresh}"
+        assert total_final_exs + dropped_by_thresh == total_start_exs, (
+            f"Something went wrong and we have predicted fewer mentions than extracted. "
+            f"Start {total_start_exs}, Out {total_final_exs}, No cand {dropped_by_thresh}"
+        )
         res_dict = {
             "qids": final_pred_cands,
             "probs": final_pred_probs,

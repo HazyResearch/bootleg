@@ -14,6 +14,10 @@ config_args = {
             "multiprocessing spawn method. forkserver will save memory but have slower startup costs.",
         ),
         "eval_batch_size": (128, "batch size for eval"),
+        "eval_accumulation_steps": (
+            100,
+            "number of eval steps to accumulate the output tensors for before saving results to file",
+        ),
         "dataloader_threads": (16, "data loader threads to feed gpus"),
         "log_level": ("info", "logging level"),
         "dataset_threads": (
@@ -68,17 +72,26 @@ config_args = {
         ),
         "alias_cand_map": (
             "alias2qids.json",
-            "name of alias candidate map, should be saved in entity_dir/entity_map_dir",
+            "name of alias candidate map file, should be saved in entity_dir/entity_map_dir",
+        ),
+        "alias_idx_map": (
+            "alias2id.json",
+            "name of alias index map file, should be saved in entity_dir/entity_map_dir",
         ),
         "emb_dir": ("embs", "where embeddings are stored"),
         "max_seq_len": (100, "max token length sentences"),
         "max_aliases": (10, "max aliases per sentence"),
         "overwrite_preprocessed_data": (False, "overwrite preprocessed data"),
+        "print_examples_prep": (False, "whether to print examples during prep or not"),
         "type_prediction": {
             "use_type_pred": (False, "whether to add type prediction or not"),
-            "file": (
+            "type_labels": (
                 "types_coarse.json",
-                "type file from qid to list of type ids",
+                "type file from qid to list of type ids or type names",
+            ),
+            "type_vocab": (
+                "vocab_coarse.json",
+                "type vocab file from typename to type id",
             ),
             "num_types": (5, "number of types for prediction"),
             "dim": (128, "type dimension"),

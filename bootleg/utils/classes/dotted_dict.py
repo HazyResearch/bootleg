@@ -78,7 +78,7 @@ class DottedDict(dict):
         """Replace the space characters on the key with _ to make valid
         attrs."""
         key = str(key)
-        allowed = string.ascii_letters + string.digits + "_"
+        allowed = string.ascii_letters + string.digits + "_" + "/"
         # Replace spaces with _
         if " " in key:
             key = key.replace(" ", "_")
@@ -261,6 +261,6 @@ def is_json(value):
         return False
     try:
         ujson.loads(value)
-    except ValueError as e:
+    except ValueError:
         return False
     return True

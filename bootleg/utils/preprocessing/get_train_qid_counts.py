@@ -56,7 +56,7 @@ def get_counts_hlp(line):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = int(0.8 * multiprocessing.cpu_count())
     print(f"Getting slice counts from {args.train_file}")
     qid_cnts = get_counts(num_processes, args.train_file)

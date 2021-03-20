@@ -45,8 +45,9 @@ class BertEncoder(nn.Module):
         if self.use_sent_proj:
             self.sent_proj = nn.Linear(self.dim, output_size)
 
-        # Embedding layers that output token ids for BERT. Due to how DDP handles calls to one module multiple times with how task flows are done in
-        # Emmental, we encapsulate all BERT calls inside this forward() call. Therefore, this class must handle the embedding forward() and postprocessing()
+        # Embedding layers that output token ids for BERT. Due to how DDP handles calls to one module multiple times
+        # with how task flows are done in Emmental, we encapsulate all BERT calls inside this forward() call.
+        # Therefore, this class must handle the embedding forward() and postprocessing()
         self.emb_objs = torch.nn.ModuleList()
 
     def add_embedding(self, emb_obj):
@@ -57,12 +58,14 @@ class BertEncoder(nn.Module):
 
         Returns:
         """
-        assert hasattr(
-            emb_obj, "postprocess_embedding"
-        ), f"To add an embedding layer to BERT, it requies you to define a forward() and postprocess_embedding() method. postprocess_embedding() is not defined."
-        assert hasattr(
-            emb_obj, "forward"
-        ), f"To add an embedding layer to BERT, it requies you to define a forward() and postprocess_embedding() method. forward() is not defined."
+        assert hasattr(emb_obj, "postprocess_embedding"), (
+            f"To add an embedding layer to BERT, it requies you to define a forward() and "
+            f"postprocess_embedding() method. postprocess_embedding() is not defined."
+        )
+        assert hasattr(emb_obj, "forward"), (
+            f"To add an embedding layer to BERT, it requies you to define a forward() and "
+            f"postprocess_embedding() method. forward() is not defined."
+        )
         self.emb_objs.append(emb_obj)
 
     def bert_forward(self, token_ids, token_type_ids, attention_mask, requires_grad):
@@ -96,7 +99,8 @@ class BertEncoder(nn.Module):
             entity_cand_eid: entity candidate EIDs (B x M x K)
             token_ids: word token ids (B x N)
 
-        Returns: sentence embedding (B x N x L), downstream sentence embedding mask (B x N), *all entity embeddings fed through BERT (B x M x K x dim)
+        Returns: sentence embedding (B x N x L), downstream sentence embedding mask (B x N),
+                *all entity embeddings fed through BERT (B x M x K x dim)
         """
         # Handle the sentence embedding
         token_type_ids = torch.zeros_like(token_ids)
@@ -109,7 +113,8 @@ class BertEncoder(nn.Module):
             downstream_output = self.sent_proj(downstream_output)
         assert downstream_output.shape[-1] == self.output_size
         # This mask is for downstream pytorch multiheadattention
-        # This assumes that TRUE means MASK (aka IGNORE). For the sentence embedding, the mask therefore is if an index is equal to the pad id
+        # This assumes that TRUE means MASK (aka IGNORE). For the sentence embedding,
+        # the mask therefore is if an index is equal to the pad id
         # Note: This mask cannot be used for a BERT model as they use the reverse mask.
         downstream_mask = token_ids == self.pad_id
 

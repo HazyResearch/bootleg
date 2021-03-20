@@ -1,4 +1,3 @@
-import logging
 import os
 
 import torch
@@ -79,11 +78,12 @@ def create_task(args, entity_symbols=None, slice_datasets=None):
     """
 
     if entity_symbols is None:
-        entity_symbols = EntitySymbols(
+        entity_symbols = EntitySymbols.load_from_cache(
             load_dir=os.path.join(
                 args.data_config.entity_dir, args.data_config.entity_map_dir
             ),
             alias_cand_map_file=args.data_config.alias_cand_map,
+            alias_idx_file=args.data_config.alias_idx_map,
         )
 
     # Create sentence encoder
@@ -97,7 +97,9 @@ def create_task(args, entity_symbols=None, slice_datasets=None):
         embedding_task_flows,  # task flows for standard embeddings (e.g., kg, type, entity)
         embedding_module_pool,  # module for standard embeddings
         embedding_module_device_dict,  # module device dict for standard embeddings
-        extra_bert_embedding_layers,  # some embeddings output indices for BERT so we handle these embeddings in our BERT layer (see comments in get_through_bert_embedding_tasks)
+        # some embeddings output indices for BERT so we handle these embeddings in our BERT layer
+        # (see comments in get_through_bert_embedding_tasks)
+        extra_bert_embedding_layers,
         embedding_payload_inputs,  # the layers that are fed into the payload
         embedding_total_sizes,  # total size of all embeddings
     ) = get_embedding_tasks(args, entity_symbols)

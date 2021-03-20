@@ -12,6 +12,32 @@ logger = logging.getLogger(__name__)
 CLS = "[CLS]"
 SEP = "[SEP]"
 
+SPECIAL_TOKENS = {
+    "SUBJ_START": "[unused1]",
+    "SUBJ_END": "[unused2]",
+    "OBJ_START": "[unused3]",
+    "OBJ_END": "[unused4]",
+    "SUBJ=ORGANIZATION": "[unused5]",
+    "OBJ=PERSON": "[unused6]",
+    "SUBJ=PERSON": "[unused7]",
+    "OBJ=ORGANIZATION": "[unused8]",
+    "OBJ=NUMBER": "[unused9]",
+    "OBJ=DATE": "[unused10]",
+    "OBJ=NATIONALITY": "[unused11]",
+    "OBJ=LOCATION": "[unused12]",
+    "OBJ=TITLE": "[unused13]",
+    "OBJ=CITY": "[unused14]",
+    "OBJ=MISC": "[unused15]",
+    "OBJ=COUNTRY": "[unused16]",
+    "OBJ=CRIMINAL_CHARGE": "[unused17]",
+    "OBJ=RELIGION": "[unused18]",
+    "OBJ=DURATION": "[unused19]",
+    "OBJ=URL": "[unused20]",
+    "OBJ=STATE_OR_PROVINCE": "[unused21]",
+    "OBJ=IDEOLOGY": "[unused22]",
+    "OBJ=CAUSE_OF_DEATH": "[unused23]",
+}
+
 
 class InputExample(object):
     """A single training/test example for span pair classification."""
@@ -147,9 +173,16 @@ def create_examples(dataset, encode_first=False):
 
 
 def convert_examples_to_features(
-    examples, max_seq_length, tokenizer, special_tokens, mode="text", encode_first=False
+    examples,
+    max_seq_length,
+    tokenizer,
+    special_tokens=None,
+    mode="text",
+    encode_first=False,
 ):
     """Loads a data file into a list of `InputBatch`s."""
+    if special_tokens is None:
+        special_tokens = SPECIAL_TOKENS
 
     def get_special_token(w):
         if w not in special_tokens:
@@ -347,7 +380,10 @@ def convert_examples_to_features(
                     "examples:    %s" % " ".join([str(x) for x in example.sentence])
                 )
                 logger.info("tokens:      %s" % " ".join([str(x) for x in tokens]))
-                logger.info("ents:        %s" % " ".join([str(x) for x in example.ent]))
+                if example.ent is not None:
+                    logger.info(
+                        "ents:        %s" % " ".join([str(x) for x in example.ent])
+                    )
                 logger.info("input_ids:   %s" % " ".join([str(x) for x in input_ids]))
                 logger.info("input_mask:  %s" % " ".join([str(x) for x in input_mask]))
                 logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
@@ -391,6 +427,7 @@ def convert_examples_to_features(
         "%d (%.2f %%) examples can fit max_seq_length = %d"
         % (num_fit_examples, num_fit_examples * 100.0 / len(examples), max_seq_length)
     )
+    logger.info(f"{special_tokens}")
     return features
 
 
@@ -415,7 +452,6 @@ class TACREDDataset(EmmentalDataset):
         split="train",
         mode="text",
         max_seq_length=128,
-        special_tokens={},
         bert_mode="base",
         encode_first=False,
     ):
@@ -439,7 +475,7 @@ class TACREDDataset(EmmentalDataset):
             examples,
             max_seq_length=max_seq_length,
             tokenizer=tokenizer,
-            special_tokens=special_tokens,
+            special_tokens=SPECIAL_TOKENS,
             mode=mode,
             encode_first=encode_first,
         )
@@ -490,5 +526,4 @@ class TACREDDataset(EmmentalDataset):
         """
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         y_dict = {name: label[index] for name, label in self.Y_dict.items()}
-
         return x_dict, y_dict

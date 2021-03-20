@@ -68,7 +68,7 @@ class DataLoader(unittest.TestCase):
             cache_dir="test/data/emb_data/pretrained_bert_models",
         )
         self.is_bert = True
-        self.entity_symbols = EntitySymbols(
+        self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
@@ -285,7 +285,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
-        # Test 3: the code passes because it's training but train in candidates is False and Q3 is not a candidate of multi word alias2
+        # Test 3: the code passes because it's training but train in candidates is False
+        # and Q3 is not a candidate of multi word alias2
         split = "train"
         self.args.data_config.train_in_candidates = False
         input_data = [
@@ -606,7 +607,8 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: there are more than max_aliases aliases in the sentence and it should be split into subparts
-        # the second subpart will have a repeat alias that should _not_ be backpropped (as it already is in the first subpart)
+        # the second subpart will have a repeat alias that should _not_ be
+        # backpropped (as it already is in the first subpart)
         # Therefore, the true entity idx is -1
         max_seq_len = 7
         max_aliases = 2
@@ -856,7 +858,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
-        # Test 3: with the split of "dev", the subsentences should remain unchanged but the true index in Y_dict should be -1
+        # Test 3: with the split of "dev", the subsentences should remain unchanged
+        # but the true index in Y_dict should be -1
         max_seq_len = 7
         max_aliases = 2
         split = "dev"
@@ -1178,7 +1181,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
-        # Test 2: now that weak label is set to False, the sentence with all golds of False should be removed for "train".
+        # Test 2: now that weak label is set to False, the sentence with all golds of False
+        # should be removed for "train".
         max_seq_len = 7
         max_aliases = 2
         self.args.data_config.max_aliases = max_aliases

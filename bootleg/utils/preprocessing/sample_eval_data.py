@@ -13,7 +13,6 @@ import multiprocessing
 import os
 import random
 import shutil
-import sys
 from collections import defaultdict
 
 import numpy as np
@@ -72,7 +71,7 @@ def get_slice_stats(num_processes, file):
     temp_out_dir = os.path.join(os.path.dirname(file), "_temp")
     os.mkdir(temp_out_dir)
 
-    all_lines = [l for l in open(file)]
+    all_lines = [li for li in open(file)]
     num_lines = len(all_lines)
     chunk_size = int(np.ceil(num_lines / num_processes))
     line_chunks = [
@@ -143,7 +142,7 @@ def get_slice_stats_hlp(args):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = int(0.8 * multiprocessing.cpu_count())
 
     in_file = os.path.join(args.data_dir, args.file)
@@ -185,7 +184,7 @@ def main():
     final_slice_cnts = defaultdict(int)
     with open(out_file, "w") as out_f:
         for line in tqdm(
-            [ujson.loads(l.strip()) for l in open(in_file)],
+            [ujson.loads(li.strip()) for li in open(in_file)],
             desc="Writing out file",
             total=num_lines,
         ):

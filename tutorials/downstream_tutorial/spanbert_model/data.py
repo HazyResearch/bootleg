@@ -22,15 +22,15 @@ def get_dataloaders(args):
         if split == "train":
             logger.info(
                 f"Loading {split} from "
-                f"{os.path.join(args.data_dir, f'{split}_ent.json')}."
+                f"{os.path.join(args.data_dir, f'{split}.json')}."
             )
-            data = load_json(os.path.join(args.data_dir, f"{split}_ent.json"))
+            data = load_json(os.path.join(args.data_dir, f"{split}.json"))
         else:
             logger.info(
                 f"Loading {split} from "
-                f"{os.path.join(args.data_dir, f'{split}_ent.json')}."
+                f"{os.path.join(args.data_dir, f'{split}.json')}."
             )
-            data = load_json(os.path.join(args.data_dir, f"{split}_ent.json"))
+            data = load_json(os.path.join(args.data_dir, f"{split}.json"))
 
         datasets[split] = TACREDDataset(
             task,

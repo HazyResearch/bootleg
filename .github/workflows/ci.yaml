@@ -2,7 +2,8 @@ name: CI
 
 on:
     push:
-        branches: [ emmental_master, master ]
+        branches:
+            - '**'
     pull_request:
         branches: [ emmental_master, master ]
     
@@ -34,7 +35,7 @@ jobs:
                     python -m pip install --upgrade pip
                     make dev
 
-            -   name: Lint with isort, black, docformatter, flake8
+            -   name: Lint with isort, black, docformatter
                 run: |
                     make format
                     make check
@@ -88,7 +89,7 @@ jobs:
               with:
                 # This path is specific to Ubuntu
                 path: ~/.cache/pip
-                # Look to see if there is a cache hit for the corresponding requirements file
+                # Look to see if there is a cache hit for the corresponding reqs file
                 key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
                 restore-keys: |
                   ${{ runner.os }}-pip-

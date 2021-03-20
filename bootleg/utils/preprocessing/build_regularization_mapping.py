@@ -1,7 +1,8 @@
 """Builds our hierarchical regularization where an entity is regularization
 proportional to the power of its popularity in the training data.
 
-The output of this is a csv file with columns QID and regulatization. This is then used in the config for an Entity Embedding.
+The output of this is a csv file with columns QID and regulatization.
+This is then used in the config for an Entity Embedding.
 
 ent_embeddings:
    - key: learned
@@ -16,9 +17,6 @@ ent_embeddings:
 import argparse
 import multiprocessing
 import os
-import random
-import shutil
-import sys
 from collections import defaultdict
 
 import numpy as np
@@ -50,6 +48,12 @@ def parse_args():
         "--alias_cand_map",
         type=str,
         default="alias2qids.json",
+        help="Path to alias candidate map",
+    )
+    parser.add_argument(
+        "--alias_idx_map",
+        type=str,
+        default="alias2id.json",
         help="Path to alias candidate map",
     )
     parser.add_argument(
@@ -119,12 +123,13 @@ def build_reg_csv(qid_cnt, es):
 
 def main():
     args = parse_args()
-    print(ujson.dumps(args, indent=4))
+    print(ujson.dumps(vars(args), indent=4))
     num_processes = min(args.processes, int(0.8 * multiprocessing.cpu_count()))
     print("Loading entity symbols")
-    entity_symbols = EntitySymbols(
+    entity_symbols = EntitySymbols.load_from_cache(
         os.path.join(args.entity_dir, args.entity_map_dir),
         alias_cand_map_file=args.alias_cand_map,
+        alias_idx_file=args.alias_idx_map,
     )
 
     in_file = os.path.join(args.data_dir, args.train_file)

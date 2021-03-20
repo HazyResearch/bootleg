@@ -1,20 +1,18 @@
 """Attention networks."""
 import logging
 
+import torch
 import torch.nn as nn
 
 import bootleg.utils.model_utils
-from bootleg.layers.helper_modules import *
+from bootleg.layers.helper_modules import MLP, AttnBlock, NormAndSum, SelfAttnBlock
 from bootleg.symbols.constants import (
     BERT_WORD_DIM,
     DISAMBIG,
-    FINAL_LOSS,
     KG_BIAS_LOAD_CLASS,
     MAIN_CONTEXT_MATRIX,
-    REL_EMB_INDICES_KEY,
-    REL_INDICES_KEY,
 )
-from bootleg.utils import eval_utils, model_utils
+from bootleg.utils import model_utils
 from bootleg.utils.embedding_utils import get_max_candidates
 
 logger = logging.getLogger(__name__)
@@ -85,7 +83,7 @@ class Bootleg(AttnNetwork):
         super(Bootleg, self).__init__(args, entity_symbols)
         self.dropout = args.train_config.dropout
 
-        # For each stage, instantiate a transformer block for phrase (entity_word) and co-occurrence (self_entity) modules
+        # For each stage, create a transformer block for phrase (entity_word) and co-occurrence (self_entity) modules
         self.attention_modules = nn.ModuleDict()
         self.combine_modules = nn.ModuleDict()
         for i in range(self.num_model_stages):
@@ -113,21 +111,22 @@ class Bootleg(AttnNetwork):
                 self.kg_bias_list.append(getattr(self, emb.key))
                 self.kg_bias_keys.append(emb.key)
         self.kg_bias_keys = sorted(self.kg_bias_keys)
-        # If we have kg bias terms, we want to take the average of those context matrices when generating the final context matrix to be returned.
-        # The no_kg_key is used for the context matrix without kg_bias terms added. If we use the key ending in _nokg, it will not be averaged
-        # in the final result.
-        # If we do not have kg bias terms, we want the nokg context matrix to be the final matrix. MAIN_CONTEXT_MATRIX key allows for this.
+        # If we have kg bias terms, we want to take the average of those context matrices when generating the final
+        # context matrix to be returned. The no_kg_key is used for the context matrix without kg_bias terms added.
+        # If we use the key ending in _nokg, it will not be averaged in the final result. If we do not have kg bias
+        # terms, we want the nokg context matrix to be the final matrix. MAIN_CONTEXT_MATRIX key allows for this.
         if len(self.kg_bias_keys) > 0:
             self.no_kg_key = "context_matrix_nokg"
         else:
             self.no_kg_key = MAIN_CONTEXT_MATRIX
         self.kg_softmax = nn.Softmax(dim=2)
 
-        # Two things to note, the attn mask is a block diagonal matrix prevent an alias from paying attention to its own K candidates in the attention layer
-        # This works because the original input is added to the output of this attention, meaning an alias becomes its
-        # original embedding plus the contributions of the other aliases in the sentence.
-        # Second, the attn mask is added to the attention before softmax (added to Q dot V^T) -- softmax makes e^(-1e9+old_value) become zero
-        # When setting it to be -inf, you can get nans in the loss if all entities end up being masked out (eg only one alias in the sentence)
+        # Two things to note, the attn mask is a block diagonal matrix prevent an alias from paying attention to its
+        # own K candidates in the attention layer This works because the original input is added to the output of
+        # this attention, meaning an alias becomes its original embedding plus the contributions of the other
+        # aliases in the sentence. Second, the attn mask is added to the attention before softmax (added to Q dot
+        # V^T) -- softmax makes e^(-1e9+old_value) become zero When setting it to be -inf, you can get nans in the
+        # loss if all entities end up being masked out (eg only one alias in the sentence)
         self.e2e_entity_mask = torch.zeros((self.K * self.M, self.K * self.M))
         for i in range(self.M):
             self.e2e_entity_mask[
@@ -303,8 +302,9 @@ class Bootleg(AttnNetwork):
                     f"{bootleg.utils.model_utils.get_stage_head_name(stage_index)}"
                 ] = score
 
-            # This will take the average of the context matrices that do not end in the key "_nokg"; if there are not kg bias terms, it will
-            # select the context_matrix_nokg (as it's key, in this setting, will not end in _nokg)
+            # This will take the average of the context matrices that do not end in the key "_nokg";
+            # if there are not kg bias terms, it will select the context_matrix_nokg
+            # (as it's key, in this setting, will not end in _nokg)
             query_tensor = (
                 model_utils.generate_final_context_matrix(
                     context_mat_dict, ending_key_to_exclude="_nokg"
@@ -332,7 +332,7 @@ class BootlegM2E(AttnNetwork):
         super(BootlegM2E, self).__init__(args, entity_symbols)
         self.dropout = args.train_config.dropout
 
-        # For each stage, instantiate a transformer block for phrase (entity_word) and co-occurrence (self_entity) modules
+        # For each stage, create a transformer block for phrase (entity_word) and co-occurrence (self_entity) modules
         self.attention_modules = nn.ModuleDict()
         self.combine_modules = nn.ModuleDict()
         for i in range(self.num_model_stages):
@@ -367,21 +367,22 @@ class BootlegM2E(AttnNetwork):
                 # self.kg_bias_list.append(getattr(self, emb.key))
                 self.kg_bias_keys.append(emb.key)
         self.kg_bias_keys = sorted(self.kg_bias_keys)
-        # If we have kg bias terms, we want to take the average of those context matrices when generating the final context matrix to be returned.
-        # The no_kg_key is used for the context matrix without kg_bias terms added. If we use the key ending in _nokg, it will not be averaged
-        # in the final result.
-        # If we do not have kg bias terms, we want the nokg context matrix to be the final matrix. MAIN_CONTEXT_MATRIX key allows for this.
+        # If we have kg bias terms, we want to take the average of those context matrices when generating the final
+        # context matrix to be returned. The no_kg_key is used for the context matrix without kg_bias terms added.
+        # If we use the key ending in _nokg, it will not be averaged in the final result. If we do not have kg bias
+        # terms, we want the nokg context matrix to be the final matrix. MAIN_CONTEXT_MATRIX key allows for this.
         if len(self.kg_bias_keys) > 0:
             self.no_kg_key = "context_matrix_nokg"
         else:
             self.no_kg_key = MAIN_CONTEXT_MATRIX
         self.kg_softmax = nn.Softmax(dim=2)
 
-        # Two things to note, the attn mask is a block diagonal matrix prevent an alias from paying attention to its own K candidates in the attention layer
-        # This works because the original input is added to the output of this attention, meaning an alias becomes its
-        # original embedding plus the contributions of the other aliases in the sentence.
-        # Second, the attn mask is added to the attention before softmax (added to Q dot V^T) -- softmax makes e^(-1e9+old_value) become zero
-        # When setting it to be -inf, you can get nans in the loss if all entities end up being masked out (eg only one alias in the sentence)
+        # Two things to note, the attn mask is a block diagonal matrix prevent an alias from paying attention to its
+        # own K candidates in the attention layer This works because the original input is added to the output of
+        # this attention, meaning an alias becomes its original embedding plus the contributions of the other
+        # aliases in the sentence. Second, the attn mask is added to the attention before softmax (added to Q dot
+        # V^T) -- softmax makes e^(-1e9+old_value) become zero When setting it to be -inf, you can get nans in the
+        # loss if all entities end up being masked out (eg only one alias in the sentence)
         self.e2e_entity_mask = torch.zeros((self.K * self.M, self.K * self.M))
         for i in range(self.M):
             self.e2e_entity_mask[
@@ -473,7 +474,8 @@ class BootlegM2E(AttnNetwork):
         key_padding_mask_entities_mention = entity_embedding_mask.contiguous().view(
             batch_size * self.M, self.K
         )
-        # Mask of aliases; key_padding_mask_entities_mention of True means mask. We want to find aliases with all masked entities
+        # Mask of aliases; key_padding_mask_entities_mention of True means mask.
+        # We want to find aliases with all masked entities
         key_padding_mask_mentions = (
             torch.sum(~key_padding_mask_entities_mention, dim=-1) == 0
         )
@@ -566,7 +568,8 @@ class BootlegM2E(AttnNetwork):
                 key_mask=key_padding_mask_entities_mention,
                 attn_mask=None,
             )
-            # key_padding_mask_mentions mentions have all padded candidates, meaning their row in the context matrix are all nan
+            # key_padding_mask_mentions mentions have all padded candidates,
+            # meaning their row in the context matrix are all nan
             mention_entity_attn_context[key_padding_mask_mentions.unsqueeze(0)] = 0
             mention_entity_attn_context = (
                 mention_entity_attn_context.expand(
@@ -613,8 +616,9 @@ class BootlegM2E(AttnNetwork):
                     f"{bootleg.utils.model_utils.get_stage_head_name(stage_index)}"
                 ] = score
 
-            # This will take the average of the context matrices that do not end in the key "_nokg"; if there are not kg bias terms, it will
-            # select the context_matrix_nokg (as it's key, in this setting, will not end in _nokg)
+            # This will take the average of the context matrices that do not end in the key "_nokg";
+            # if there are not kg bias terms, it will select the context_matrix_nokg
+            # (as it's key, in this setting, will not end in _nokg)
             query_tensor = (
                 model_utils.generate_final_context_matrix(
                     context_mat_dict, ending_key_to_exclude="_nokg"
