@@ -55,7 +55,9 @@ We also provide sample `training <https://github.com/HazyResearch/bootleg/tree/m
 
 Entities and Aliases
 ^^^^^^^^^^^^^^^^^^^^
+
 Our `Entity Profile`_ page details how to create the correct metadata for the entities and aliases and the structural files. Here we list the requirements of the mappings and inputs.
+
 Requirements
 ~~~~~~~~~~~~
 
