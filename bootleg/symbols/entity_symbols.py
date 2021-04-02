@@ -8,7 +8,7 @@ import marisa_trie
 from tqdm import tqdm
 
 import bootleg.utils.utils as utils
-from bootleg.symbols.constants import UNK_AL, edit_op
+from bootleg.symbols.constants import edit_op
 
 logger = logging.getLogger(__name__)
 
@@ -359,11 +359,8 @@ class EntitySymbols:
 
         Returns: alias string
         """
-        try:
-            res = self._id2alias[alias_idx]
-        except KeyError:
-            res = UNK_AL
-        return res
+        assert alias_idx in self._id2alias
+        return self._id2alias[alias_idx]
 
     # ============================================================
     # EDIT MODE OPERATIONS

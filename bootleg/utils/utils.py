@@ -1,5 +1,7 @@
+import collections
 import json
 import logging
+import math
 import os
 import pathlib
 import shutil
@@ -317,6 +319,23 @@ def get_lnrm(s, strip, lower):
     # will remove if there are any duplicate white spaces e.g. "the  alias    is here"
     lnrm = " ".join(lnrm.split())
     return lnrm
+
+
+def strip_nan(input_list):
+    """Replaces float('nan') with nulls. Used for ujson loading/dumping.
+
+    Args:
+        input_list: list of items to remove the Nans from
+
+    Returns: list or nested list where Nan is not None
+    """
+    final_list = []
+    for item in input_list:
+        if isinstance(item, collections.abc.Iterable):
+            final_list.append(strip_nan(item))
+        else:
+            final_list.append(item if not math.isnan(item) else None)
+    return final_list
 
 
 def try_rmtree(rm_dir):

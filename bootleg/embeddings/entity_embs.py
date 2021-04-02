@@ -145,8 +145,8 @@ class LearnedEntityEmb(EntityEmb):
                 )
                 log_rank_0_debug(logger, f"Saving init vector to {vec_save_file}")
                 if (
-                    torch.distributed.is_initialized()
-                    and torch.distributed.get_rank() == 0
+                    not torch.distributed.is_initialized()
+                    or torch.distributed.get_rank() in [0, -1]
                 ):
                     np.save(vec_save_file, init_vec)
             else:

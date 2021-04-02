@@ -682,20 +682,28 @@ def convert_examples_to_features_and_save_single(
             assert (
                 span_end_idx <= max_seq_len
             ), f"{span_end_idx} is beyond max len {max_seq_len}."
-            # generate indexes into alias table.
-            assert entitysymbols.alias_exists(
-                alias
-            ), f"Alias {alias} not in alias mapping"
-            alias_trie_idx = entitysymbols.get_alias_idx(alias)
-            alias_qids = np.array(entitysymbols.get_qid_cands(alias))
+            # generate indexes into alias table; -2 if unk
+            if not entitysymbols.alias_exists(alias):
+                # if we do not have this alias in our set, we give it an index of -2, meaning we will
+                # always get it wrong in eval
+                assert split in ["test", "dev",], (
+                    f"Expected split of 'test' or 'dev'. If you are training, "
+                    f"the alias {alias} must be in our entity dump"
+                )
+                alias_trie_idx = -2
+                alias_qids = []
+            else:
+                alias_trie_idx = entitysymbols.get_alias_idx(alias)
+                alias_qids = np.array(entitysymbols.get_qid_cands(alias))
             # When doing eval, we allow for QID to be "Q-1" so we can predict anyways -
             # as this QID isn't in our alias_qids, the assert below verifies that this will happen only for test/dev
             eid = -1
             if entitysymbols.qid_exists(qid):
                 eid = entitysymbols.get_eid(qid)
             if qid not in alias_qids:
-                # assert not data_args.train_in_candidates
-                if not train_in_candidates:
+                # if we are not training in candidates, we only assing 0 correct id if we have candidates;
+                # otherwise we assign -2
+                if not train_in_candidates and alias_trie_idx != -2:
                     # set class label to be "not in candidate set"
                     gold_cand_K_idx = 0
                 else:
@@ -704,7 +712,7 @@ def convert_examples_to_features_and_save_single(
                     # always get this example incorrect
                     assert split in ["test", "dev",], (
                         f"Expected split of 'test' or 'dev'. If you are training, "
-                        f"the QID must be in the candidate list for data_args.train_in_candidates to be True"
+                        f"the QID {qid} must be in the candidate list for data_args.train_in_candidates to be True"
                     )
                     gold_cand_K_idx = -2
             else:

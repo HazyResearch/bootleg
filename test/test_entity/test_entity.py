@@ -1200,6 +1200,7 @@ class AliasTableTest(unittest.TestCase):
                 [0, 4, 3, 2],
                 [0, 4, 3, 2],
                 [-1, -1, -1, -1],
+                [-1, -1, -1, -1],
             ]
         )
         assert torch.equal(
@@ -1233,6 +1234,7 @@ class AliasTableTest(unittest.TestCase):
                 [4, 3, 2],
                 [4, 3, 2],
                 [-1, -1, -1],
+                [-1, -1, -1],
             ]
         )
         assert torch.equal(
@@ -1245,9 +1247,11 @@ class AliasTableTest(unittest.TestCase):
             DottedDict(self.config["data_config"]), self.entity_symbols
         )
         # idx 0 is multi word alias 2, idx 1 is alias 1
-        actual_indices = self.alias_entity_table.forward(torch.tensor([[[0, 1]]]))
+        actual_indices = self.alias_entity_table.forward(torch.tensor([[[0, 1, -2]]]))
         # 0 is for non-candidate, -1 is for padded value
-        expected_tensor = torch.tensor([[[[0, 1, 4, -1], [0, 1, -1, -1]]]])
+        expected_tensor = torch.tensor(
+            [[[[0, 1, 4, -1], [0, 1, -1, -1], [-1, -1, -1, -1]]]]
+        )
         assert torch.equal(actual_indices.long(), expected_tensor.long())
 
 

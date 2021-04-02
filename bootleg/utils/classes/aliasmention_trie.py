@@ -29,9 +29,9 @@ def get_qid_cand_with_score(
     max_value: int, value: List[Tuple[str, int]], vocabulary: marisa_trie
 ):
     assert type(value) is list
-    assert len(value) > 0
-    assert all(type(v[0]) is str for v in value)
-    assert all((type(v[1]) is float) or (type(v[1]) is int) for v in value)
+    if len(value) > 0:
+        assert all(type(v[0]) is str for v in value)
+        assert all((type(v[1]) is float) or (type(v[1]) is int) for v in value)
     new_value = flatten([[vocabulary[p[0]], p[1]] for p in value])
     assert -1 not in new_value
     new_value.extend([-1] * (2 * max_value - len(new_value)))

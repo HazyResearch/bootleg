@@ -28,18 +28,22 @@ class AliasEntityTable(nn.Module):
         self.num_entities_with_pad_and_nocand = (
             entity_symbols.num_entities_with_pad_and_nocand
         )
-        self.num_aliases_with_pad = len(entity_symbols.get_all_aliases()) + 1
+        self.num_aliases_with_pad_and_unk = len(entity_symbols.get_all_aliases()) + 2
         self.M = data_config.max_aliases
         self.K = get_max_candidates(entity_symbols, data_config)
         self.alias2entity_table, self.prep_file = self.prep(
             data_config,
             entity_symbols,
-            num_aliases_with_pad=self.num_aliases_with_pad,
+            num_aliases_with_pad_and_unk=self.num_aliases_with_pad_and_unk,
             num_cands_K=self.K,
         )
         # self.alias2entity_table = model_utils.move_to_device(self.alias2entity_table)
         # Small check that loading was done correctly. This isn't a catch all,
-        # but will catch is the same or something went wrong.
+        # but will catch is the same or something went wrong. -2 is for alias not in our set and -1 is pad.
+        assert torch.equal(
+            self.alias2entity_table[-2],
+            torch.ones_like(self.alias2entity_table[-1]) * -1,
+        ), f"The second to last row of the alias table isn't -1, something wasn't loaded right."
         assert torch.equal(
             self.alias2entity_table[-1],
             torch.ones_like(self.alias2entity_table[-1]) * -1,
@@ -50,7 +54,7 @@ class AliasEntityTable(nn.Module):
         cls,
         data_config,
         entity_symbols,
-        num_aliases_with_pad,
+        num_aliases_with_pad_and_unk,
         num_cands_K,
     ):
         """Preps the alias to entity EID table.
@@ -58,14 +62,14 @@ class AliasEntityTable(nn.Module):
         Args:
             data_config: data config
             entity_symbols: entity symbols
-            num_aliases_with_pad: number of aliases including pad
+            num_aliases_with_pad_and_unk: number of aliases including pad and unk
             num_cands_K: number of candidates per alias (aka K)
 
         Returns: torch Tensor of the alias to EID table, save pt file
         """
-        # we pass num_aliases_with_pad and num_cands_K to remove the dependence on entity_symbols
+        # we pass num_aliases_with_pad_and_unk and num_cands_K to remove the dependence on entity_symbols
         # when the alias table is already prepped
-        data_shape = (num_aliases_with_pad, num_cands_K)
+        data_shape = (num_aliases_with_pad_and_unk, num_cands_K)
         # dependent on train_in_candidates flag
         prep_dir = data_utils.get_emb_prep_dir(data_config)
         alias_str = os.path.splitext(data_config.alias_cand_map.replace("/", "_"))[0]
@@ -108,13 +112,14 @@ class AliasEntityTable(nn.Module):
 
         Returns: numpy array where row is alias ID and columns are EID
         """
-        # we need to include a non candidate entity option for each alias and a row for PAD alias
-        # +1 is for PAD alias (last row)
-        num_aliases_with_pad = len(entity_symbols.get_all_aliases()) + 1
+        # we need to include a non candidate entity option for each alias and a row for PAD alias and not in dump alias
+        # +2 is for PAD alias (last row) and not in dump alias (second to last row)
+        # - same as -2 entity ids being not in cand list
+        num_aliases_with_pad_and_unk = len(entity_symbols.get_all_aliases()) + 2
         alias2entity_table = (
             np.ones(
                 (
-                    num_aliases_with_pad,
+                    num_aliases_with_pad_and_unk,
                     get_max_candidates(entity_symbols, data_config),
                 )
             )
@@ -165,6 +170,6 @@ class AliasEntityTable(nn.Module):
                 self.prep_file,
                 dtype="int64",
                 mode="r",
-                shape=(self.num_aliases_with_pad, self.K),
+                shape=(self.num_aliases_with_pad_and_unk, self.K),
             )
         )

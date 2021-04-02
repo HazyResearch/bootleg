@@ -77,10 +77,10 @@
             "file": "end2end_train.jsonl"
         },
         "dev_dataset": {
-            "file": "end2end_train.jsonl"
+            "file": "end2end_dev.jsonl"
         },
         "test_dataset": {
-            "file": "end2end_train.jsonl"
+            "file": "end2end_dev.jsonl"
         }
     }
 }
