@@ -2,10 +2,10 @@
 
 from functools import wraps
 
-UNK_AL = "_unk_"
 PAD = "<pad>"
 UNK_ID = 0
 PAD_ID = -1
+
 CLS_BERT = "[CLS]"
 SEP_BERT = "[SEP]"
 PAD_BERT = "[PAD]"
