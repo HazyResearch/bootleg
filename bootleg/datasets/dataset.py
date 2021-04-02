@@ -701,7 +701,7 @@ def convert_examples_to_features_and_save_single(
             if entitysymbols.qid_exists(qid):
                 eid = entitysymbols.get_eid(qid)
             if qid not in alias_qids:
-                # if we are not training in candidates, we only assing 0 correct id if we have candidates;
+                # if we are not training in candidates, we only assign 0 correct id if the alias is in our map;
                 # otherwise we assign -2
                 if not train_in_candidates and alias_trie_idx != -2:
                     # set class label to be "not in candidate set"
