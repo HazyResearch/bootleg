@@ -158,7 +158,7 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, min_alias_len=1, max_ali
     split_sent = sentence.split()
     new_to_old_span = get_new_to_old_dict(split_sent)
     # find largest aliases first
-    for n in range(max_alias_len + 1, min_alias_len - 1, -1):
+    for n in range(max_alias_len, min_alias_len - 1, -1):
         grams = nltk.ngrams(doc, n)
         j_st = -1
         j_end = n - 1
