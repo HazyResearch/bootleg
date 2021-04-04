@@ -138,6 +138,7 @@ class BootlegAnnotator(object):
     Args:
         config: model config (default None)
         device: model device, -1 for CPU (default None)
+        min_alias_len: minimum alias length (default 1)
         max_alias_len: maximum alias length (default 6)
         cand_map: alias candidate map (default None)
         threshold: probability threshold (default 0.0)
@@ -150,6 +151,7 @@ class BootlegAnnotator(object):
         self,
         config=None,
         device=None,
+        min_alias_len=1,
         max_alias_len=6,
         cand_map=None,
         threshold=0.0,
@@ -157,9 +159,8 @@ class BootlegAnnotator(object):
         model_name=None,
         verbose=False,
     ):
-        self.max_alias_len = (
-            max_alias_len  # minimum probability of prediction to return mention
-        )
+        self.min_alias_len = min_alias_len
+        self.max_alias_len = max_alias_len
         self.verbose = verbose
         self.threshold = threshold
 
@@ -298,7 +299,7 @@ class BootlegAnnotator(object):
         Returns: JSON object of sentence to be used in eval
         """
         found_aliases, found_spans = label_func(
-            text, self.all_aliases_trie, self.max_alias_len
+            text, self.all_aliases_trie, self.min_alias_len, self.max_alias_len
         )
         return {
             "sentence": text,
