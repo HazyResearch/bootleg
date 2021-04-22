@@ -1,13 +1,12 @@
 import numpy as np
 import torch
-from torch import nn
-
 from pytorch_pretrained_bert.modeling import (
     BertEncoder,
     BertLayerNorm,
     BertPooler,
     BertPreTrainedModel,
 )
+from torch import nn
 
 
 class EntBertEncoder(BertPreTrainedModel):
@@ -25,7 +24,15 @@ class EntBertEncoder(BertPreTrainedModel):
         freeze=True,
     ):
         super(EntBertEncoder, self).__init__(config)
-        self.encoder = BertEncoder(config)
+        if (
+            ent_emb_file is not None
+            or static_ent_emb_file is not None
+            or type_ent_emb_file is not None
+            or rel_ent_emb_file is not None
+        ):
+            self.encoder = BertEncoder(config)
+        else:
+            self.encoder = None
         self.pooler = BertPooler(config)
 
         self.apply(self.init_bert_weights)
@@ -151,21 +158,26 @@ class EntBertEncoder(BertPreTrainedModel):
             rel_ents_embeddings = self.rel_ent_embeddings(input_rel_ent_ids)
             embedding_output.append(rel_ents_embeddings)
 
-        embedding_output = torch.cat(embedding_output, dim=-1)
-        embedding_output = self.proj(embedding_output)
+        if self.encoder is not None:
+            embedding_output = torch.cat(embedding_output, dim=-1)
+            embedding_output = self.proj(embedding_output)
 
-        if self.proj_activation:
-            embedding_output = self.proj_activation(embedding_output)
+            if self.proj_activation:
+                embedding_output = self.proj_activation(embedding_output)
 
-        if self.norm:
-            embedding_output = self.LayerNorm(embedding_output)
-            embedding_output = self.dropout(embedding_output)
+            if self.norm:
+                embedding_output = self.LayerNorm(embedding_output)
+                embedding_output = self.dropout(embedding_output)
 
-        encoded_layers = self.encoder(
-            embedding_output,
-            extended_attention_mask,
-            output_all_encoded_layers=output_all_encoded_layers,
-        )
+            encoded_layers = self.encoder(
+                embedding_output,
+                extended_attention_mask,
+                output_all_encoded_layers=output_all_encoded_layers,
+            )
+        else:
+            assert len(embedding_output) == 1
+            encoded_layers = embedding_output
+
         sequence_output = encoded_layers[-1]
         pooled_output = self.pooler(sequence_output)
         if not output_all_encoded_layers:

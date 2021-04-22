@@ -3,7 +3,6 @@ import unittest
 from nltk import SpaceTokenizer
 from transformers import BertTokenizer
 
-from bootleg.utils import data_utils
 from bootleg.utils.sentence_utils import split_sentence
 
 
@@ -28,7 +27,10 @@ class SentenceUtils(unittest.TestCase):
         max_seq_len = 24
 
         # Manually created data
-        sentence = "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5"
+        sentence = (
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want "
+            "our cat and our alias5"
+        )
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
         spans = [[0, 2], [12, 13], [20, 21]]
@@ -54,9 +56,8 @@ class SentenceUtils(unittest.TestCase):
 
         # Truth data
         true_phrase_arr = [
-            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(
-                " "
-            )
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our "
+            "cat and our alias5 <pad> <pad> <pad>".split(" ")
         ]
         true_spans_arr = [[[0, 2], [12, 13], [20, 21]]]
         true_alias_to_predict_arr = [[0, 1, 2]]
@@ -86,7 +87,10 @@ class SentenceUtils(unittest.TestCase):
         max_seq_len = 24
 
         # Manually created data
-        sentence = "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5"
+        sentence = (
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because "
+            "we want our cat and our alias5"
+        )
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
         spans = [[0, 2], [12, 13], [20, 21]]
@@ -112,9 +116,8 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = [
-            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(
-                " "
-            )
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our "
+            "cat and our alias5 <pad> <pad> <pad>".split(" ")
         ] * 2
         true_spans_arr = [[[0, 2], [12, 13]], [[20, 21]]]
         true_alias_to_predict_arr = [[0, 1], [0]]
@@ -144,7 +147,10 @@ class SentenceUtils(unittest.TestCase):
         max_seq_len = 24
 
         # Manually created data
-        sentence = "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5"
+        sentence = (
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 "
+            "because we want our cat and our alias5"
+        )
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1]
         spans = [[0, 2], [12, 13], [20, 21]]
@@ -170,9 +176,8 @@ class SentenceUtils(unittest.TestCase):
 
         # Truth data
         true_phrase_arr = [
-            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5 <pad> <pad> <pad>".split(
-                " "
-            )
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat "
+            "and our alias5 <pad> <pad> <pad>".split(" ")
         ]
         true_spans_arr = [[[0, 2], [12, 13], [20, 21]]]
         true_alias_to_predict_arr = [[0, 1]]
@@ -202,7 +207,10 @@ class SentenceUtils(unittest.TestCase):
         max_seq_len = 12
 
         # Manual data
-        sentence = "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5"
+        sentence = (
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 because "
+            "we want our cat and our alias5"
+        )
         aliases = ["The big", "alias3", "alias5"]
         aliases_to_predict = [0, 1, 2]
         spans = [[0, 2], [12, 13], [20, 21]]
@@ -307,7 +315,10 @@ class SentenceUtils(unittest.TestCase):
         max_seq_len = 3
 
         # Manual data
-        sentence = "The big alias1 ran away from dogs and multi word alias2 and alias3 because we want our cat and our alias5"
+        sentence = (
+            "The big alias1 ran away from dogs and multi word alias2 and alias3 "
+            "because we want our cat and our alias5"
+        )
         aliases = ["The big alias1", "multi word alias2 and alias3"]
         aliases_to_predict = [0, 1]
         spans = [[0, 3], [8, 13]]
@@ -332,7 +343,8 @@ class SentenceUtils(unittest.TestCase):
         )
 
         # True data
-        # The position of a mention is taken by first token so we expect to have 1 word on each side for the second alias
+        # The position of a mention is taken by first token so we expect to have 1 word on
+        # each side for the second alias
         true_phrase_arr = ["The big alias1".split(), "and multi word".split()]
         true_spans_arr = [[[0, 3]], [[1, 3]]]
         true_alias_to_predict_arr = [[0], [0]]
@@ -363,8 +375,19 @@ class SentenceUtils(unittest.TestCase):
         max_aliases = 30
         max_seq_len = 50
 
-        # 3114|0~*~1~*~2~*~3~*~4~*~5|mexico~*~panama~*~ecuador~*~peru~*~bolivia~*~colombia|3966054~*~22997~*~9334~*~170691~*~3462~*~5222|19:20~*~36:37~*~39:40~*~44:45~*~48:49~*~70:71|The animal is called paca in most of its range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or guartinaja in Colombia
-        sentence = "The animal is called paca in most of its range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or guartinaja in Colombia"
+        # 3114|0~*~1~*~2~*~3~*~4~*~5|mexico~*~panama~*~ecuador~*~peru~*~bolivia~*~colombia|3966054~*~22997~*~9334
+        # ~*~170691~*~3462~*~5222|19:20~*~36:37~*~39:40~*~44:45~*~48:49~*~70:71|The animal is called paca in most of
+        # its range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in
+        # northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or
+        # picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija
+        # en Rionegro Santander Humboldt Institute or guartinaja in Colombia
+        sentence = (
+            "The animal is called paca in most of its range but tepezcuintle original Aztec language "
+            "name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the "
+            "Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi "
+            "pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en "
+            "Rionegro Santander Humboldt Institute or guartinaja in Colombia"
+        )
         aliases = ["mexico", "panama", "ecuador", "peru", "bolivia", "colombia"]
         aliases_to_predict = [0, 1, 2, 3, 4, 5]
         spans = [[19, 20], [36, 37], [39, 40], [44, 45], [48, 49], [70, 71]]
@@ -390,8 +413,14 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = [
-            "range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media".split(),
-            "Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or guartinaja in Colombia".split(),
+            "range but tepezcuintle original Aztec language name in most of Mexico and Central America pisquinte "
+            "in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in Panama guanta in Ecuador "
+            "majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna "
+            "y flora de la cuenca media".split(),
+            "Central America pisquinte in northern Costa Rica jaleb in the Yucatán peninsula conejo pintado in "
+            "Panama guanta in Ecuador majás or picuro in Peru jochi pintado in Bolivia and boruga tinajo Fauna "
+            "y flora de la cuenca media del Río Lebrija en Rionegro Santander Humboldt Institute or "
+            "guartinaja in Colombia".split(),
         ]
         true_spans_arr = [
             [[10, 11], [27, 28], [30, 31], [35, 36], [39, 40]],
@@ -423,8 +452,23 @@ class SentenceUtils(unittest.TestCase):
         max_aliases = 10
         max_seq_len = 50
 
-        # 20|0~*~1~*~2~*~3~*~4~*~5~*~6~*~7~*~8~*~9~*~10~*~11~*~12~*~13~*~14~*~15~*~16~*~17~*~18~*~19~*~20|coolock~*~swords~*~darndale~*~santry~*~donnycarney~*~baldoyle~*~sutton~*~donaghmede~*~artane~*~whitehall~*~kilbarrack~*~raheny~*~clontarf~*~fairview~*~malahide~*~howth~*~marino~*~ballybough~*~north strand~*~sheriff street~*~east wall|1037463~*~182210~*~8554720~*~2432965~*~7890942~*~1223621~*~1008011~*~3698049~*~1469895~*~2144656~*~3628425~*~1108214~*~1564212~*~1438118~*~944694~*~1037467~*~5745962~*~2436385~*~5310245~*~12170199~*~2814197|12:13~*~14:15~*~15:16~*~17:18~*~18:19~*~19:20~*~20:21~*~21:22~*~22:23~*~23:24~*~24:25~*~25:26~*~26:27~*~27:28~*~28:29~*~29:30~*~30:31~*~38:39~*~39:41~*~41:43~*~43:45|East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall
-        sentence = "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall"
+        # 20|0~*~1~*~2~*~3~*~4~*~5~*~6~*~7~*~8~*~9~*~10~*~11~*~12~*~13~*~14~*~15~*~16~*~17~*~18~*~19~*~20|coolock
+        # ~*~swords~*~darndale~*~santry~*~donnycarney~*~baldoyle~*~sutton~*~donaghmede~*~artane~*~whitehall
+        # ~*~kilbarrack~*~raheny~*~clontarf~*~fairview~*~malahide~*~howth~*~marino~*~ballybough~*~north
+        # strand~*~sheriff street~*~east wall|1037463~*~182210~*~8554720~*~2432965~*~7890942~*~1223621~*~1008011
+        # ~*~3698049~*~1469895~*~2144656~*~3628425~*~1108214~*~1564212~*~1438118~*~944694~*~1037467~*~5745962
+        # ~*~2436385~*~5310245~*~12170199~*~2814197|12:13~*~14:15~*~15:16~*~17:18~*~18:19~*~19:20~*~20:21~*~21:22
+        # ~*~22:23~*~23:24~*~24:25~*~25:26~*~26:27~*~27:28~*~28:29~*~29:30~*~30:31~*~38:39~*~39:41~*~41:43~*~43:45
+        # |East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale
+        # Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf
+        # Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff
+        # Street East Wall
+        sentence = (
+            "East edition The original east edition is distributed to areas such as Coolock Kilmore "
+            "Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall "
+            "Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city "
+            "Summerhill Ballybough North Strand Sheriff Street East Wall"
+        )
         aliases = [
             "coolock",
             "swords",
@@ -516,9 +560,18 @@ class SentenceUtils(unittest.TestCase):
 
         # Truth
         true_phrase_arr = [
-            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
-            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
-            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
+            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale "
+            "Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf "
+            "Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff "
+            "Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
+            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale "
+            "Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf "
+            "Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff "
+            "Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
+            "East edition The original east edition is distributed to areas such as Coolock Kilmore Swords Darndale "
+            "Priorswood Santry Donnycarney Baldoyle Sutton Donaghmede Artane Whitehall Kilbarrack Raheny Clontarf "
+            "Fairview Malahide Howth Marino and the north east inner city Summerhill Ballybough North Strand Sheriff "
+            "Street East Wall <pad> <pad> <pad> <pad> <pad>".split(),
         ]
         true_spans_arr = [
             [
@@ -616,8 +669,13 @@ class SentenceUtils(unittest.TestCase):
         max_aliases = 10
         max_seq_len = 100
 
-        # 84|0~*~1|kentucky~*~green|621151~*~478999|8:9~*~9:10|The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s schools
-        sentence = "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s schools"
+        # 84|0~*~1|kentucky~*~green|621151~*~478999|8:9~*~9:10|The Assembly also reserved tolls collected on the
+        # Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s
+        # schools
+        sentence = (
+            "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for "
+            "education and passed a two percent property tax to fund the state s schools"
+        )
         aliases = ["kentucky", "green"]
         aliases_to_predict = [0, 1]
         spans = [[8, 9], [9, 10]]
@@ -643,7 +701,12 @@ class SentenceUtils(unittest.TestCase):
 
         # True data
         true_phrase_arr = [
-            "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and passed a two percent property tax to fund the state s schools <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad>".split()
+            "The Assembly also reserved tolls collected on the Kentucky Green and Barren rivers for education and "
+            "passed a two percent property tax to fund the state s schools <pad> <pad> <pad> <pad> <pad> <pad> "
+            "<pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> "
+            "<pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> "
+            "<pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> "
+            "<pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad> <pad>".split()
         ]
         true_spans_arr = [[[8, 9], [9, 10]]]
         true_alias_to_predict_arr = [[0, 1]]
@@ -832,12 +895,16 @@ class SentenceUtils(unittest.TestCase):
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
 
-        # Example 3: Test greedy nature of algorithm. It will greedily pack the first two aliases together and the last alias will be split up even though the second alias is also in the second split.
+        # Example 3: Test greedy nature of algorithm. It will greedily pack the first two aliases together and the
+        # last alias will be split up even though the second alias is also in the second split.
         max_aliases = 30
         max_seq_len = 20
 
         # Manual data
-        sentence = "Kittens Kittens Kittens Kittens love purpleish pupppeteers because alias2 and spanning the brreaches alias5"
+        sentence = (
+            "Kittens Kittens Kittens Kittens love purpleish pupppeteers because alias2 and "
+            "spanning the brreaches alias5"
+        )
         aliases = ["Kittens love", "alias2", "alias5"]
         spans = [[3, 5], [8, 9], [13, 14]]
         aliases_to_predict = [0, 1, 2]
@@ -1047,7 +1114,14 @@ class SentenceUtils(unittest.TestCase):
         tokenizer = load_tokenizer(is_bert)
 
         # Manual data
-        sentence = "The guest roster for O'Brien 's final show on January 22\u2014 Tom Hanks , Steve Carell and original first guest Will Ferrell \u2014was regarded by O'Brien as a `` dream lineup '' ; in addition , Neil Young performed his song `` Long May You Run `` and , as the show closed , was joined by Beck , Ferrell ( dressed as Ronnie Van Zant ) , Billy Gibbons , Ben Harper , O'Brien , Viveca Paulin , and The Tonight Show Band to perform the Lynyrd Skynyrd song `` Free Bird `` ."
+        sentence = (
+            "The guest roster for O'Brien 's final show on January 22\u2014 Tom Hanks , Steve Carell and "
+            "original first guest Will Ferrell \u2014was regarded by O'Brien as a `` dream lineup '' ; "
+            "in addition , Neil Young performed his song `` Long May You Run `` and , as the show closed , "
+            "was joined by Beck , Ferrell ( dressed as Ronnie Van Zant ) , Billy Gibbons , Ben Harper , "
+            "O'Brien , Viveca Paulin , and The Tonight Show Band to perform the Lynyrd Skynyrd song `` "
+            "Free Bird `` ."
+        )
         aliases = [
             "tom hanks",
             "steve carell",
@@ -1384,13 +1458,18 @@ class SentenceUtils(unittest.TestCase):
         max_aliases = 10
         max_seq_len = 102
 
-        # Manual data
-        # sentence = "Alexander Rae Baldwin III ( born April 3 , 1958 , in Massapequa , Long Island , New York , USA ) is an American actor who is the oldest and best known of the \" Baldwin brothers \" , with brothers Daniel , Stephen and William ."
-        # aliases = ["april 3", "other events of 1958", "massapequa", "long island", "united states", "actor", "baldwin brothers", "leroy", "stephen baldwin", "william baldwin"]
-        # spans = [[6, 8], [9, 10], [12, 13], [14, 16], [20, 21], [25, 26], [36, 38], [42, 43], [44, 45], [46, 47]]
-        # aliases_to_predict = [0,1,2,3,4,5,6,7,8,9]
+        # Manual data sentence = "Alexander Rae Baldwin III ( born April 3 , 1958 , in Massapequa , Long Island ,
+        # New York , USA ) is an American actor who is the oldest and best known of the \" Baldwin brothers \" ,
+        # with brothers Daniel , Stephen and William ." aliases = ["april 3", "other events of 1958", "massapequa",
+        # "long island", "united states", "actor", "baldwin brothers", "leroy", "stephen baldwin",
+        # "william baldwin"] spans = [[6, 8], [9, 10], [12, 13], [14, 16], [20, 21], [25, 26], [36, 38], [42, 43],
+        # [44, 45], [46, 47]] aliases_to_predict = [0,1,2,3,4,5,6,7,8,9]
 
-        sentence = 'Alexander få Baldwin III (born April 3, 1958, in Massapequa, Long Island, New York, USA) is an American actor who is the oldest and best known of the "Baldwin brothers", with brothers Daniel, Stephen and William.'
+        sentence = (
+            "Alexander få Baldwin III (born April 3, 1958, in Massapequa, Long Island, New York, USA) is an "
+            'American actor who is the oldest and best known of the "Baldwin brothers", with brothers '
+            "Daniel, Stephen and William."
+        )
         aliases = [
             "april 3",
             "other events of 1958",
@@ -1745,8 +1824,12 @@ class SentenceUtils(unittest.TestCase):
 
         max_aliases = 10
         max_seq_len = 102
-        # There is a special unicode character at , ‍‍‍‍ '' Upal (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
-        sentence = "Upal ( , Wade-Giles : Wup ‘ aêrh Hsiang , Xiao'erjing : ءُپَاعَر سِيْا , ‍‍‍‍ '' Upal '' , Упал ) is a small town in western Xinjiang , China ."
+        # There is a special unicode character at , ‍‍‍‍ '' Upal (in between ,  and '' of \u200d\u200d\u200d\u200d -
+        # this gets cleaned
+        sentence = (
+            "Upal ( , Wade-Giles : Wup ‘ aêrh Hsiang , Xiao'erjing : ءُپَاعَر سِيْا , ‍‍‍‍ '' Upal '' , Упал ) is a "
+            "small town in western Xinjiang , China ."
+        )
         aliases = ["upal", "xiaoerjing", "upal", "xinjiang", "china"]
         spans = [[0, 1], [10, 11], [15, 18], [28, 29], [30, 31]]
         aliases_to_predict = [0, 1, 2, 3, 4]
@@ -1896,14 +1979,16 @@ class SentenceUtils(unittest.TestCase):
             self.assertEqual(aliases_to_predict_arr[i], true_alias_to_predict_arr[i])
             self.assertEqual([aliases[idx] for idx in idxs_arr[i]], true_aliases_arr[i])
 
-        # TESTING THE ADJUSTING INDEXES WHEN ALIAS IS UNICODE CHARACTERS
-        # One of the aliases is around a unicode character. We adjust the spans to drop this and take the next character instead. If we can't do this
-        # we take the former character (i.e., at the end of the sentence). While we could probably do something fancier, this is a rare case.
+        # TESTING THE ADJUSTING INDEXES WHEN ALIAS IS UNICODE CHARACTERS One of the aliases is around a unicode
+        # character. We adjust the spans to drop this and take the next character instead. If we can't do this we
+        # take the former character (i.e., at the end of the sentence). While we could probably do something
+        # fancier, this is a rare case.
 
         # This is testing if we DO have a character after the unicode
         max_aliases = 10
         max_seq_len = 102
-        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
+        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d - this
+        # gets cleaned
         sentence = "Upal Xiao , ‍‍‍‍ '"
         aliases = ["upal", "xiaoerjing", "upal"]
         spans = [[0, 1], [1, 2], [3, 4]]
@@ -2058,7 +2143,8 @@ class SentenceUtils(unittest.TestCase):
         # This is testing is we do NOT have a character after the unicode
         max_aliases = 10
         max_seq_len = 102
-        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d - this gets cleaned
+        # There is a special unicode character at , ‍‍‍‍ '' (in between ,  and '' of \u200d\u200d\u200d\u200d -
+        # this gets cleaned
         sentence = "Upal Xiao , ‍‍‍‍ "
         aliases = ["upal", "xiaoerjing", "upal"]
         spans = [[0, 1], [1, 2], [3, 4]]

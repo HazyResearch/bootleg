@@ -21,11 +21,6 @@ Install via
 pip install bootleg
 ```
 
-As we use Spacy as a component in our mention extractor, you'll need to have a Spacy model installed via
-```
-python3 -m spacy download en_core_web_sm
-```
-
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
 
 ## Models

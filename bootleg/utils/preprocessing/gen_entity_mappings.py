@@ -51,7 +51,6 @@ def main():
     with open(args.qid2title) as f:
         qid2title = ujson.load(f)
 
-    max_alias_len = -1
     for alias in alias2qids:
         assert (
             alias.lower() == alias
@@ -59,18 +58,15 @@ def main():
         # ensure only max_candidates per alias
         qids = sorted(alias2qids[alias], key=lambda x: (x[1], x[0]), reverse=True)
         alias2qids[alias] = qids[: args.max_candidates]
-        # keep track of the maximum number of words in an alias
-        max_alias_len = max(max_alias_len, len(alias.split()))
 
     entity_mappings = EntitySymbols(
         max_candidates=args.max_candidates,
-        max_alias_len=max_alias_len,
         alias2qids=alias2qids,
         qid2title=qid2title,
         alias_cand_map_file=args.alias_cand_map_file,
     )
 
-    entity_mappings.dump(os.path.join(args.entity_dir, args.entity_map_dir))
+    entity_mappings.save(os.path.join(args.entity_dir, args.entity_map_dir))
     print("entity mappings exported.")
 
 

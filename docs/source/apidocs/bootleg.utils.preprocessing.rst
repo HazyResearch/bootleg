@@ -36,6 +36,22 @@ bootleg.utils.preprocessing.count\_body\_part\_size module
    :undoc-members:
    :show-inheritance:
 
+bootleg.utils.preprocessing.gen\_alias\_cand\_map module
+--------------------------------------------------------
+
+.. automodule:: bootleg.utils.preprocessing.gen_alias_cand_map
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bootleg.utils.preprocessing.gen\_entity\_mappings module
+--------------------------------------------------------
+
+.. automodule:: bootleg.utils.preprocessing.gen_entity_mappings
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 bootleg.utils.preprocessing.get\_train\_qid\_counts module
 ----------------------------------------------------------
 

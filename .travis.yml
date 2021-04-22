@@ -5,7 +5,7 @@ dist: xenial
 cache: pip
 
 python:
-  - "3.6"
+  - "3.8"
 
 # command to install dependencies
 install:

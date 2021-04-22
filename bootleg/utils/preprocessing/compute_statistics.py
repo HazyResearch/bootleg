@@ -75,7 +75,7 @@ def get_all_aliases(alias2qidcands):
     alias2qids = {}
     for al in tqdm(alias2qidcands):
         alias2qids[al] = [c[0] for c in alias2qidcands[al]]
-    logging.info(f"Loaded entity dump with {len(alias2qids)} aliases.")
+    logging.info(f"Loaded entity save with {len(alias2qids)} aliases.")
     all_aliases = marisa_trie.Trie(alias2qids.keys())
     return all_aliases
 
@@ -222,8 +222,8 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
 
 def main():
     args = parse_args()
-    logging.info(json.dumps(args, indent=4))
-    entity_symbols = EntitySymbols(
+    logging.info(json.dumps(vars(args), indent=4))
+    entity_symbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(args.data_dir, args.entity_symbols_dir)
     )
     train_file = os.path.join(args.data_dir, args.train_file)

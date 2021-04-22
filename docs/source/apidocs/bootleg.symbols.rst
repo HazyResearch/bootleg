@@ -12,6 +12,14 @@ bootleg.symbols.constants module
    :undoc-members:
    :show-inheritance:
 
+bootleg.symbols.entity\_profile module
+--------------------------------------
+
+.. automodule:: bootleg.symbols.entity_profile
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 bootleg.symbols.entity\_symbols module
 --------------------------------------
 

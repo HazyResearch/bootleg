@@ -6,7 +6,6 @@ import fileinput
 import os
 
 import ujson
-import yaml
 
 import bootleg.utils.classes.comment_json as comment_json
 from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict
@@ -54,7 +53,7 @@ def is_json(value):
         return False
     try:
         ujson.loads(value)
-    except ValueError as e:
+    except ValueError:
         return False
     return True
 
@@ -166,7 +165,7 @@ def flatten_nested_args_for_parser(args, new_args, groups, prefix):
                 )
             else:
                 new_args.append(f"--{prefix}{key}")
-                new_args.append(f"{ujson.dumps(args[key])}")
+                new_args.append(f"{ujson.dumps(vars(args)[key])}")
         elif isinstance(args[key], list):
             for v in args[key]:
                 new_args.append(f"--{prefix}{key}")
@@ -218,7 +217,8 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     """
     Returns a parsed Bootleg config from config. Config can be a path to a config file or an already loaded dictionary.
     The high level work flow
-       1. Reads Bootleg default config (config_args) and addes params to a arg parser, flattening all hierarchical values into "." values
+       1. Reads Bootleg default config (config_args) and addes params to a arg parser,
+          flattening all hierarchical values into "." values
                E.g., data_config -> word_embeddings -> layers becomes --data_config.word_embedding.layers
        2. Flattens the given config values into the "." format
        3. Adds any unknown values from the first arg parser that parses the config script.
@@ -288,8 +288,10 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
 
 def parse_boot_and_emm_args(config_script, unknown=None):
     """
-    Merges the Emmental config with the Bootleg config. As we have an emmental: ... level in our config for emmental commands,
-    we need to parse those with the Emmental parser and then merge the Bootleg only config values with the Emmental ones.
+    Merges the Emmental config with the Bootleg config.
+    As we have an emmental: ... level in our config for emmental commands,
+    we need to parse those with the Emmental parser and then merge the Bootleg only config values
+    with the Emmental ones.
     Args:
         config_script: config script for Bootleg and Emmental args
         unknown: unknown arg values passed from command line to overwrite file values
@@ -307,7 +309,8 @@ def parse_boot_and_emm_args(config_script, unknown=None):
     config_parser, parser_hierarchy = emm_parse_args(parser=config_parser)
     # Add Bootleg args and parse
     all_args = get_boot_config(config_script, parser_hierarchy, config_parser, unknown)
-    # These have emmental -> config group -> arg structure for emmental. Must remove that hierarchy to converte to internal Emmental hierarchy
+    # These have emmental -> config group -> arg structure for emmental.
+    # Must remove that hierarchy to converte to internal Emmental hierarchy
     emm_args = {}
     for k, v in all_args["emmental"].items():
         emm_args[k] = v

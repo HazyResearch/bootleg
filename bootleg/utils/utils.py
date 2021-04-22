@@ -1,5 +1,10 @@
+import collections
 import json
+import logging
+import math
 import os
+import pathlib
+import shutil
 import time
 import unicodedata
 from importlib import import_module
@@ -10,6 +15,10 @@ import ujson
 import yaml
 from tqdm import tqdm
 
+from bootleg import log_rank_0_info
+
+logger = logging.getLogger(__name__)
+
 
 def ensure_dir(d):
     """Checks if a directory exists. If not, it makes it.
@@ -19,9 +28,7 @@ def ensure_dir(d):
 
     Returns:
     """
-    if len(d) > 0:
-        if not os.path.exists(d):
-            os.makedirs(d, exist_ok=True)
+    pathlib.Path(d).mkdir(exist_ok=True, parents=True)
 
 
 def exists_dir(d):
@@ -32,7 +39,7 @@ def exists_dir(d):
 
     Returns:
     """
-    return os.path.exists(d)
+    return pathlib.Path(d).exists()
 
 
 def dump_json_file(filename, contents):
@@ -40,11 +47,12 @@ def dump_json_file(filename, contents):
 
     Args:
         filename: file to write to
-        contents: dictionary to dump
+        contents: dictionary to save
 
     Returns:
     """
-    ensure_dir(os.path.dirname(filename))
+    filename = pathlib.Path(filename)
+    filename.parent.mkdir(exist_ok=True, parents=True)
     with open(filename, "w") as f:
         try:
             ujson.dump(contents, f)
@@ -57,11 +65,12 @@ def dump_yaml_file(filename, contents):
 
     Args:
         filename: file to write to
-        contents: dictionary to dump
+        contents: dictionary to save
 
     Returns:
     """
-    ensure_dir(os.path.dirname(filename))
+    filename = pathlib.Path(filename)
+    filename.parent.mkdir(exist_ok=True, parents=True)
     with open(filename, "w") as f:
         yaml.dump(contents, f)
 
@@ -90,6 +99,21 @@ def load_yaml_file(filename):
     with open(filename) as f:
         contents = yaml.load(f, Loader=yaml.FullLoader)
     return contents
+
+
+def assert_keys_in_dict(allowable_keys, d):
+    """
+    Checks that all keys in d are in allowable keys
+    Args:
+        allowable_keys: Set or List of allowable keys
+        d: Dict
+
+    Returns: Boolean if satisfied, None if correct/key that is not in allowable keys
+    """
+    for k in d:
+        if k not in allowable_keys:
+            return False, k
+    return True, None
 
 
 def write_to_file(filename, value):
@@ -171,7 +195,7 @@ def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
         num_lines: number of lines in each chunk
         prefix: prefix for output files in out_dir
 
-    Returns: total number of lines read, dictionary of output file path -> number of lines in that file (useful for tqdms)
+    Returns: total number of lines read, dictionary of output file path -> number of lines in that file (for tqdms)
     """
     ensure_dir(out_dir)
     out_files = {}
@@ -214,7 +238,7 @@ def create_single_item_trie(in_dict, out_file=""):
     """
     keys = []
     values = []
-    for k in tqdm(in_dict, total=len(in_dict), desc="Reading values for marisa trie"):
+    for k in in_dict:
         assert type(in_dict[k]) is int
         keys.append(k)
         # Tries require list of item for the record trie
@@ -244,7 +268,8 @@ def import_class(prefix_string, base_string):
     This can be used in conjunciton with
         `getattr(mod, load_class)(...)`
     to initialize the base_string class
-    Ex: import_class("bootleg.embeddings", "LearnedEntityEmb") will return bootleg.embeddings module and "LearnedEntityEmb"
+    Ex: import_class("bootleg.embeddings", "LearnedEntityEmb") will return
+    bootleg.embeddings module and "LearnedEntityEmb"
 
     Args:
         prefix_string: prefix path
@@ -294,3 +319,45 @@ def get_lnrm(s, strip, lower):
     # will remove if there are any duplicate white spaces e.g. "the  alias    is here"
     lnrm = " ".join(lnrm.split())
     return lnrm
+
+
+def strip_nan(input_list):
+    """Replaces float('nan') with nulls. Used for ujson loading/dumping.
+
+    Args:
+        input_list: list of items to remove the Nans from
+
+    Returns: list or nested list where Nan is not None
+    """
+    final_list = []
+    for item in input_list:
+        if isinstance(item, collections.abc.Iterable):
+            final_list.append(strip_nan(item))
+        else:
+            final_list.append(item if not math.isnan(item) else None)
+    return final_list
+
+
+def try_rmtree(rm_dir):
+    """In the case a resource is open, rmtree will fail. This retries to rmtree
+    after 1 second waits for 5 times.
+
+    Args:
+        rm_dir: directory to remove
+
+    Returns:
+    """
+    num_retries = 0
+    max_retries = 5
+    while num_retries < max_retries:
+        try:
+            shutil.rmtree(rm_dir)
+            break
+        except OSError:
+            time.sleep(1)
+            num_retries += 1
+            if num_retries >= max_retries:
+                log_rank_0_info(
+                    logger,
+                    f"{rm_dir} was not able to be deleted. This is okay but will have to manually be removed.",
+                )

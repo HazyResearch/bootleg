@@ -8,8 +8,9 @@ Subpackages
    :maxdepth: 4
 
    bootleg.utils.classes
+   bootleg.utils.entity_profile
    bootleg.utils.parser
-   bootleg.utils.postprocessing
+   bootleg.utils.preprocessing
 
 Submodules
 ----------

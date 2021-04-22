@@ -1,6 +1,6 @@
 """Base embeddings."""
 import logging
-from typing import Dict, List
+from typing import Dict
 
 import torch
 import torch.nn as nn

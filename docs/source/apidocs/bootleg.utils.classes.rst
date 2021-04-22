@@ -4,6 +4,14 @@ bootleg.utils.classes package
 Submodules
 ----------
 
+bootleg.utils.classes.aliasmention\_trie module
+-----------------------------------------------
+
+.. automodule:: bootleg.utils.classes.aliasmention_trie
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 bootleg.utils.classes.comment\_json module
 ------------------------------------------
 

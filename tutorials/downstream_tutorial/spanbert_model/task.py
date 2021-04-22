@@ -42,16 +42,27 @@ def create_task(args):
     task_name = "TACRED"
 
     bert_model = BertModel.from_pretrained(args.bert_model, cache_dir="./cache/")
+
     bert_output_dim = 768 if "base" in args.bert_model else 1024
 
     config = ENT_BERT_ENCODER_CONFIG
-    config["num_hidden_layers"] = args.kg_encoder_layer
+    if (
+        args.ent_emb_file is not None
+        or args.static_ent_emb_file is not None
+        or args.type_emb_file is not None
+        or args.rel_emb_file is not None
+    ):
+        config["num_hidden_layers"] = args.kg_encoder_layer
+        output_size = ENT_BERT_ENCODER_CONFIG["hidden_size"]
+    else:
+        output_size = bert_output_dim
+        ENT_BERT_ENCODER_CONFIG["hidden_size"] = output_size
     config = BertConfig.from_dict(config)
-    log_rank_0_info(config)
+    logger.info(config)
     encoder = EntBertEncoder(
         config,
         bert_output_dim,
-        bert_output_dim,
+        output_size,
         args.ent_emb_file,
         args.static_ent_emb_file,
         args.type_emb_file,
@@ -67,7 +78,7 @@ def create_task(args):
                 "bert": bert_model,
                 "encoder": encoder,
                 f"{task_name}_pred_head": nn.Linear(
-                    bert_output_dim, len(LABEL_TO_ID.keys())
+                    output_size, len(LABEL_TO_ID.keys())
                 ),
             }
         ),

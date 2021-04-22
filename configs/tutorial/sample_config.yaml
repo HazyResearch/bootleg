@@ -10,6 +10,7 @@ run_config:
   eval_batch_size: 16
   dataloader_threads: 2
   dataset_threads: 2
+  log_level: info
 train_config:
   batch_size: 16
 model_config:
@@ -21,7 +22,7 @@ model_config:
 data_config:
   data_dir: data/sample_text_data
   data_prep_dir: prep
-  emb_dir: data/sample_emb_data
+  emb_dir: data/sample_entity_data
   ent_embeddings:
        - key: learned
          load_class: LearnedEntityEmb
@@ -34,7 +35,8 @@ data_config:
          load_class: LearnedTypeEmb
          freeze: false
          args:
-           type_labels: qid2types.json
+           type_labels: type_mappings/wiki/qid2typeids.json
+           type_vocab: type_mappings/wiki/type_vocab.json
            max_types: 3
            type_dim: 128
            merge_func: addattn
@@ -43,7 +45,8 @@ data_config:
          load_class: LearnedTypeEmb
          freeze: false
          args:
-           type_labels: qid2relations.json
+           type_labels: type_mappings/relations/qid2typeids.json
+           type_vocab: type_mappings/relations/type_vocab.json
            max_types: 50
            type_dim: 128
            merge_func: addattn
@@ -53,7 +56,7 @@ data_config:
          batch_on_the_fly: true
          normalize: false
          args:
-           kg_adj: kg_conn.txt
+           kg_adj: kg_mappings/kg_adj.txt
   entity_dir: data/sample_entity_data
   max_aliases: 10
   max_seq_len: 100
@@ -69,6 +72,6 @@ data_config:
     use_weak_label: true
   train_in_candidates: true
   word_embedding:
-    cache_dir: data/sample_emb_data
+    cache_dir: data/pretrained_bert_models
     freeze: true
     layers: 12

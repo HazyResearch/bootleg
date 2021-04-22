@@ -3,6 +3,7 @@ import shutil
 import unittest
 
 import torch
+import ujson
 
 import emmental
 from bootleg.run import run_model
@@ -44,7 +45,7 @@ class TestEnd2End(unittest.TestCase):
 
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -55,17 +56,19 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withoutkg(self):
         # KG IS LAST EMBEDDING SO WE REMOVE IT
         self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:-1]
-
+        # Just setting this for testing pipelines
+        self.args.data_config.max_aliases = 1
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -76,21 +79,25 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
+            range(52)
+        )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
-    def test_end2end_withtype(self):
+    def test_end2end_withtype_singlethread(self):
         self.args.data_config.type_prediction.use_type_pred = True
         self.args.model_config.hidden_size = 20
-
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
         # unfreezing the word embedding helps the type prediction task
         self.args.data_config.word_embedding.freeze = False
-
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -101,25 +108,32 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
+            range(52)
+        )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
-    def test_end2end_withtitle(self):
+    # Doubling up a test here to also test accumulation steps
+    def test_end2end_withtitle_accstep(self):
         self.args.data_config.ent_embeddings.append(
             DottedDict(
                 {
                     "key": "title1",
                     "load_class": "TitleEmb",
                     "send_through_bert": True,
-                    "through_bert_metadata_keys": [4, 5],
                     "args": {"proj": 6},
                 }
             )
         )
+        # Just setting this for testing pipelines
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -130,9 +144,15 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
+            range(52)
+        )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
-    def test_end2end_withreg(self):
+    # Doubling up a test here to also test greater than 1 eval batch size
+    def test_end2end_withreg_evalbatch(self):
         reg_file = "test/temp/reg_file.csv"
         utils.ensure_dir("test/temp")
         reg_data = [
@@ -142,17 +162,18 @@ class TestEnd2End(unittest.TestCase):
             ["Q3", "0.2"],
             ["Q4", "0.9"],
         ]
+        self.args.data_config.eval_accumulation_steps = 2
+        self.args.run_config.dataset_threads = 2
+        self.args.run_config.eval_batch_size = 2
         with open(reg_file, "w") as out_f:
             for item in reg_data:
                 out_f.write(",".join(item) + "\n")
 
         self.args.data_config.ent_embeddings[0]["args"]["regularize_mapping"] = reg_file
-
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -163,23 +184,29 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
+            range(52)
+        )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
         shutil.rmtree("test/temp", ignore_errors=True)
 
-    def test_end2end_bert(self):
+    # Doubling up a test here to also test long context
+    def test_end2end_bert_long_context(self):
         self.args.model_config.attn_class = "BERTNED"
         # Only take the learned entity embeddings for BERTNED
         self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:1]
         # Set the learned embedding to hidden size for BERTNED
         self.args.data_config.ent_embeddings[0].args.learned_embedding_size = 20
         self.args.data_config.word_embedding.use_sent_proj = False
-
+        self.args.data_config.max_seq_len = 100
+        self.args.data_config.max_aliases = 10
         scores = run_model(mode="train", config=self.args)
-
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -190,6 +217,11 @@ class TestEnd2End(unittest.TestCase):
 
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
+            range(52)
+        )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
         shutil.rmtree("test/temp", ignore_errors=True)

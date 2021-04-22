@@ -9,6 +9,7 @@ Subpackages
 
    bootleg.datasets
    bootleg.embeddings
+   bootleg.end2end
    bootleg.layers
    bootleg.optimizers
    bootleg.slicing

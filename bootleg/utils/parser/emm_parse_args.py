@@ -1,6 +1,6 @@
 """Overrides the Emmental parse_args."""
 import argparse
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from typing import Any, Dict, Optional, Tuple
 
 from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict
@@ -96,7 +96,7 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     model_config.add_argument(
         "--emmental.dataparallel",
         type=str2bool,
-        default=True,
+        default=False,
         help="Whether to use dataparallel or not",
     )
 
@@ -177,7 +177,7 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     learner_config.add_argument(
         "--emmental.online_eval",
         type=str2bool,
-        default=True,
+        default=False,
         help="Whether to perform online evaluation",
     )
 

@@ -417,7 +417,8 @@ class PositionalEncoding(nn.Module):
         # pe = torch.stack(hidden_dim*[torch.arange(max_len)]).transpose(0,1).long()
         # Add one for PAD positional for unknown aliases
 
-        # There were some weird bugs by doing assignment from dims 0 to hidden_dim if making pe original have an extra column of zeros
+        # There were some weird bugs by doing assignment from dims 0 to
+        # hidden_dim if making pe original have an extra column of zeros
         pe = torch.cat([pe, torch.zeros(1, hidden_dim).float()])
         pe = pe.unsqueeze(0)
         # This allows the tensor pe to be saved in state dict but not trained

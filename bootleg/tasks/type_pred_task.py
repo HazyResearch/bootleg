@@ -1,4 +1,3 @@
-import logging
 import os
 from functools import partial
 
@@ -94,11 +93,12 @@ def create_task(args, entity_symbols=None, slice_datasets=None):
     Returns: EmmentalTask for type prediction
     """
     if entity_symbols is None:
-        entity_symbols = EntitySymbols(
+        entity_symbols = EntitySymbols.load_from_cache(
             load_dir=os.path.join(
                 args.data_config.entity_dir, args.data_config.entity_map_dir
             ),
             alias_cand_map_file=args.data_config.alias_cand_map,
+            alias_idx_file=args.data_config.alias_idx_map,
         )
 
     # Create sentence encoder

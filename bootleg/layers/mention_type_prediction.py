@@ -3,7 +3,6 @@ from torch import nn as nn
 from torch.nn.init import xavier_normal_
 
 from bootleg.layers.helper_modules import MLP
-from bootleg.symbols.constants import TYPEPRED
 from bootleg.utils import model_utils
 
 

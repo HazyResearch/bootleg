@@ -1,6 +1,5 @@
-from .base_emb import *
-from .entity_embs import *
-from .kg_embs import *
-from .title_embs import *
+from .base_emb import EntityEmb
+from .entity_embs import LearnedEntityEmb, StaticEmb, TopKEntityEmb
+from .kg_embs import KGAdjEmb, KGIndices, KGWeightedAdjEmb
 from .title_embs import TitleEmb
-from .type_embs import *
+from .type_embs import LearnedTypeEmb, TypeEmb

@@ -2,9 +2,9 @@
 Distributed Training
 ====================
 
-We discuss how to use distributed training to train a Bootleg model on the full Wikipedia dump. This tutorial assumes you have already completed the `Basic Training Tutorial`_.
+We discuss how to use distributed training to train a Bootleg model on the full Wikipedia save. This tutorial assumes you have already completed the `Basic Training Tutorial`_.
 
-As Wikipedia has over 5 million entities and over 50 million sentences, training on the full Wikipedia dump is computationally expensive. We recommend using a `p4d.24xlarge <https://aws.amazon.com/ec2/instance-types/p4/>`_ instance on AWS to train on Wikipedia.
+As Wikipedia has over 5 million entities and over 50 million sentences, training on the full Wikipedia save is computationally expensive. We recommend using a `p4d.24xlarge <https://aws.amazon.com/ec2/instance-types/p4/>`_ instance on AWS to train on Wikipedia.
 
 We provide a config for training Wikipedia `here <https://github.com/HazyResearch/bootleg/tree/master/configs/tutorial/wiki_uncased_ft.yaml>`_. Note this config is the config used to train the pretrained model provided in the `End-to-End Tutorial <https://github.com/HazyResearch/bootleg/tree/master/tutorials/end2end_ned_tutorial.ipynb>`_.
 
@@ -36,8 +36,10 @@ At the end, the directory structure should be
   <DOWNLOAD_DIRECTORY>
     wiki_data/
         prep/
-    wiki_entity_data/
+    entity_db/
         entity_mappings/
+        type_mappings/
+        kg_mappings/
         prep/
 
 2. Setting up Distributed Training

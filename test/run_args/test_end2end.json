@@ -1,10 +1,14 @@
 {
     "emmental": {
-        "n_epochs": 20,
-        "seed": 1234
+        "n_epochs": 40,
+        "seed": 1234,
+        "checkpointing": false,
+        "checkpoint_freq": 20,
     },
     "run_config": {
         "dataloader_threads": 1,
+        "eval_accumulation_steps": 1,
+        "eval_batch_size": 1,
         "dataset_threads": 1,
         "spawn_method": "fork",
         "log_level": "debug"
@@ -27,7 +31,8 @@
         "type_prediction": {
             "use_type_pred": false,
             "num_types": 3,
-            "file": "type_pred_mapping.json"
+            "type_labels": "type_pred_mapping.json",
+            "type_vocab": "type_pred_vocab.json"
         },
         "word_embedding":
         {
@@ -51,6 +56,7 @@
                "freeze": false,
                "args": {
                    "type_labels": "type_pred_mapping.json",
+                   "type_vocab": "type_pred_vocab.json",
                    "max_types": 1,
                    "type_dim": 10,
                    "merge_func": "addattn",
@@ -71,10 +77,10 @@
             "file": "end2end_train.jsonl"
         },
         "dev_dataset": {
-            "file": "end2end_train.jsonl"
+            "file": "end2end_dev.jsonl"
         },
         "test_dataset": {
-            "file": "end2end_train.jsonl"
+            "file": "end2end_dev.jsonl"
         }
     }
 }

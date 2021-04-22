@@ -44,7 +44,12 @@ def add_application_args(parser):
         "--bert_model",
         type=str,
         default="spanbert-base-cased",
-        choices=["spanbert-base-cased", "spanbert-large-cased"],
+        choices=[
+            "spanbert-base-cased",
+            "spanbert-large-cased",
+            "bert-base-uncased",
+            "bert-large-uncased",
+        ],
         help="Which bert pretrained model to use",
     )
 
