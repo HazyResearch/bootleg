@@ -1,6 +1,10 @@
 Unreleased 1.0.2dev0
 ---------------------
 
+Changed
+^^^^^^^^^
+* Removed condition that aliases for eval must appear in candidate lists. We now allow for eval to not have known aliases and always mark these as incorrect. When dumping predictions, these get "-1" candidates and null probabilities.
+
 1.0.1 - 2021-03-22
 -------------------
 

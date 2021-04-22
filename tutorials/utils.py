@@ -1,28 +1,20 @@
 import os
-from collections import defaultdict
 
 import jsonlines
 import numpy as np
 import pandas as pd
+import requests
 import tagme
 import ujson
 from tqdm import tqdm
 
+from bootleg.symbols.entity_profile import EntityProfile
+
 pd.options.display.max_colwidth = 500
 
-from bootleg.symbols.constants import *
 
-
-def load_train_data(
-    train_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None
-):
+def load_train_data(train_file, title_map, entity_profile=None):
     """Loads a jsonl file and creates a pandas DataFrame. Adds candidates, types, and KGs if available."""
-    if cands_map is None:
-        cands_map = {}
-    if type_symbols is None:
-        type_symbols = []
-    if kg_symbols is None:
-        kg_symbols = []
     num_lines = sum(1 for _ in open(train_file))
     rows = []
     with jsonlines.open(train_file) as f:
@@ -61,28 +53,36 @@ def load_train_data(
                         ):
                             slices.append(sl_name)
                 res["slices"] = slices
-                if len(cands_map) > 0:
+                if entity_profile is not None:
                     res["cand_names"] = [
                         title_map[q[0]]
-                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                        for i, q in enumerate(
+                            entity_profile.get_qid_count_cands(
+                                line["aliases"][alias_idx]
+                            )
+                        )
                     ]
                     res["cand_qids"] = [
                         q[0]
-                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                        for i, q in enumerate(
+                            entity_profile.get_qid_count_cands(
+                                line["aliases"][alias_idx]
+                            )
+                        )
                     ]
-                for type_sym in type_symbols:
-                    type_nm = os.path.basename(os.path.splitext(type_sym.type_file)[0])
-                    gold_types = type_sym.get_types(gold_qids[alias_idx])
-                    res[f"{type_nm}_gld"] = gold_types
-                for kg_sym in kg_symbols:
-                    kg_nm = os.path.basename(os.path.splitext(kg_sym.kg_adj_file)[0])
+                    for type_sym in entity_profile.get_all_typesystems():
+                        gold_types = entity_profile.get_types(
+                            gold_qids[alias_idx], type_sym
+                        )
+                        res[f"{type_sym}_gld"] = gold_types
+
                     connected_pairs_gld = []
                     for alias_idx2 in range(len(gold_qids)):
-                        if kg_sym.is_connected(
+                        if entity_profile.is_connected(
                             gold_qids[alias_idx], gold_qids[alias_idx2]
                         ):
                             connected_pairs_gld.append(gold_qids[alias_idx2])
-                    res[f"{kg_nm}_gld"] = connected_pairs_gld
+                    res[f"kg_gld"] = connected_pairs_gld
                 rows.append(res)
     return pd.DataFrame(rows)
 
@@ -108,15 +108,9 @@ def load_predictions(file):
 
 
 def score_predictions(
-    orig_file, pred_file, title_map, cands_map=None, type_symbols=None, kg_symbols=None
+    orig_file, pred_file, title_map, entity_profile: EntityProfile = None
 ):
     """Loads a jsonl file and joins with the results from dump_preds"""
-    if cands_map is None:
-        cands_map = {}
-    if type_symbols is None:
-        type_symbols = []
-    if kg_symbols is None:
-        kg_symbols = []
     num_lines = sum(1 for line in open(orig_file))
     preds = load_predictions(pred_file)
     correct = 0
@@ -175,7 +169,7 @@ def score_predictions(
                         ):
                             slices.append(sl_name)
                 res["slices"] = slices
-                if len(cands_map) > 0:
+                if entity_profile is not None:
                     res["cands"] = [
                         tuple(
                             [
@@ -183,29 +177,35 @@ def score_predictions(
                                 preds[sent_idx]["cand_probs"][alias_idx][i],
                             ]
                         )
-                        for i, q in enumerate(cands_map[line["aliases"][alias_idx]])
+                        for i, q in enumerate(
+                            entity_profile.get_qid_count_cands(
+                                line["aliases"][alias_idx]
+                            )
+                        )
                     ]
-                for type_sym in type_symbols:
-                    type_nm = os.path.basename(os.path.splitext(type_sym.type_file)[0])
-                    gold_types = type_sym.get_types(gold_qids[alias_idx])
-                    pred_types = type_sym.get_types(pred_qids[alias_idx])
-                    res[f"{type_nm}_gld"] = gold_types
-                    res[f"{type_nm}_pred"] = pred_types
-                for kg_sym in kg_symbols:
-                    kg_nm = os.path.basename(os.path.splitext(kg_sym.kg_adj_file)[0])
-                    connected_pairs_gld = []
-                    connected_pairs_pred = []
-                    for alias_idx2 in range(len(gold_qids)):
-                        if kg_sym.is_connected(
-                            gold_qids[alias_idx], gold_qids[alias_idx2]
-                        ):
-                            connected_pairs_gld.append(gold_qids[alias_idx2])
-                        if kg_sym.is_connected(
-                            pred_qids[alias_idx], pred_qids[alias_idx2]
-                        ):
-                            connected_pairs_pred.append(pred_qids[alias_idx2])
-                    res[f"{kg_nm}_gld"] = connected_pairs_gld
-                    res[f"{kg_nm}_pred"] = connected_pairs_pred
+                for type_sym in entity_profile.get_all_typesystems():
+                    gold_types = entity_profile.get_types(
+                        gold_qids[alias_idx], type_sym
+                    )
+                    pred_types = entity_profile.get_types(
+                        pred_qids[alias_idx], type_sym
+                    )
+                    res[f"{type_sym}_gld"] = gold_types
+                    res[f"{type_sym}_pred"] = pred_types
+
+                connected_pairs_gld = []
+                connected_pairs_pred = []
+                for alias_idx2 in range(len(gold_qids)):
+                    if entity_profile.is_connected(
+                        gold_qids[alias_idx], gold_qids[alias_idx2]
+                    ):
+                        connected_pairs_gld.append(gold_qids[alias_idx2])
+                    if entity_profile.is_connected(
+                        pred_qids[alias_idx], pred_qids[alias_idx2]
+                    ):
+                        connected_pairs_pred.append(pred_qids[alias_idx2])
+                res[f"kg_gld"] = connected_pairs_gld
+                res[f"kg_pred"] = connected_pairs_pred
                 rows.append(res)
     return pd.DataFrame(rows)
 
@@ -221,9 +221,6 @@ def load_mentions(file):
             }
             lines.append(new_line)
     return pd.DataFrame(lines)
-
-
-import requests
 
 
 def enwiki_title_to_wikidata_id(title: str) -> str:
@@ -290,7 +287,7 @@ def entity_linking_tp_with_overlap(gold, predicted, ignore_entity=False):
     :param gold:
     :param predicted:
     :return:
-    >>> entity_linking_tp_with_overlap([('Q7366', 14, 18), ('Q780394', 19, 35)], [('Q7366', 14, 16), ('Q780394', 19, 35)])
+    >>> entity_linking_tp_with_overlap([('Q7366', 14, 18),('Q780394', 19, 35)],[('Q7366', 14, 16),('Q780394', 19, 35)])
     2, 1
     >>> entity_linking_tp_with_overlap([('Q7366', 14, 18), ('Q780394', 19, 35)], [('Q7366', 14, 16)])
     1, 0

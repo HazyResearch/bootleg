@@ -45,7 +45,7 @@ class TestEnd2End(unittest.TestCase):
 
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -68,7 +68,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -97,7 +97,7 @@ class TestEnd2End(unittest.TestCase):
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -133,7 +133,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -173,7 +173,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -206,7 +206,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"

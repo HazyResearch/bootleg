@@ -386,27 +386,25 @@ class EntityProfile:
         """
         return self._entity_symbols.get_eid(qid)
 
-    @check_qid_exists
     def get_qid_cands(self, mention):
         """Gets the entity QID candidates of the mention.
 
         Args:
-            qid: mention
+            mention: mention
 
         Returns: List of QIDs
         """
         return self._entity_symbols.get_qid_cands(mention)
 
-    @check_qid_exists
-    def get_qid_count_cands(self, qid):
+    def get_qid_count_cands(self, mention):
         """Gets the entity QID candidates with their scores of the mention.
 
         Args:
-            qid: entity QID
+            mention: mention
 
         Returns: List of tuples [QID, score]
         """
-        return self._entity_symbols.get_qid_count_cands(qid)
+        return self._entity_symbols.get_qid_count_cands(mention)
 
     def get_num_entities_with_pad_and_nocand(self):
         """Gets the number of entities including a PAD and UNK entity.
