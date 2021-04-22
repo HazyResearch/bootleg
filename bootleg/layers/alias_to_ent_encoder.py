@@ -82,7 +82,7 @@ class AliasEntityTable(nn.Module):
             log_rank_0_debug(logger, f"Loading alias table from {prep_file}")
             start = time.time()
             alias2entity_table = np.memmap(
-                prep_file, dtype="int64", mode="r", shape=data_shape
+                prep_file, dtype="int64", mode="r+", shape=data_shape
             )
             log_rank_0_debug(
                 logger, f"Loaded alias table in {round(time.time() - start, 2)}s"
