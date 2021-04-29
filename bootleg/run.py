@@ -10,6 +10,7 @@ from functools import partial
 
 import numpy as np
 import torch
+from rich.logging import RichHandler
 
 import emmental
 from bootleg import log_rank_0_debug, log_rank_0_info
@@ -109,7 +110,10 @@ def setup(config, run_config_path=None):
         local_rank=config.learner_config.local_rank,
         level=log_level,
     )
-
+    log = logging.getLogger()
+    # Remove streaming handlers and use rich
+    log.handlers = [h for h in log.handlers if not type(h) is logging.StreamHandler]
+    log.addHandler(RichHandler())
     # Set up distributed backend
     emmental.Meta.init_distributed_backend()
 
@@ -315,7 +319,11 @@ def run_model(mode, config, run_config_path=None):
 
     # If just finished training a model or in eval mode, run eval
     if mode in ["train", "eval"]:
-        scores = model.score(dataloaders)
+        if mode == "train":
+            # Skip the TRAIN dataloader
+            scores = model.score(dataloaders[1:])
+        else:
+            scores = model.score(dataloaders)
         # Save metrics and models
         log_rank_0_info(logger, f"Saving metrics to {emmental.Meta.log_path}")
         log_rank_0_info(logger, f"Metrics: {scores}")

@@ -6,15 +6,20 @@
 """
 
 import argparse
+import os
 from collections import OrderedDict
+from pathlib import Path
 
 import numpy as np
 import torch
 import ujson
 import ujson as json
 import yaml
+from tqdm import tqdm
+from transformers import BertModel, BertTokenizer
 
 from bootleg.symbols.entity_profile import EntityProfile
+from bootleg.utils.preprocessing.build_static_embeddings import BERT_DIM, average_titles
 
 ENTITY_EMB_KEYS = ["module_pool", "learned", "learned_entity_embedding.weight"]
 ENTITY_REG_KEYS = ["module_pool", "learned", "eid2reg"]
@@ -67,6 +72,26 @@ def parse_args():
         type=str,
         default=None,
         help="Where to save the config if it was passed in.",
+    )
+    parser.add_argument(
+        "--bert_model",
+        type=str,
+        default="bert-base-uncased",
+        help="Bert model for title embeddings",
+    )
+    parser.add_argument(
+        "--bert_model_cache",
+        type=str,
+        default=None,
+        help="Path to saved bert models",
+    )
+    parser.add_argument(
+        "--no_title_emb",
+        action="store_true",
+        help="Turn off title embedding adjustment",
+    )
+    parser.add_argument(
+        "--cpu", action="store_true", help="Use cpu for getting new Bert embeddings"
     )
     args = parser.parse_args()
     return args
@@ -191,10 +216,9 @@ def refit_weights(
         # Is not eid2reg in model
         entity_reg = None
     assert (
-        entity_weights.shape[0]
-        == train_entity_profile.get_num_entities_with_pad_and_nocand()
+        entity_weights.shape[0] == train_entity_profile.num_entities_with_pad_and_nocand
     ), (
-        f"{train_entity_profile.get_num_entities_with_pad_and_nocand()} does not "
+        f"{train_entity_profile.num_entities_with_pad_and_nocand} does not "
         f"match entity weights shape of {entity_weights.shape[0]}"
     )
     # Last row is pad row of all zeros
@@ -204,7 +228,7 @@ def refit_weights(
 
     new_entity_weight = np.zeros(
         (
-            new_entity_profile.get_num_entities_with_pad_and_nocand(),
+            new_entity_profile.num_entities_with_pad_and_nocand,
             entity_weights.shape[1],
         ),
     )
@@ -234,14 +258,6 @@ def refit_weights(
     shared_newindex = np.array(shared_newindex)
     shared_oldindex = np.array(shared_oldindex)
     newent_index = np.array(newent_index)
-    print(
-        "OG",
-        new_entity_weight.shape[0] - 1,  # Drop 1 for the -1 for the last row of zeros
-        "SHARED",
-        len(shared_newindex),
-        "NEW",
-        len(newent_index),
-    )
     # Copy over the old weights
     if len(shared_newindex) > 0:
         new_entity_weight[shared_newindex, :] = entity_weights[shared_oldindex, :]
@@ -256,9 +272,7 @@ def refit_weights(
     state_dict = set_nested_item(state_dict, ENTITY_EMB_KEYS, new_entity_weight)
     # Create regularization file if need to
     if entity_reg is not None:
-        new_entity_reg = np.zeros(
-            (new_entity_profile.get_num_entities_with_pad_and_nocand())
-        )
+        new_entity_reg = np.zeros((new_entity_profile.num_entities_with_pad_and_nocand))
         # Copy over the old weights
         if len(shared_newindex) > 0:
             new_entity_reg[shared_newindex] = entity_reg[shared_oldindex]
@@ -268,6 +282,123 @@ def refit_weights(
         new_entity_reg = torch.from_numpy(new_entity_reg).float()
         state_dict = set_nested_item(state_dict, ENTITY_REG_KEYS, new_entity_reg)
     return state_dict
+
+
+def refit_titles(
+    np_same_ents,
+    np_new_ents,
+    neweid2oldeid,
+    train_entity_profile,
+    new_entity_profile,
+    train_title_embeddings,
+    bert_model,
+    word_model_cache=None,
+    cpu=False,
+):
+    """Refits the entity embeddings between the two models using the different
+    entity profiles.
+
+    Args:
+        np_same_ents: new profile mapped entities that are the same
+        np_new_ents: new profile mapped entities that are new
+        neweid2oldeid: new profile EID to old profile EID
+        train_entity_profile: original entity profile
+        new_entity_profile: new entity profile
+        train_title_embeddings: matrix of original title embeddings
+        bert_model: bert model to use
+        word_model_cache: cache dir (default None)
+        cpu: whether to use CPU or not (default False)
+
+    Returns: adjusted title embeddings
+    """
+    assert (
+        train_title_embeddings.shape[0]
+        == train_entity_profile.num_entities_with_pad_and_nocand
+    ), (
+        f"{train_entity_profile.num_entities_with_pad_and_nocand} does not "
+        f"match title embs shape of {train_title_embeddings.shape[0]}"
+    )
+
+    new_title_embeddings = np.zeros(
+        (
+            new_entity_profile.num_entities_with_pad_and_nocand,
+            train_title_embeddings.shape[1],
+        ),
+    )
+
+    # Create index map from new eid to old eid for the entities that are shared
+    shared_neweid2old = {
+        new_entity_profile.get_eid(qid): neweid2oldeid[new_entity_profile.get_eid(qid)]
+        for qid in np_same_ents
+    }
+    # shared_newindex: the new index set of the shared entities
+    # shared_oldindex: the old index set of the shared entities
+    # The 0 represents the NC title embedding. We always want to copy
+    # this over so we add it to both (i.e., 0 row maps to 0 row)
+    shared_newindex = [0]
+    shared_oldindex = [0]
+    newent_index = []
+    # We start at 1 because we already handled 0 above.
+    # We end at -1 as we want the last row to always be zero
+    for i in range(1, new_title_embeddings.shape[0] - 1):
+        # If the entity id is shared with the old set
+        if i in shared_neweid2old:
+            shared_newindex.append(i)
+            shared_oldindex.append(shared_neweid2old[i])
+        # If the entity id is a new entity
+        else:
+            newent_index.append(i)
+    shared_newindex = np.array(shared_newindex)
+    shared_oldindex = np.array(shared_oldindex)
+    newent_index = np.array(newent_index)
+    # Copy over the old weights
+    if len(shared_newindex) > 0:
+        new_title_embeddings[shared_newindex, :] = train_title_embeddings[
+            shared_oldindex, :
+        ]
+    # Assign new entities
+    if len(newent_index) > 0:
+        assert len(newent_index) == len(np_new_ents)
+        print(f"Extracting {len(newent_index)} titles using BERT")
+        newent_set = set(newent_index)
+        tokenizer = BertTokenizer.from_pretrained(
+            bert_model,
+            do_lower_case="uncased" in bert_model,
+            cache_dir=word_model_cache,
+        )
+        model = BertModel.from_pretrained(
+            bert_model,
+            cache_dir=word_model_cache,
+            output_attentions=False,
+            output_hidden_states=False,
+        )
+        if not cpu:
+            model = model.to("cuda")
+        model.eval()
+
+        for new_qid in tqdm(np_new_ents, desc="Adding new titles"):
+            eid = new_entity_profile.get_eid(new_qid)
+            assert eid in newent_set, f"{eid} for {new_qid} not in new eids"
+            title = new_entity_profile.get_title(new_qid)
+            input_ids = tokenizer(
+                [title], padding=True, truncation=True, return_tensors="pt"
+            )
+            inputs = input_ids["input_ids"].to(model.device)
+            attention_mask = input_ids["attention_mask"].to(model.device)
+
+            # model() returns tuple of (last layer of embeddings, pooled output)
+            with torch.no_grad():
+                outputs = model(inputs, attention_mask=attention_mask)[0]
+            assert list(outputs.shape) == [1, inputs.shape[1], BERT_DIM]
+            outputs[inputs == 0] = 0
+            assert all(outputs[(1 - attention_mask).bool()].sum(-1) == 0)
+            avgtitle = average_titles(inputs, outputs).to("cpu").detach().numpy()
+            new_title_embeddings[eid] = avgtitle
+    # Last row is pad row of all zeros
+    np.testing.assert_array_almost_equal(
+        new_title_embeddings[-1], np.zeros(new_title_embeddings.shape[1])
+    ), "Last row of new title data wasn't zero"
+    return new_title_embeddings
 
 
 def modify_config(old_config_path, new_config_path, model_save_path, new_entity_path):
@@ -345,6 +476,7 @@ def fit_profiles(args):
     except:
         raise ValueError(f"ERROR: All of {ENTITY_EMB_KEYS} are not in model_state_dict")
 
+    # Refit weights
     if args.init_vec_file is not None and len(args.init_vec_file) > 0:
         vector_for_new_ent = np.load(args.init_vec_file)
     else:
@@ -358,10 +490,80 @@ def fit_profiles(args):
         vector_for_new_ent,
         model_state_dict,
     )
-    print(new_model_state_dict["module_pool"]["learned"].keys())
     state_dict["model"] = new_model_state_dict
     print(f"Saving model at {args.save_model_path}")
     torch.save(state_dict, args.save_model_path)
+
+    # Refit titles
+    # Will keep track of all embeddings to adjust. If given a config, we will only adjust
+    # the one from the config. Othwerwise, we adjust all that are "static_table_" arrays of
+    # length BERT_DIM
+    if not args.no_title_emb:
+        title_embeddings = []
+        prepped_title_emb_files = []
+        title_emb_file = None
+        prep_subdir = "prep"
+        # First try to read entity_prep_dir from config
+        if args.model_config is not None:
+            with open(args.model_config) as file:
+                config = yaml.load(file, Loader=yaml.FullLoader)
+            prep_subdir = config["data_config"].get("entity_prep_dir", "prep")
+            for ent in config["data_config"]["ent_embeddings"]:
+                if ent["load_class"] == "StaticEmb" and ent["key"] == "title_static":
+                    assert (
+                        "emb_file" in ent["args"]
+                    ), f"emb_file needs to be in title_static config"
+                    title_emb_file = ent["args"]["emb_file"]
+
+        prep_dir = Path(args.train_entity_profile) / prep_subdir
+        out_prep_dir = Path(args.new_entity_profile) / prep_subdir
+
+        print(f"Looking for title embedding in {prep_dir}")
+        # Try to find a saved title prep file
+        for file in prep_dir.iterdir():
+            if file.is_file() and file.name.startswith("static_table_"):
+                # If we know the title embedding file from the config, use it to find the right prepped file
+                if (
+                    title_emb_file is not None
+                    and file.name
+                    != f"static_table_{os.path.splitext(os.path.basename(title_emb_file))[0]}.npy"
+                ):
+                    continue
+                possible_titles = np.load(file)
+                if list(possible_titles.shape) == [
+                    train_entity_profile.num_entities_with_pad_and_nocand,
+                    BERT_DIM,
+                ]:
+                    title_embeddings.append(possible_titles)
+                    prepped_title_emb_files.append(file.name)
+        if len(title_embeddings) == 0:
+            print(
+                f"We were unable to adjust titles. If your model does not use title embeddings, ignore this. If your"
+                f"model does (all Bootleg models by default do), please call "
+                f"```python -m bootleg.utils.preprocessing.build_static_embeddings --help``` to extract manually. "
+                f"The saved file from this method should be added to ```emb_file``` config param for the title"
+                f"embedding."
+            )
+        else:
+            for title_embed, prepped_title_emb_file in zip(
+                title_embeddings, prepped_title_emb_files
+            ):
+                print(f"Attempting to refit title {prepped_title_emb_file}")
+                adjusted_title_embedding = refit_titles(
+                    np_same_ents,
+                    np_new_ents,
+                    neweid2oldeid,
+                    train_entity_profile,
+                    new_entity_profile,
+                    title_embed,
+                    args.bert_model,
+                    args.bert_model_cache,
+                    args.cpu,
+                )
+                out_prep_dir.mkdir(parents=True, exist_ok=True)
+                np.save(
+                    str(out_prep_dir / prepped_title_emb_file), adjusted_title_embedding
+                )
 
     if args.model_config is not None:
         modify_config(

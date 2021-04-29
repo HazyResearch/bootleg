@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="bootleg",
-    version="1.0.1",
+    version="1.0.2",
     description="Bootleg NED System",
     packages=find_packages(),
     url="https://github.com/HazyResearch/bootleg",
@@ -18,6 +18,8 @@ setup(
         "numpy~=1.19.0",
         "pandas~=1.2.3",
         "progressbar==2.5",
+        "pydantic==1.7.1",
+        "rich==10.1.0",
         "scikit_learn~=0.24.1",
         "scipy~=1.6.1",
         "sentencepiece==0.1.*",

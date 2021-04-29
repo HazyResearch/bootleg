@@ -26,27 +26,7 @@ from emmental.utils.utils import array_to_numpy, prob_to_pred
 logger = logging.getLogger(__name__)
 
 
-def masked_softmax(pred, mask, dim=2, temp=1.0):
-    """Masked softmax. Mask of 0/False means mask value (ignore it)
-
-    Args:
-        pred: input tensor
-        mask: mask
-        dim: softmax dimension
-        temp: softmax temperature
-
-    Returns: masked softmax tensor
-    """
-    assert temp > 0, f"You can't have a temperature of 0"
-    # https://github.com/allenai/allennlp/blob/b6cc9d39651273e8ec2a7e334908ffa9de5c2026/allennlp/nn/util.py#L272-L303
-    pred = pred / temp
-    mask = mask.float()
-    masked_pred = pred.masked_fill((1 - mask).byte().bool(), -2e15)
-    result = F.softmax(masked_pred, dim=dim)
-    return result
-
-
-def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0):
+def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0, zero_delta=1e-45):
     """Masked logsoftmax. Mask of 0/False means mask value (ignore it)
 
     Args:
@@ -54,6 +34,7 @@ def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0):
         mask: mask
         dim: softmax dimension
         temp: softmax temperature
+        zero_delta: small value to add so that vector + (mask+zero_delta).log() is not Nan for all 0s
 
     Returns: masked softmax tensor
     """
@@ -62,8 +43,9 @@ def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0):
     # https://github.com/allenai/allennlp/blob/b6cc9d39651273e8ec2a7e334908ffa9de5c2026/allennlp/nn/util.py#L272-L303
     pred = pred / temp
     pred = (
-        pred + (mask + 5e-16).log()
-    )  # we could also do 1e-46 but I feel safer with 5e-16 especially if doing FP16
+        pred + (mask + zero_delta).log()
+    )  # we could also do 1e-46 but I feel safer 1e-45
+    # WARNING: might need 5e-16 with FP16 and training
     # compute softmax over the k dimension
     return F.log_softmax(input=pred, dim=dim)
 
@@ -335,7 +317,6 @@ def batched_pred_iter(
         ):
             num_eval_steps += 1
             X_bdict, Y_bdict = bdict
-
             (
                 uid_bdict,
                 loss_bdict,

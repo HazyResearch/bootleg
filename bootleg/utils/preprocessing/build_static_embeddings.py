@@ -91,7 +91,7 @@ def build_title_table(cpu, batch_size, model, tokenizer, entity_symbols):
     eids = []
     for q in tqdm(
         entity_symbols.get_all_qids(),
-        total=len(entity_symbols.get_all_titles()),
+        total=len(entity_symbols.get_all_qids()),
         desc="Itearting over entities",
     ):
         eids.append(entity_symbols.get_eid(q))
@@ -138,7 +138,7 @@ def main():
         output_attentions=False,
         output_hidden_states=False,
     )
-    if not args.cpu:
+    if torch.cuda.is_available():
         model = model.to("cuda")
     model.eval()
 
