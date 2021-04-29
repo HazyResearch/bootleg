@@ -32,10 +32,10 @@ from emmental.model import EmmentalModel
 logger = logging.getLogger(__name__)
 
 BOOTLEG_MODEL_PATHS = {
-    "bootleg_cased": "https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_cased.tar.gz",
-    "bootleg_cased_mini": "https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz",
-    "bootleg_uncased": "https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
-    "bootleg_uncased_mini": "https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz",
+    "bootleg_cased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased.tar.gz",
+    "bootleg_cased_mini": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz",
+    "bootleg_uncased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
+    "bootleg_uncased_mini": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz",
 }
 
 
@@ -121,7 +121,7 @@ def create_sources(model_path, data_path, model_name):
     if not (data_path / "entity_db").exists():
         print(f"{data_path / 'entity_db'} not found. Downloading..")
         urllib.request.urlretrieve(
-            "https://bootleg-data.s3.amazonaws.com/data/latest/entity_db.tar.gz",
+            "https://bootleg-data.s3-us-west-2.amazonaws.com/data/latest/entity_db.tar.gz",
             filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
@@ -337,19 +337,21 @@ class BootlegAnnotator(object):
         """Extracts mentions and runs disambiguation. If user provides extracted_examples, we will ignore text_list
 
         Args:
-            text_list: list of text to disambiguate (or single sentence)
+            text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
             label_func: mention extraction funciton (optional)
-            extracted_examples: List of Dicts of keys "sentence", "aliases", "spans", "cands" (QIDs)
+            extracted_examples: List of Dicts of keys "sentence", "aliases", "spans", "cands" (QIDs) (optional)
 
         Returns: Dict of
 
             * ``qids``: final predicted QIDs,
             * ``probs``: final predicted probs,
             * ``titles``: final predicted titles,
-            * ``cands``: all entity canddiates,
+            * ``cands``: all entity candidates,
             * ``cand_probs``: probabilities of all candidates,
             * ``spans``: final extracted word spans,
             * ``aliases``: final extracted aliases,
+            * ``embs``: final entity contextualized embeddings (if return_embs is True)
+            * ``cand_embs``: final candidate entity contextualized embeddings (if return_embs is True)
         """
         # Check inputs are sane
         do_extract_mentions = True
