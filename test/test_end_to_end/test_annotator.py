@@ -140,6 +140,7 @@ class TestEnd2End(unittest.TestCase):
         res = ann.label_mentions("alias1 alias2 multi word alias3 I have no idea")
         assert "embs" in res
         assert res["embs"][0][0].shape[0] == 20
+        assert list(res["cand_embs"][0][0].shape) == [3, 20]
 
         # TEST CUSTOM CANDS
         ann.return_embs = False

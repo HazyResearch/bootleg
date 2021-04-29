@@ -652,7 +652,6 @@ class StaticEmb(EntityEmb):
         """
         ending = os.path.splitext(emb_file)[1]
         found = 0
-        raw_num_ents = 0
         if ending == ".json":
             dct = utils.load_json_file(emb_file)
             val = next(iter(dct.values()))
