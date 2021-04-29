@@ -406,7 +406,8 @@ class EntityProfile:
         """
         return self._entity_symbols.get_qid_count_cands(mention)
 
-    def get_num_entities_with_pad_and_nocand(self):
+    @property
+    def num_entities_with_pad_and_nocand(self):
         """Gets the number of entities including a PAD and UNK entity.
 
         Returns: integer

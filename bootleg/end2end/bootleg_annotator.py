@@ -562,6 +562,7 @@ class BootlegAnnotator(object):
         final_cand_probs = [[] for _ in range(num_exs)]
         final_pred_probs = [[] for _ in range(num_exs)]
         final_entity_embs = [[] for _ in range(num_exs)]
+        final_entity_cand_embs = [[] for _ in range(num_exs)]
         final_titles = [[] for _ in range(num_exs)]
         final_spans = [[] for _ in range(num_exs)]
         final_aliases = [[] for _ in range(num_exs)]
@@ -630,6 +631,9 @@ class BootlegAnnotator(object):
                                 final_entity_embs[idx_unq].append(
                                     output_embs[ex_i][alias_idx][pred_idx]
                                 )
+                                final_entity_cand_embs[idx_unq].append(
+                                    output_embs[ex_i][alias_idx]
+                                )
                             final_aliases[idx_unq].append(
                                 batch_aliases_arr[b_i + ex_i][alias_idx]
                             )
@@ -659,7 +663,7 @@ class BootlegAnnotator(object):
         }
         if self.return_embs:
             res_dict["embs"] = final_entity_embs
-
+            res_dict["cand_embs"] = final_entity_cand_embs
         return res_dict
 
     def get_forward_batch(self, start_span_idx, end_span_idx, token_ids, alias_idx):
