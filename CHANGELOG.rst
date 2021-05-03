@@ -1,5 +1,9 @@
 Unreleased 1.0.3dev0
 ---------------------
+Fixed
+^^^^^^^
+* Corrected how custom candidates were handled in the BootlegAnnotator when using ``extracted_examples``
+* Fixed memory leak in BooltegAnnotator due to missing ``torch.no_grad()``
 
 1.0.2 - 2021-04-28
 ---------------------
