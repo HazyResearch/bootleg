@@ -471,7 +471,7 @@ class EntityProfile:
         """
         if self._kg_symbols is None:
             return False
-        self._kg_symbols.is_connected(qid, qid2)
+        return self._kg_symbols.is_connected(qid, qid2)
 
     # ============================================================
     # EDIT MODE OPERATIONS
