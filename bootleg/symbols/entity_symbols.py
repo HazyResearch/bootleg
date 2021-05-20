@@ -407,6 +407,9 @@ class EntitySymbols:
 
         Returns:
         """
+        # Cast to lower and stripped for aliases
+        mention = utils.get_lnrm(mention, strip=True, lower=True)
+
         # If mention is in mapping, make sure the qid is not
         if mention in self._alias2qids:
             if qid in set(map(lambda x: x[0], self._alias2qids[mention])):
