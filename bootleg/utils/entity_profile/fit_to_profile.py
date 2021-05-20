@@ -9,12 +9,14 @@ import argparse
 import os
 from collections import OrderedDict
 from pathlib import Path
+from tempfile import mkdtemp
 
 import numpy as np
 import torch
 import ujson
 import ujson as json
 import yaml
+from numpy.lib.format import open_memmap
 from tqdm import tqdm
 from transformers import BertModel, BertTokenizer
 
@@ -318,14 +320,17 @@ def refit_titles(
         f"{train_entity_profile.num_entities_with_pad_and_nocand} does not "
         f"match title embs shape of {train_title_embeddings.shape[0]}"
     )
-
-    new_title_embeddings = np.zeros(
-        (
+    temp_title_emb_file = os.path.join(mkdtemp(), "newfile.dat")
+    new_title_embeddings_fp = np.memmap(
+        temp_title_emb_file,
+        dtype="float32",
+        mode="w+",
+        shape=(
             new_entity_profile.num_entities_with_pad_and_nocand,
             train_title_embeddings.shape[1],
         ),
     )
-
+    new_title_embeddings_fp[:] = 0
     # Create index map from new eid to old eid for the entities that are shared
     shared_neweid2old = {
         new_entity_profile.get_eid(qid): neweid2oldeid[new_entity_profile.get_eid(qid)]
@@ -340,7 +345,7 @@ def refit_titles(
     newent_index = []
     # We start at 1 because we already handled 0 above.
     # We end at -1 as we want the last row to always be zero
-    for i in range(1, new_title_embeddings.shape[0] - 1):
+    for i in range(1, new_title_embeddings_fp.shape[0] - 1):
         # If the entity id is shared with the old set
         if i in shared_neweid2old:
             shared_newindex.append(i)
@@ -353,7 +358,7 @@ def refit_titles(
     newent_index = np.array(newent_index)
     # Copy over the old weights
     if len(shared_newindex) > 0:
-        new_title_embeddings[shared_newindex, :] = train_title_embeddings[
+        new_title_embeddings_fp[shared_newindex, :] = train_title_embeddings[
             shared_oldindex, :
         ]
     # Assign new entities
@@ -393,12 +398,13 @@ def refit_titles(
             outputs[inputs == 0] = 0
             assert all(outputs[(1 - attention_mask).bool()].sum(-1) == 0)
             avgtitle = average_titles(inputs, outputs).to("cpu").detach().numpy()
-            new_title_embeddings[eid] = avgtitle
+            new_title_embeddings_fp[eid] = avgtitle
+            del avgtitle
     # Last row is pad row of all zeros
     np.testing.assert_array_almost_equal(
-        new_title_embeddings[-1], np.zeros(new_title_embeddings.shape[1])
+        new_title_embeddings_fp[-1], np.zeros(new_title_embeddings_fp.shape[1])
     ), "Last row of new title data wasn't zero"
-    return new_title_embeddings
+    return new_title_embeddings_fp
 
 
 def modify_config(old_config_path, new_config_path, model_save_path, new_entity_path):
@@ -437,11 +443,12 @@ def fit_profiles(args):
 
     print(f"Loading train entity profile from {args.train_entity_profile}")
     train_entity_profile = EntityProfile.load_from_cache(
-        load_dir=args.train_entity_profile
+        load_dir=args.train_entity_profile, no_type=True, no_kg=True
     )
     print(f"Loading new entity profile from {args.new_entity_profile}")
-    new_entity_profile = EntityProfile.load_from_cache(load_dir=args.new_entity_profile)
-
+    new_entity_profile = EntityProfile.load_from_cache(
+        load_dir=args.new_entity_profile, no_type=True, no_kg=True
+    )
     oldqid2newqid = dict()
     newqid2oldqid = dict()
     if args.oldqid2newqid is not None and len(args.oldqid2newqid) > 0:
@@ -493,6 +500,7 @@ def fit_profiles(args):
     state_dict["model"] = new_model_state_dict
     print(f"Saving model at {args.save_model_path}")
     torch.save(state_dict, args.save_model_path)
+    del state_dict
 
     # Refit titles
     # Will keep track of all embeddings to adjust. If given a config, we will only adjust
@@ -529,7 +537,7 @@ def fit_profiles(args):
                     != f"static_table_{os.path.splitext(os.path.basename(title_emb_file))[0]}.npy"
                 ):
                     continue
-                possible_titles = np.load(file)
+                possible_titles = np.load(file, mmap_mode="r")
                 if list(possible_titles.shape) == [
                     train_entity_profile.num_entities_with_pad_and_nocand,
                     BERT_DIM,
@@ -549,7 +557,8 @@ def fit_profiles(args):
                 title_embeddings, prepped_title_emb_files
             ):
                 print(f"Attempting to refit title {prepped_title_emb_file}")
-                adjusted_title_embedding = refit_titles(
+                # Returns memmap array
+                adjusted_title_embedding_fp = refit_titles(
                     np_same_ents,
                     np_new_ents,
                     neweid2oldeid,
@@ -561,9 +570,19 @@ def fit_profiles(args):
                     args.cpu,
                 )
                 out_prep_dir.mkdir(parents=True, exist_ok=True)
-                np.save(
-                    str(out_prep_dir / prepped_title_emb_file), adjusted_title_embedding
+                print(f"Saving to {str(out_prep_dir / prepped_title_emb_file)}")
+                # Saves memmap as npy file without loading into memory
+                title_emb_npy = open_memmap(
+                    str(out_prep_dir / prepped_title_emb_file),
+                    mode="w+",
+                    dtype=adjusted_title_embedding_fp.dtype,
+                    shape=adjusted_title_embedding_fp.shape,
                 )
+
+                # copy the array contents
+                title_emb_npy[:] = adjusted_title_embedding_fp[:]
+                del title_emb_npy
+                del adjusted_title_embedding_fp
 
     if args.model_config is not None:
         modify_config(

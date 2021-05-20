@@ -217,9 +217,9 @@ class BootlegAnnotator(object):
             device = 0 if torch.cuda.is_available() else -1
 
         if self.verbose:
-            self.config.run_config.log_level = "DEBUG"
+            self.config["run_config"]["log_level"] = "DEBUG"
         else:
-            self.config.run_config.log_level = "INFO"
+            self.config["run_config"]["log_level"] = "INFO"
 
         self.torch_device = (
             torch.device(device) if device != -1 else torch.device("cpu")
