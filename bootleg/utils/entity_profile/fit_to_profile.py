@@ -9,7 +9,6 @@ import argparse
 import os
 from collections import OrderedDict
 from pathlib import Path
-from tempfile import mkdtemp
 
 import numpy as np
 import torch
@@ -18,7 +17,7 @@ import ujson as json
 import yaml
 from numpy.lib.format import open_memmap
 from tqdm import tqdm
-from transformers import BertModel, BertTokenizer
+from transformers import AutoModel, AutoTokenizer
 
 from bootleg.symbols.entity_profile import EntityProfile
 from bootleg.utils.preprocessing.build_static_embeddings import BERT_DIM, average_titles
@@ -293,8 +292,9 @@ def refit_titles(
     train_entity_profile,
     new_entity_profile,
     train_title_embeddings,
+    new_title_emb_file,
     bert_model,
-    word_model_cache=None,
+    bert_model_cache=None,
     cpu=False,
 ):
     """Refits the entity embeddings between the two models using the different
@@ -307,8 +307,9 @@ def refit_titles(
         train_entity_profile: original entity profile
         new_entity_profile: new entity profile
         train_title_embeddings: matrix of original title embeddings
+        new_title_emb_file: path of where new embeddings will be saved
         bert_model: bert model to use
-        word_model_cache: cache dir (default None)
+        bert_model_cache: cache dir (default None)
         cpu: whether to use CPU or not (default False)
 
     Returns: adjusted title embeddings
@@ -320,11 +321,11 @@ def refit_titles(
         f"{train_entity_profile.num_entities_with_pad_and_nocand} does not "
         f"match title embs shape of {train_title_embeddings.shape[0]}"
     )
-    temp_title_emb_file = os.path.join(mkdtemp(), "newfile.dat")
-    new_title_embeddings_fp = np.memmap(
-        temp_title_emb_file,
-        dtype="float32",
+    # Saves memmap as npy file
+    new_title_embeddings_fp = open_memmap(
+        new_title_emb_file,
         mode="w+",
+        dtype=train_title_embeddings.dtype,
         shape=(
             new_entity_profile.num_entities_with_pad_and_nocand,
             train_title_embeddings.shape[1],
@@ -366,14 +367,13 @@ def refit_titles(
         assert len(newent_index) == len(np_new_ents)
         print(f"Extracting {len(newent_index)} titles using BERT")
         newent_set = set(newent_index)
-        tokenizer = BertTokenizer.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             bert_model,
-            do_lower_case="uncased" in bert_model,
-            cache_dir=word_model_cache,
+            cache_dir=bert_model_cache,
         )
-        model = BertModel.from_pretrained(
+        model = AutoModel.from_pretrained(
             bert_model,
-            cache_dir=word_model_cache,
+            cache_dir=bert_model_cache,
             output_attentions=False,
             output_hidden_states=False,
         )
@@ -500,6 +500,7 @@ def fit_profiles(args):
     state_dict["model"] = new_model_state_dict
     print(f"Saving model at {args.save_model_path}")
     torch.save(state_dict, args.save_model_path)
+    del new_model_state_dict
     del state_dict
 
     # Refit titles
@@ -557,32 +558,22 @@ def fit_profiles(args):
                 title_embeddings, prepped_title_emb_files
             ):
                 print(f"Attempting to refit title {prepped_title_emb_file}")
+                out_prep_dir.mkdir(parents=True, exist_ok=True)
+                save_file = out_prep_dir / prepped_title_emb_file
+                print(f"Saving to {save_file}")
                 # Returns memmap array
-                adjusted_title_embedding_fp = refit_titles(
+                _ = refit_titles(
                     np_same_ents,
                     np_new_ents,
                     neweid2oldeid,
                     train_entity_profile,
                     new_entity_profile,
                     title_embed,
+                    str(save_file),
                     args.bert_model,
                     args.bert_model_cache,
                     args.cpu,
                 )
-                out_prep_dir.mkdir(parents=True, exist_ok=True)
-                print(f"Saving to {str(out_prep_dir / prepped_title_emb_file)}")
-                # Saves memmap as npy file without loading into memory
-                title_emb_npy = open_memmap(
-                    str(out_prep_dir / prepped_title_emb_file),
-                    mode="w+",
-                    dtype=adjusted_title_embedding_fp.dtype,
-                    shape=adjusted_title_embedding_fp.shape,
-                )
-
-                # copy the array contents
-                title_emb_npy[:] = adjusted_title_embedding_fp[:]
-                del title_emb_npy
-                del adjusted_title_embedding_fp
 
     if args.model_config is not None:
         modify_config(

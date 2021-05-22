@@ -452,8 +452,9 @@ class TestFitToProfile(unittest.TestCase):
             train_entity_profile,
             new_entity_profile,
             title_embs,
+            str(self.dir / "temp_title.npy"),
             "bert-base-uncased",
-            self.dir / "temp_bert_models",
+            str(self.dir / "temp_bert_models"),
             True,
         )
         # Compute gold BERT titles for new entities
