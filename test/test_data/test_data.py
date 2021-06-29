@@ -439,6 +439,117 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
+    def test_nonmatch_alias(self):
+        """ENTITY SYMBOLS
+        {
+          "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
+          "alias1":[["Q1",10.0],["Q4",6.0]],
+          "alias3":[["Q1",30.0]],
+          "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
+        }
+        """
+        max_seq_len = 7
+        max_aliases = 4
+        self.args.data_config.max_aliases = max_aliases
+        self.args.data_config.max_seq_len = max_seq_len
+        input_data = [
+            {
+                "aliases": ["alias0", "multi word alias2"],
+                "qids": ["Q1", "Q4"],
+                "sent_idx_unq": 0,
+                "sentence": "alias0 or multi word alias2",
+                "spans": [[0, 1], [2, 5]],
+                "gold": [True, True],
+            }
+        ]
+        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
+        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
+        X_dict, Y_dict = (
+            {
+                "guids": [uniq_id],
+                "sent_idx": torch.tensor([0]),
+                "subsent_idx": torch.tensor([0]),
+                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
+                "end_span_idx": torch.tensor(
+                    [[2, 5, -1, -1]]
+                ),  # the end span gets -1 to be inclusive
+                "alias_idx": torch.tensor(
+                    [
+                        [
+                            -2,
+                            self.entity_symbols.get_alias_idx("multi word alias2"),
+                            -1,
+                            -1,
+                        ]
+                    ]
+                ),
+                "token_ids": torch.tensor(
+                    [
+                        adjust_sentence(
+                            "alias0 or multi word alias2",
+                            max_seq_len,
+                            self.is_bert,
+                            self.tokenizer,
+                        )
+                    ]
+                ),
+                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
+                "gold_eid": torch.tensor([[1, 4, -1, -1]]),
+                "for_dump_gold_cand_K_idx_train": torch.tensor([[-2, 2, -1, -1]]),
+            },
+            {
+                "gold_cand_K_idx": torch.tensor([[-2, 2, -1, -1]]),
+            },
+        )
+        utils.write_jsonl(self.temp_file_name, input_data)
+        use_weak_label = True
+
+        with self.assertRaises(Exception) as context:
+            dataset = BootlegDataset(
+                self.args.data_config,
+                name="Bootleg_test",
+                dataset=self.temp_file_name,
+                use_weak_label=use_weak_label,
+                tokenizer=self.tokenizer,
+                entity_symbols=self.entity_symbols,
+                dataset_threads=1,
+                split="train",
+                is_bert=True,
+            )
+            self.assertTrue(type(context.exception) == AssertionError)
+
+        dataset = BootlegDataset(
+            self.args,
+            name="Bootleg_test",
+            dataset=self.temp_file_name,
+            use_weak_label=use_weak_label,
+            tokenizer=self.tokenizer,
+            entity_symbols=self.entity_symbols,
+            dataset_threads=1,
+            split="test",
+            is_bert=True,
+        )
+        assert_data_dicts_equal(X_dict, dataset.X_dict)
+        assert_data_dicts_equal(Y_dict, dataset.Y_dict)
+
+        # Assert the -2 stays even though train_in_cands is False
+        self.args.data_config.train_in_candidates = False
+        dataset = BootlegDataset(
+            self.args,
+            name="Bootleg_test",
+            dataset=self.temp_file_name,
+            use_weak_label=use_weak_label,
+            tokenizer=self.tokenizer,
+            entity_symbols=self.entity_symbols,
+            dataset_threads=1,
+            split="test",
+            is_bert=True,
+        )
+        X_dict["for_dump_gold_cand_K_idx_train"] = torch.tensor([[-2, 3, -1, -1]])
+        Y_dict["gold_cand_K_idx"] = torch.tensor([[-2, 3, -1, -1]])
+        assert_data_dicts_equal(X_dict, dataset.X_dict)
+        assert_data_dicts_equal(Y_dict, dataset.Y_dict)
+
     def test_long_sentences(self):
         """ENTITY SYMBOLS
         {

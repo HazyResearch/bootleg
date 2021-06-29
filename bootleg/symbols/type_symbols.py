@@ -170,7 +170,7 @@ class TypeSymbols:
         if typename not in self._type_vocab:
             raise ValueError(f"{typename} is not a type in the typesystem")
         # This will not be None as we are in edit mode
-        return self._typename2qids[typename]
+        return self._typename2qids.get(typename, [])
 
     @edit_op
     def add_type(self, qid, typename):

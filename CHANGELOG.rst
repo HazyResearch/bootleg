@@ -1,5 +1,25 @@
-Unreleased 1.0.2dev0
+Unreleased 1.0.3dev0
 ---------------------
+Fixed
+^^^^^^^
+* Corrected how custom candidates were handled in the BootlegAnnotator when using ``extracted_examples``
+* Fixed memory leak in BooltegAnnotator due to missing ``torch.no_grad()``
+
+1.0.2 - 2021-04-28
+---------------------
+
+Added
+^^^^^^
+* Support for ``min_alias_len`` to ``extract_mentions`` and the ``BootlegAnnotator``.
+* ``return_embs`` flag to pass into ``BootlegAnnotator`` that will return the contextualized embeddings of the entity (using key ``embs``) and entity candidates (using key ``cand_embs``).
+
+Changed
+^^^^^^^^^
+* Removed condition that aliases for eval must appear in candidate lists. We now allow for eval to not have known aliases and always mark these as incorrect. When dumping predictions, these get "-1" candidates and null probabilities.
+
+Fixed
+^^^^^^^
+* Corrected ``fit_to_profile`` to rebuild the title embeddings for the new entities.
 
 1.0.1 - 2021-03-22
 -------------------

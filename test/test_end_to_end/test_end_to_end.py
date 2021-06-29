@@ -45,7 +45,7 @@ class TestEnd2End(unittest.TestCase):
 
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -57,7 +57,7 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withoutkg(self):
@@ -68,7 +68,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -80,9 +80,9 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(51)
+            range(52)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
@@ -97,7 +97,7 @@ class TestEnd2End(unittest.TestCase):
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -109,9 +109,9 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(51)
+            range(52)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
@@ -133,7 +133,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.08
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -145,9 +145,9 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(51)
+            range(52)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
@@ -173,7 +173,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.05
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -185,9 +185,9 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(51)
+            range(52)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 
@@ -206,7 +206,7 @@ class TestEnd2End(unittest.TestCase):
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/train/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 0.5
 
         self.args["model_config"][
             "model_path"
@@ -218,9 +218,9 @@ class TestEnd2End(unittest.TestCase):
         result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
-        assert 18 == len(results)  # 18 total sentences
+        assert 19 == len(results)  # 18 total sentences
         assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(51)
+            range(52)
         )  # 38 total mentions
         assert os.path.exists(out_emb_file)
 

@@ -66,6 +66,7 @@ def parse_args():
     parser.add_argument(
         "--cand_map", type=str, required=True, help="Alias table to use"
     )
+    parser.add_argument("--min_alias_len", type=int, default=1)
     parser.add_argument("--max_alias_len", type=int, default=6)
     parser.add_argument("--num_workers", type=int, default=8)
     return parser.parse_args()
@@ -137,12 +138,15 @@ def get_new_to_old_dict(split_sentence):
     return new_to_old
 
 
-def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
+def find_aliases_in_sentence_tag(
+    sentence, all_aliases, min_alias_len=1, max_alias_len=6
+):
     """Mention extraction function.
 
     Args:
         sentence: text
         all_aliases: Trie of all aliases in our save
+        min_alias_len: minimum length (in words) of an alias
         max_alias_len: maximum length (in words) of an alias
 
     Returns: list of aliases, list of span offsets
@@ -156,7 +160,7 @@ def find_aliases_in_sentence_tag(sentence, all_aliases, max_alias_len=6):
     split_sent = sentence.split()
     new_to_old_span = get_new_to_old_dict(split_sent)
     # find largest aliases first
-    for n in range(max_alias_len + 1, 0, -1):
+    for n in range(max_alias_len, min_alias_len - 1, -1):
         grams = nltk.ngrams(doc, n)
         j_st = -1
         j_end = n - 1
@@ -339,6 +343,7 @@ def subprocess(args):
     """
     in_file = args["in_file"]
     out_file = args["out_file"]
+    min_alias_len = args["min_alias_len"]
     max_alias_len = args["max_alias_len"]
     verbose = args["verbose"]
     all_aliases = marisa_trie.Trie().load(args["all_aliases_trie_f"])
@@ -348,7 +353,7 @@ def subprocess(args):
             f_in, total=num_lines, disable=not verbose, desc="Processing data"
         ):
             found_aliases, found_spans = find_aliases_in_sentence_tag(
-                line["sentence"], all_aliases, max_alias_len
+                line["sentence"], all_aliases, min_alias_len, max_alias_len
             )
             f_out.write(create_out_line(line, found_aliases, found_spans))
 
@@ -377,6 +382,7 @@ def extract_mentions(
     in_filepath,
     out_filepath,
     cand_map_file,
+    min_alias_len=1,
     max_alias_len=6,
     num_workers=8,
     verbose=False,
@@ -387,6 +393,7 @@ def extract_mentions(
         in_filepath: input file
         out_filepath: output file
         cand_map_file: alias to candidate file
+        min_alias_len: minimum alias length (in words)
         max_alias_len: maximum alias length (in words)
         num_workers: number of multiprocessing workers
         verbose: verbose boolean
@@ -426,6 +433,7 @@ def extract_mentions(
             {
                 "in_file": chunk_infiles[i],
                 "out_file": chunk_outfiles[i],
+                "min_alias_len": min_alias_len,
                 "max_alias_len": max_alias_len,
                 "all_aliases_trie_f": all_aliases_trie_f,
                 "verbose": verbose,
@@ -455,7 +463,7 @@ def extract_mentions(
             sent_idx_unq = 0
             for line in in_file:
                 found_aliases, found_spans = find_aliases_in_sentence_tag(
-                    line["sentence"], all_aliases_trie, max_alias_len
+                    line["sentence"], all_aliases_trie, min_alias_len, max_alias_len
                 )
                 new_line = create_out_line(line, found_aliases, found_spans)
                 if "sent_idx_unq" not in new_line:
@@ -478,6 +486,7 @@ def main():
         in_file,
         out_file,
         cand_map_file=args.cand_map,
+        min_alias_len=args.min_alias_len,
         max_alias_len=args.max_alias_len,
         num_workers=args.num_workers,
     )

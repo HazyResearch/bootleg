@@ -21,11 +21,6 @@ Install via
 pip install bootleg
 ```
 
-As we use Spacy as a component in our mention extractor, you'll need to have a Spacy model installed via
-```
-python3 -m spacy download en_core_web_sm
-```
-
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
 
 ## Models
@@ -33,10 +28,10 @@ We have four different Bootleg models you can download. Each download comes with
 
 | Model               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| BootlegCased        | All entity embeddings with type, KG, and title embeddings. | 1.3B | [Download](https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_cased.tar.gz) |
-| BootlegCasedSmall   | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. | 187M | [Download](https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz) |
-| BootlegUncased      | All entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
-| BootlegUncasedSmall | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 187M | [Download](https://bootleg-data.s3.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz) |
+| BootlegCased        | All entity embeddings with type, KG, and title embeddings. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased.tar.gz) |
+| BootlegCasedSmall   | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. | 187M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz) |
+| BootlegUncased      | All entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
+| BootlegUncasedSmall | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 187M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz) |
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
