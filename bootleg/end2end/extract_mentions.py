@@ -138,7 +138,9 @@ def get_new_to_old_dict(split_sentence):
     return new_to_old
 
 
-def find_aliases_in_sentence_tag(sentence, all_aliases, min_alias_len=1, max_alias_len=6):
+def find_aliases_in_sentence_tag(
+    sentence, all_aliases, min_alias_len=1, max_alias_len=6
+):
     """Mention extraction function.
 
     Args:
