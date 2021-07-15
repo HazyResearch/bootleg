@@ -1,6 +1,10 @@
 Unreleased 1.0.5dev0
 ---------------------
 
+Added
+^^^^^^
+* Tutorial to generate contextualized entity embeddings that perform better downstream
+
 1.0.3 - 2021-07-12
 ---------------------
 Fixed
