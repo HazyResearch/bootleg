@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 # Self-Supervision for Named Entity Disambiguation at the Tail
-Bootleg is a self-supervised named entity disambiguation (NED) system built to improve disambiguation of entities that occur infrequently, or not at all, in training data. We call these entities *tail* entities. This is a critical task as the majority of entities are rare. The core insight behind Bootleg is that these tail entities can be disambiguated by reasoning over entity types and relations. We give an [overview](#bootleg-overview) of how Bootleg achieves this below. For details, please see our [blog post](https://hazyresearch.stanford.edu/bootleg_blog) and [paper](http://arxiv.org/abs/2010.10363).
+Bootleg is a self-supervised named entity disambiguation (NED) system for English built to improve disambiguation of entities that occur infrequently, or not at all, in training data. We call these entities *tail* entities. This is a critical task as the majority of entities are rare. The core insight behind Bootleg is that these tail entities can be disambiguated by reasoning over entity types and relations. We give an [overview](#bootleg-overview) of how Bootleg achieves this below. For details, please see our [blog post](https://hazyresearch.stanford.edu/bootleg_blog) and [paper](http://arxiv.org/abs/2010.10363).
 
 Note that Bootleg is *actively under development* and feedback is welcome. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
 
@@ -54,3 +54,6 @@ We recommend using GPUs for training Bootleg models. For large datasets, we supp
 
 ## Downstream Tasks
 Bootleg produces contextual entity embeddings (as well as learned static embeddings) that can be used in downstream tasks, such as relation extraction and question answering. Check out the [tutorial](tutorials) to see how this is done.
+
+## Other Languages
+The released Bootleg model only supports English, but we have trained multi-lingual models using Wikipedia and Wikidata. If you have interest in doing this, please let us know with an issue request or email lorr1@cs.stanford.edu. We have data prep code to help prepare multi-lingual data.

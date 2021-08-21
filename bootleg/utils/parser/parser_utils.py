@@ -265,9 +265,9 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     assert all(
         unknown[idx].startswith(("-", "--")) for idx in range(0, len(unknown), 2)
     )
-    assert all(
-        not unknown[idx].startswith(("-", "--")) for idx in range(1, len(unknown), 2)
-    )
+    for idx in range(1, len(unknown), 2):
+        # allow passing -1 for emmental.device argument
+        assert not unknown[idx].startswith(("-", "--")) or (unknown[idx-1] == "emmental.device" and unknown[idx] == "-1")
     for idx in range(0, len(unknown), 2):
         arg = unknown[idx]
         # If override one you already have in json
