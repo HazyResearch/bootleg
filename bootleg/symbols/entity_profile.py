@@ -26,6 +26,7 @@ class EntityObj(BaseModel):
     entity_id: str
     mentions: List[Tuple[str, float]]
     title: str
+    description: str
     types: Optional[Dict[str, List[str]]]
     relations: Optional[List[Dict[str, str]]]
 
@@ -129,7 +130,7 @@ class EntityProfile:
             print(f"Loading KG Symbols")
         if no_kg:
             print(
-                f"Not loading KG information. We will act as if there is not KG connections between entities. "
+                f"Not loading KG information. We will act as if there is no KG connections between entities. "
                 f"We will not modify the KG information in any way, even if calling `add`."
             )
         kg_symbols = None
@@ -175,12 +176,17 @@ class EntityProfile:
 
         Returns: entity profile object
         """
-        qid2title, alias2qids, type_systems, qid2relations = cls._read_profile_file(
-            profile_file
-        )
+        (
+            qid2title,
+            qid2desc,
+            alias2qids,
+            type_systems,
+            qid2relations,
+        ) = cls._read_profile_file(profile_file)
         entity_symbols = EntitySymbols(
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
             max_candidates=max_candidates,
             edit_mode=edit_mode,
         )
@@ -206,6 +212,7 @@ class EntityProfile:
         Returns: Dicts of qid2title, alias2qids, type_systems, qid2relations
         """
         qid2title: Dict[str, str] = {}
+        qid2desc: Dict[str, str] = {}
         alias2qids: Dict[str, list] = {}
         type_systems: Dict[str, Dict[str, List[str]]] = {}
         qid2relations: Dict[str, Dict[str, List[str]]] = {}
@@ -225,6 +232,7 @@ class EntityProfile:
                         entity_id=line["entity_id"],
                         mentions=line["mentions"],
                         title=line.get("title", line["entity_id"]),
+                        description=line.get("description", ""),
                         types=line.get("types", {}),
                         relations=line.get("relations", []),
                     )
@@ -234,6 +242,7 @@ class EntityProfile:
                 if ent.entity_id in qid2title:
                     raise ValueError(f"{ent.entity_id} is already in our dump")
                 qid2title[ent.entity_id] = ent.title
+                qid2desc[ent.entity_id] = ent.description
                 # For each [mention, score] value, create a value of mention -> [qid, score] in the alias2qid dict
                 for men_pair in ent.mentions:
                     if men_pair[0] not in alias2qids:
@@ -269,7 +278,7 @@ class EntityProfile:
                     type_systems[type_sys][qid] = []
             if qid not in qid2relations:
                 qid2relations[qid] = {}
-        return qid2title, alias2qids, type_systems, qid2relations
+        return qid2title, qid2desc, alias2qids, type_systems, qid2relations
 
     # To quickly get the mention scores, the object must be in edit mode
     @edit_op
@@ -285,6 +294,7 @@ class EntityProfile:
             for qid in tqdm(self.get_all_qids(), disable=not self.verbose):
                 mentions = self.get_mentions_with_scores(qid)
                 title = self.get_title(qid)
+                desc = self.get_desc(qid)
                 ent_type_sys = {}
                 for type_sys in self._type_systems:
                     types = self.get_types(qid, type_sys)
@@ -300,6 +310,9 @@ class EntityProfile:
                     "mentions": mentions,
                     "title": title,
                 }
+                # Add description if nonempty
+                if len(desc) > 0:
+                    ent_obj["description"] = desc
                 if len(ent_type_sys) > 0:
                     ent_obj["types"] = ent_type_sys
                 if len(relations) > 0:
@@ -374,6 +387,17 @@ class EntityProfile:
         Returns: string
         """
         return self._entity_symbols.get_title(qid)
+
+    @check_qid_exists
+    def get_desc(self, qid):
+        """Gets the description of an entity QID.
+
+        Args:
+            qid: entity QID
+
+        Returns: string
+        """
+        return self._entity_symbols.get_desc(qid)
 
     @check_qid_exists
     def get_eid(self, qid):
@@ -543,6 +567,7 @@ class EntityProfile:
                 entity_id=entity_obj["entity_id"],
                 mentions=entity_obj["mentions"],
                 title=entity_obj.get("title", entity_obj["entity_id"]),
+                description=entity_obj.get("description", ""),
                 types=entity_obj.get("types", {}),
                 relations=entity_obj.get("relations", []),
             )
@@ -579,7 +604,9 @@ class EntityProfile:
             if rel_pair["relation"] not in parsed_rels:
                 parsed_rels[rel_pair["relation"]] = []
             parsed_rels[rel_pair["relation"]].append(rel_pair["object"])
-        self._entity_symbols.add_entity(ent.entity_id, ent.mentions, ent.title)
+        self._entity_symbols.add_entity(
+            ent.entity_id, ent.mentions, ent.title, ent.description
+        )
         for type_sys in self._type_systems:
             self._type_systems[type_sys].add_entity(
                 ent.entity_id, ent.types.get(type_sys, [])

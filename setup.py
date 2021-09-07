@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="bootleg",
-    version="1.0.5",
+    version="1.1.0dev0",
     description="Bootleg NED System",
     packages=find_packages(),
     url="https://github.com/HazyResearch/bootleg",

@@ -4,18 +4,15 @@ import os
 from collections import defaultdict
 from typing import Any, Dict, List, Tuple, Union
 
-from torch import Tensor
+import torch
 from torch.utils.data import DistributedSampler, RandomSampler
-from transformers import BertTokenizer
 
-from bootleg import log_rank_0_debug, log_rank_0_info
-from bootleg.datasets.dataset import BootlegDataset
+from bootleg import log_rank_0_info
+from bootleg.dataset import BootlegDataset
 from bootleg.slicing.slice_dataset import BootlegSliceDataset
-from bootleg.task_config import NED_TASK_TO_LABEL
-from bootleg.utils import embedding_utils
-from bootleg.utils.utils import import_class
+from bootleg.task_config import BATCH_CANDS_LABEL, CANDS_LABEL
 from emmental import Meta
-from emmental.data import EmmentalDataLoader
+from emmental.data import EmmentalDataLoader, emmental_collate_fn
 from emmental.utils.utils import list_to_tensor
 
 logger = logging.getLogger(__name__)
@@ -51,30 +48,26 @@ def get_slicedatasets(args, splits, entity_symbols):
 def get_dataloaders(
     args,
     tasks,
+    use_batch_cands,
     splits,
     entity_symbols,
-    batch_on_the_fly_kg_adj,
+    tokenizer,
 ):
     """Gets the dataloaders.
 
     Args:
         args: main args
         tasks: task names
+        use_batch_cands: whether to use candidates across a batch (train and eval_batch_cands)
         splits: data splits to generate dataloaders for
         entity_symbols: entity symbols
-        batch_on_the_fly_kg_adj: kg embeddings metadata for the __get_item__ method (see get_dataloader_embeddings)
 
     Returns: list of dataloaders
     """
-    task_to_label_dict = {t: NED_TASK_TO_LABEL[t] for t in tasks}
-    is_bert = len(args.data_config.word_embedding.bert_model) > 0
-    tokenizer = BertTokenizer.from_pretrained(
-        args.data_config.word_embedding.bert_model,
-        do_lower_case=True
-        if "uncased" in args.data_config.word_embedding.bert_model
-        else False,
-        cache_dir=args.data_config.word_embedding.cache_dir,
-    )
+    task_to_label_dict = {
+        t: BATCH_CANDS_LABEL if use_batch_cands else CANDS_LABEL for t in tasks
+    }
+    is_bert = True
 
     datasets = {}
     for split in splits:
@@ -91,16 +84,16 @@ def get_dataloaders(
             dataset_threads=args.run_config.dataset_threads,
             split=split,
             is_bert=is_bert,
-            batch_on_the_fly_kg_adj=batch_on_the_fly_kg_adj,
         )
-
     dataloaders = []
     for split, dataset in datasets.items():
         if split in args.learner_config.train_split:
             dataset_sampler = (
                 RandomSampler(dataset)
                 if Meta.config["learner_config"]["local_rank"] == -1
-                else DistributedSampler(dataset)
+                else DistributedSampler(
+                    dataset, seed=Meta.config["meta_config"]["seed"]
+                )
             )
         else:
             dataset_sampler = None
@@ -116,7 +109,9 @@ def get_dataloaders(
                 dataset=dataset,
                 sampler=dataset_sampler,
                 split=split,
-                collate_fn=bootleg_collate_fn,
+                collate_fn=bootleg_collate_fn
+                if use_batch_cands
+                else emmental_collate_fn,
                 batch_size=args.train_config.batch_size
                 if split in args.learner_config.train_split
                 or args.run_config.eval_batch_size is None
@@ -135,90 +130,15 @@ def get_dataloaders(
     return dataloaders
 
 
-def get_dataloader_embeddings(main_args, entity_symbols):
-    """Gets KG embeddings that need to be processed in the __get_item__ method
-    of a dataset (e.g., querying a sparce numpy matrix). We save, for each KG
-    embedding class that needs this preprocessing, the adjacency matrix (for KG
-    connections), the processing function to run in __get_item__, and the file
-    to load the adj matrix for dumping/loading.
-
-    Args:
-        main_args: main arguments
-        entity_symbols: entity symbols
-
-    Returns: Dict of KG metadata for using in the __get_item__ method.
-    """
-    batch_on_the_fly_kg_adj = {}
-    for emb in main_args.data_config.ent_embeddings:
-        batch_on_fly = "batch_on_the_fly" in emb and emb["batch_on_the_fly"] is True
-        # Find embeddings that have a "batch of the fly" key
-        if batch_on_fly:
-            log_rank_0_debug(
-                logger,
-                f"Loading class {emb.load_class} for preprocessing as on the fly or in data prep embeddings",
-            )
-            (
-                cpu,
-                dropout1d_perc,
-                dropout2d_perc,
-                emb_args,
-                freeze,
-                normalize,
-                through_bert,
-            ) = embedding_utils.get_embedding_args(emb)
-            try:
-                # Load the object
-                mod, load_class = import_class("bootleg.embeddings", emb.load_class)
-                kg_class = getattr(mod, load_class)(
-                    main_args=main_args,
-                    emb_args=emb_args,
-                    entity_symbols=entity_symbols,
-                    key=emb.key,
-                    cpu=cpu,
-                    normalize=normalize,
-                    dropout1d_perc=dropout1d_perc,
-                    dropout2d_perc=dropout2d_perc,
-                )
-                # Extract its kg adj, we'll use this later
-                # Extract the kg_adj_process_func (how to process the embeddings in __get_item__ or dataset prep)
-                # Extract the prep_file. We use this to load the kg_adj back after
-                # saving/loading state using scipy.sparse.load_npz(prep_file)
-                assert hasattr(
-                    kg_class, "kg_adj"
-                ), f"The embedding class {emb.key} does not have a kg_adj attribute and it needs to."
-                assert hasattr(
-                    kg_class, "kg_adj_process_func"
-                ), f"The embedding class {emb.key} does not have a kg_adj_process_func attribute and it needs to."
-                assert hasattr(kg_class, "prep_file"), (
-                    f"The embedding class {emb.key} does not have a prep_file attribute and it needs to. We will call"
-                    f" `scipy.sparse.load_npz(prep_file)` to load the kg_adj matrix."
-                )
-                batch_on_the_fly_kg_adj[emb.key] = {
-                    "kg_adj": kg_class.kg_adj,
-                    "kg_adj_process_func": kg_class.kg_adj_process_func,
-                    "prep_file": kg_class.prep_file,
-                }
-            except AttributeError as e:
-                logger.warning(
-                    f"No prep method found for {emb.load_class} with error {e}"
-                )
-                raise
-            except Exception as e:
-                print("ERROR", e)
-                raise
-    return batch_on_the_fly_kg_adj
-
-
 def bootleg_collate_fn(
-    batch: Union[List[Tuple[Dict[str, Any], Dict[str, Tensor]]], List[Dict[str, Any]]]
-) -> Union[Tuple[Dict[str, Any], Dict[str, Tensor]], Dict[str, Any]]:
+    batch: Union[
+        List[Tuple[Dict[str, Any], Dict[str, torch.Tensor]]], List[Dict[str, Any]]
+    ]
+) -> Union[Tuple[Dict[str, Any], Dict[str, torch.Tensor]], Dict[str, Any]]:
     """Collate function (modified from emmental collate fn). The main
-    difference is our collate function handles the kg_adj dictionary items from
-    the dataset. We collate each value of each dict key.
-
+    difference is our collate function merges candidates from across the batch for disambiguation.
     Args:
       batch: The batch to collate.
-
     Returns:
       The collated batch.
     """
@@ -230,7 +150,6 @@ def bootleg_collate_fn(
 
     # Learnable batch should be a pair of dict, while non learnable batch is a dict
     is_learnable = True if not isinstance(batch[0], dict) else False
-
     if is_learnable:
         for x_dict, y_dict in batch:
             if isinstance(x_dict, dict) and isinstance(y_dict, dict):
@@ -238,7 +157,7 @@ def bootleg_collate_fn(
                     if isinstance(value, list):
                         X_batch[field_name] += value
                     elif isinstance(value, dict):
-                        # We reinstantiate the field_name here in case there is not kg adj data
+                        # We reinstantiate the field_name here
                         # This keeps the field_name key intact
                         if field_name not in X_sub_batch:
                             X_sub_batch[field_name] = defaultdict(list)
@@ -262,7 +181,7 @@ def bootleg_collate_fn(
                 if isinstance(value, list):
                     X_batch[field_name] += value
                 elif isinstance(value, dict):
-                    # We reinstantiate the field_name here in case there is not kg adj data
+                    # We reinstantiate the field_name here
                     # This keeps the field_name key intact
                     if field_name not in X_sub_batch:
                         X_sub_batch[field_name] = defaultdict(list)
@@ -273,20 +192,17 @@ def bootleg_collate_fn(
                             X_sub_batch[field_name][sub_field_name].append(sub_value)
                 else:
                     X_batch[field_name].append(value)
-
     field_names = copy.deepcopy(list(X_batch.keys()))
     for field_name in field_names:
         values = X_batch[field_name]
         # Only merge list of tensors
-        if isinstance(values[0], Tensor):
+        if isinstance(values[0], torch.Tensor):
             item_tensor, item_mask_tensor = list_to_tensor(
                 values,
                 min_len=Meta.config["data_config"]["min_data_len"],
                 max_len=Meta.config["data_config"]["max_data_len"],
             )
             X_batch[field_name] = item_tensor
-            if item_mask_tensor is not None:
-                X_batch[f"{field_name}_mask"] = item_mask_tensor
 
     field_names = copy.deepcopy(list(X_sub_batch.keys()))
     for field_name in field_names:
@@ -294,16 +210,13 @@ def bootleg_collate_fn(
         for sub_field_name in sub_field_names:
             values = X_sub_batch[field_name][sub_field_name]
             # Only merge list of tensors
-            if isinstance(values[0], Tensor):
+            if isinstance(values[0], torch.Tensor):
                 item_tensor, item_mask_tensor = list_to_tensor(
                     values,
                     min_len=Meta.config["data_config"]["min_data_len"],
                     max_len=Meta.config["data_config"]["max_data_len"],
                 )
                 X_sub_batch[field_name][sub_field_name] = item_tensor
-                if item_mask_tensor is not None:
-                    X_sub_batch[field_name][f"{sub_field_name}_mask"] = item_mask_tensor
-
     # Add sub batch to batch
     for field_name in field_names:
         X_batch[field_name] = dict(X_sub_batch[field_name])
@@ -314,6 +227,58 @@ def bootleg_collate_fn(
                 min_len=Meta.config["data_config"]["min_data_len"],
                 max_len=Meta.config["data_config"]["max_data_len"],
             )[0]
+    # ACROSS BATCH CANDIDATE MERGING
+    # Turns from b x m x k to E where E is the number of unique entities
+    all_uniq_eids = []
+    all_uniq_eid_idx = []
+    label = []
+    # print("BATCH", X_batch["entity_cand_eid"])
+    for k, batch_eids in enumerate(X_batch["entity_cand_eid"]):
+        for j, eid in enumerate(batch_eids):
+            # Skip if already in batch or if it's the unk...we don't use masking in the softmax for batch_cands
+            # data loading (training and during train eval)
+            if (
+                eid in all_uniq_eids
+                or X_batch["entity_cand_eval_mask"][k][j].item() is True
+            ):
+                continue
+            all_uniq_eids.append(eid)
+            all_uniq_eid_idx.append([k, j])
+
+    for eid in X_batch["gold_eid"]:
+        men_label = []
+        if eid not in all_uniq_eids:
+            men_label.append(-2)
+        else:
+            men_label.append(all_uniq_eids.index(eid))
+        label.append(men_label)
+
+    # Super rare edge case if doing eval during training on small batch sizes and have an entire batch
+    # where the alias is -2 (i.e., we don't have it in our dump)
+    if len(all_uniq_eids) == 0:
+        # Give the unq entity in this case -> we want the model to get the wrong answer anyways and it will
+        # all_uniq_eids = [X_batch["entity_cand_eid"][0][0]]
+        all_uniq_eid_idx = [[0, 0]]
+
+    all_uniq_eid_idx = torch.LongTensor(all_uniq_eid_idx)
+    assert len(all_uniq_eid_idx.size()) == 2 and all_uniq_eid_idx.size(1) == 2
+    for key in X_batch.keys():
+        # Don't transform the mask as that's only used for no batch cands
+        if (
+            key.startswith("entity_")
+            and key != "entity_cand_eval_mask"
+            and key != "entity_to_mask"
+        ):
+            X_batch[key] = X_batch[key][all_uniq_eid_idx[:, 0], all_uniq_eid_idx[:, 1]]
+    # print("FINAL", X_batch["entity_cand_eid"])
+    Y_batch["gold_unq_eid_idx"] = torch.LongTensor(label)
+    # for k in X_batch:
+    #     try:
+    #         print(k, X_batch[k].shape)
+    #     except:
+    #         print(k, len(X_batch[k]))
+    # for k in Y_batch:
+    #     print(k, Y_batch[k].shape, Y_batch[k])
     if is_learnable:
         return dict(X_batch), dict(Y_batch)
     else:

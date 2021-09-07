@@ -21,6 +21,7 @@ class EntitySymbolsSubclass(EntitySymbols):
         # Used if we need to do any string searching for aliases. This keep track of the largest n-gram needed.
         self.max_alias_len = 1
         self._qid2title = {"Q1": "a b c d e", "Q2": "f", "Q3": "dd a b", "Q4": "x y z"}
+        self._qid2desc = None
         self._qid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
         self._alias2id = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6}
         self._alias2qids = {
@@ -224,35 +225,6 @@ class EvalUtils(unittest.TestCase):
         torch_grad = preds.grad
         assert torch.allclose(torch_grad, actual_grad)
 
-    def test_select_embs(self):
-        # final_entity_embs is batch x M x K x hidden_size, pred_cands in batch x M
-        # batch size 2, M is 2, K is 3, hidden size is 4
-        final_entity_embs = np.array(
-            [
-                [
-                    [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]],
-                    [[11, 12, 13, 14], [15, 16, 17, 18], [19, 20, 21, 22]],
-                ],
-                [
-                    [[10, 11, 12, 13], [14, 15, 16, 17], [18, 19, 20, 21]],
-                    [[110, 120, 130, 140], [150, 160, 170, 180], [190, 200, 210, 220]],
-                ],
-            ]
-        )
-
-        pred_cands = np.array([[0, 1], [2, 0]])
-        gold_embs = np.array(
-            [[[0, 1, 2, 3], [15, 16, 17, 18]], [[18, 19, 20, 21], [110, 120, 130, 140]]]
-        )
-        # compare outputs
-        selected_embs = np.vstack(
-            [
-                eval_utils.select_embs(final_entity_embs[i], pred_cands[i], M=2)
-                for i in range(gold_embs.shape[0])
-            ]
-        )
-        assert np.array_equal(selected_embs, gold_embs)
-
     def test_merge_subsentences(self):
 
         test_full_emb_file = tempfile.NamedTemporaryFile()
@@ -260,26 +232,24 @@ class EvalUtils(unittest.TestCase):
         gold_merged_emb_file = tempfile.NamedTemporaryFile()
         cache_folder = tempfile.TemporaryDirectory()
 
-        num_examples = 3
+        num_examples = 7
         total_num_mentions = 7
-        M = 3
-        K = 2
+        K = 3
         hidden_size = 2
 
         # create full embedding file
         storage_type_full = np.dtype(
             [
-                ("M", int),
                 ("K", int),
                 ("hidden_size", int),
                 ("sent_idx", int),
                 ("subsent_idx", int),
-                ("alias_list_pos", int, M),
-                ("entity_emb", float, M * hidden_size),
-                ("final_loss_true", int, M),
-                ("final_loss_pred", int, M),
-                ("final_loss_prob", float, M),
-                ("final_loss_cand_probs", float, M * K),
+                ("alias_list_pos", int, 1),
+                ("entity_emb", float, hidden_size),
+                ("final_loss_true", int, 1),
+                ("final_loss_pred", int, 1),
+                ("final_loss_prob", float, 1),
+                ("final_loss_cand_probs", float, K),
             ]
         )
         full_emb = np.memmap(
@@ -289,31 +259,49 @@ class EvalUtils(unittest.TestCase):
             shape=(num_examples,),
         )
 
-        # 2 sentences, 1st sent has 1 subsentence, 2nd sentence has 2 subsentences
-        # first sentence
         full_emb["hidden_size"] = hidden_size
-        full_emb["M"] = M
         full_emb["K"] = K
         full_emb[0]["sent_idx"] = 0
         full_emb[0]["subsent_idx"] = 0
-        # last alias is padded
-        full_emb[0]["alias_list_pos"] = np.array([0, 1, -1])
-        full_emb[0]["final_loss_true"] = np.array([0, 1, -1])
-        # entity embs are flattened
-        full_emb[0]["entity_emb"] = np.array([0, 1, 2, 3, 0, 0])
+        full_emb[0]["alias_list_pos"] = 0
+        full_emb[0]["final_loss_true"] = 0
+        full_emb[0]["entity_emb"] = np.array([0, 1])
 
-        full_emb[1]["sent_idx"] = 1
-        full_emb[1]["subsent_idx"] = 0
-        full_emb[1]["alias_list_pos"] = np.array([0, 1, 2])
-        # last alias goes with next subsentence
-        full_emb[1]["final_loss_true"] = np.array([1, 1, -1])
-        full_emb[1]["entity_emb"] = np.array([4, 5, 6, 7, 8, 9])
+        full_emb[1]["sent_idx"] = 0
+        full_emb[1]["subsent_idx"] = 1
+        full_emb[1]["alias_list_pos"] = 1
+        full_emb[1]["final_loss_true"] = 1
+        full_emb[1]["entity_emb"] = np.array([2, 3])
 
         full_emb[2]["sent_idx"] = 1
-        full_emb[2]["subsent_idx"] = 1
-        full_emb[2]["alias_list_pos"] = np.array([2, 3, 4])
-        full_emb[2]["final_loss_true"] = np.array([1, 1, 1])
-        full_emb[2]["entity_emb"] = np.array([10, 11, 12, 13, 14, 15])
+        full_emb[2]["subsent_idx"] = 0
+        full_emb[2]["alias_list_pos"] = 0
+        full_emb[2]["final_loss_true"] = 1
+        full_emb[2]["entity_emb"] = np.array([4, 5])
+
+        full_emb[3]["sent_idx"] = 1
+        full_emb[3]["subsent_idx"] = 1
+        full_emb[3]["alias_list_pos"] = 1
+        full_emb[3]["final_loss_true"] = 1
+        full_emb[3]["entity_emb"] = np.array([6, 7])
+
+        full_emb[4]["sent_idx"] = 1
+        full_emb[4]["subsent_idx"] = 2
+        full_emb[4]["alias_list_pos"] = 2
+        full_emb[4]["final_loss_true"] = 1
+        full_emb[4]["entity_emb"] = np.array([8, 9])
+
+        full_emb[5]["sent_idx"] = 1
+        full_emb[5]["subsent_idx"] = 3
+        full_emb[5]["alias_list_pos"] = 3
+        full_emb[5]["final_loss_true"] = 1
+        full_emb[5]["entity_emb"] = np.array([10, 11])
+
+        full_emb[6]["sent_idx"] = 1
+        full_emb[6]["subsent_idx"] = 4
+        full_emb[6]["alias_list_pos"] = 4
+        full_emb[6]["final_loss_true"] = 1
+        full_emb[6]["entity_emb"] = np.array([12, 13])
 
         # create merged embedding file
         storage_type_merged = np.dtype(
@@ -334,7 +322,7 @@ class EvalUtils(unittest.TestCase):
             shape=(total_num_mentions,),
         )
         merged_emb_gold["entity_emb"] = np.array(
-            [[0, 1], [2, 3], [4, 5], [6, 7], [10, 11], [12, 13], [14, 15]]
+            [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13]]
         )
 
         # create data file -- just needs aliases and sentence indices

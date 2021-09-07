@@ -1,115 +1,43 @@
 Model Overview
 ==============
-Given an input sentence, list of mentions to be disambiguated, and list of possible candidates for each mention (described in `Input Data`_), Bootleg outputs the most likely candidate for each mention. Bootleg's model consists of three components: the embeddings, the embedding payload, and the attention network. For each entity candidate, the embedding component generates a set of relevant embeddings for each entity based on its types, relations, and other relevant metadata. The embedding payload merges these embedding components together into a single entity representation. This representation then gets used, along with our sentence embedding, as inputs into our neural model.
+Given an input sentence, list of mentions to be disambiguated, and list of possible candidates for each mention (described in `Input Data`_), Bootleg outputs the most likely candidate for each mention. Bootleg's model is a biencoder architecture and consists of two components: the entity encoder and context encoder. For each entity candidate, the entity encoder generates an embedding representing this entity from a textual input containing entity information such as the title, description, and types. The context encoder embeds the mention and its surrounded context. The selected candidate is the one with the highest dot product.
 
-We now describe each step in detail and explain how to add/remove them from the our `Bootleg Config`_.
+We now describe each step in detail and explain how to add/remove different parts of the entity encoder in our `Bootleg Config`_.
 
-Bootleg Embeddings
-------------------
-All embeddings share a few common requirements. For one, any embedding must subclass our base embedding class at `bootleg/embeddings/base_emb.py <../apidocs/bootleg.embeddings.html#module-bootleg.embeddings.base_emb>`_ and define a ``forward`` function that takes as input candidate entity ids (size ``B x M x K`` with batch size ``B``, number of mentions ``M``, and number of candidates ``K``) and outputs an embedding, one for each candidate. There are a few caveats to this described in `Embedding Nuances`_. Secondly, all embeddings share a common set of configurable parameter that can be set in the config. These are
+Entity Encoder
+--------------------------
+The entity encoder is a BERT Transformer that takes a textual input for an entity and feeds it through BERT. During training, we take the ``[CLS]`` token as the entity embedding. There are four pieces of information we add to the textual input for an entity:
 
-* ``load_class``: The class name of the embedding to load
-* ``key``: A unique key for each embedding
-* ``cpu``: True/False if embeddings should be placed on CPU (only valid for `bootleg/embeddings/entity_embs.py <../apidocs/bootleg.embeddings.html#module-bootleg.embeddings.entity_embs>`_)
-* ``freeze``: True/False if all parameters of that embedding class should be frozen
-* ``dropout1d``: 1D dropout percent to be applied before retuning the embedding from the forward
-* ``dropout2d``: 2D dropout percent to be applied before retuning the embedding from the forward
-* ``normalize``: True/False if embedding should be L2 normalized before retuning the embedding from the forward
-* ``send_through_bert``: True/False if this embedding outputs token ids to be sent through BERT (see `Embedding Nuances`_)
-* ``args``: JSON of custom arguments for the embedding passed in the ``init``.
+* ``title``: Entity title. Comes from ``qid2title.json``. This is always used.
+* ``description``: Entity description. Comes from ``qid2desc.json``. This is toggled on/off.
+* ``type``: Entity type from one of the type systems. Comes from ``qid2typeids.json`` of a type system specified in the config. If the entity has multiple types, we add them to the input as ``<type_1> ; <type_2> ; ...``
+* ``KG``: Entity KG triples. Comes from ``qid2relations.json`` specified in the config. We add KG relations to the input as ``<predicate_1> <object_1> ; <predicate_2> <object_2> ; ...`` where the head of each triple is the entity in question.
 
-An example YAML config setting these in the ``data_confg.ent_embeddings`` field looks like
+The final entity input is ``<title> [SEP] <types> [SEP] <relations> [SEP] <description>``.
+
+You control what inputs are added by the following part in the input config. All the relevant entity encoder code is in `bootleg/dataset.py <../apidocs/bootleg.datasets.html>`_.
 
 .. code-block::
 
     data_config:
         ...
-        ent_embeddings:
-            - load_class: LearnedEntityEmb
-              key: learned
-              cpu: false
-              freeze: false
-              dropout1d: 0.0
-              dropout2d: 0.4
-              normalize: true
-              sent_through_bert: false
-              args:
-                  learned_embedding_size: 256
-            - load_class: LearnedTypeEmb
-              key: learned_type
-              ...
+        use_entity_desc: true
+        entity_type_data:
+          use_entity_types: true
+          type_labels: type_mappings/wiki/qid2typeids.json
+          type_vocab: type_mappings/wiki/type_vocab.json
+        entity_kg_data:
+          use_entity_kg: true
+          kg_labels: kg_mappings/qid2relations.json
+          kg_vocab: kg_mappings/relation_vocab.json
+        max_seq_len: 128
+        max_seq_window_len: 64
+        max_ent_len: 128
 
 
-Entity Embeddings
-^^^^^^^^^^^^^^^^^
-Entity embeddings (see `bootleg/embeddings/entity_embs.py <../apidocs/bootleg.embeddings.html#module-bootleg.embeddings.entity_embs>`_) are an embedding that is unique for each entity. We support three kinds of entity embeddings: a learned entity embedding (class ``LearnedEntityEmb``), a subselected learned entity embeddings where only the most popular entity embeddings get an embedding (class ``TopKEntityEmb``), and a static embedding that loads an array of preexisting embeddings for each entity (class ``StaticEmb``).
-
-Required config parameters passed in ``args`` are
-
-``LearnedEntityEmb``
-
-* ``learned_embedding_size``: dimension of embedding
-
-``TopKEntityEmb``
-
-* ``learned_embedding_size``: dimension of embedding
-* ``perc_emb_drop``: percent of embeddings to be dropped
-* ``qid2topk_eid``: JSON file of QID -> topK entity ID (see `bootleg/utils/postprocessing/compress_topk_entity_embeddings.py <../apidocs/bootleg.utils.postprocessing.html#module-bootleg.utils.postprocessing.compress_topk_entity_embeddings>`_)
-
-``StaticEmb``
-
-* ``emb_file``: path to embedding matrix or JSON with QID -> embedding array (see `bootleg/utils/preprocessing/build_static_embeddings.py <../apidocs/bootleg.utils.preprocessing.html#module-bootleg.utils.preprocessing.build_static_embeddings>`_ for an example embedding of the average title of an entity)
-
-Type Embeddings
-^^^^^^^^^^^^^^^^^
-Type embeddings (see `bootleg/embeddings/type_embs.py <../apidocs/bootleg.embeddings.html#module-bootleg.embeddings.type_embs>`_) are unqiue for each type (class ``LearnedTypeEmb``). We get an embedding for each entity type and merge the type together via either averaging (default) or an additive attention (set via ``merge_func`` param being ``average`` or ``addattn``).
-
-Required config parameters passed in ``args`` are
-
-``LearnedTypeEmb``
-
-* ``type_labels``: file (located inside ``data_config.emb_dir``) of QID -> list of type IDs
-* ``type_dim``: type embedding dimension
-* ``max_types``: maximum number of types to consider for each QID
-
-
-KG Embeddings
-^^^^^^^^^^^^^^^^^
-KG embeddings (see `bootleg/embeddings/kg_embs.py <../apidocs/bootleg.embeddings.html#module-bootleg.embeddings.kg_embs>`_) are pairwise features that are used in our neural model. At their core, a KG embedding creates an adjacency matrix to be used in the model. We have two KG classes. The base KG embedding class returns the sum of the (possibly weighted) adjacency matrix of the batch candidates (class ``KGWeightedAdjEmb``). The final, does not return an actual embedding (described more in `Embedding Nuances`_) but instead directly creates a softmax weighted adjacency multiplication matrix to be used in the neural model (class ``KGIndices``).
-
-Required config parameters passed in ``args`` are
-
-``KGWeightedAdjEmb`` and ``KGIndices``
-
-* ``kg_adj``: file (located inside ``data_config.emb_dir``) of either QID pairs, one per line (for binary adjacency) or JSON file with format head -> tail -> weight.
-
-Title Embeddings
-^^^^^^^^^^^^^^^^^
-Title embeddings are embeddings based on the title of an entity. These are integrated into our BERT encoder so they are contextualized with each forward pass (especially useful if fine tuning BERT). See `Embedding Nuances`_ for details.
-
-There are no required arguments for the title embedding. You will need to set ``send_through_bert: true``. Further, we recommend setting ``requires_grad: false`` as a custom ``arg``. This turns off gradient updates for the title embedding which can often be too expensive to store.
-
-Type Prediction
+Context Encoder
 ------------------
-We can optionally add a type prediction module to Bootleg. This uses the mention word embeddings to perform a soft type prediction and adds the predicted type embedding to each candidate for the predicted mention to the payload, described next. The type prediction is a secondary task learned during training (see `bootleg/layers/mention_type_prediction.py <../apidocs/bootleg.layers.html#module-bootleg.layers.mention_type_prediction>`_).
-
-Embedding Payload
-------------------
-Our embedding payload is a simple concat and project of the embeddings into a hidden dimension. We do add in sine positional embeddings to the embeddings to indicate where the mention is in the sentence (see `bootleg/layers/embedding_payload.py <../apidocs/bootleg.layers.html#module-bootleg.layers.embedding_payload>`_)
-
-Attention Network
-------------------
-Our attention network (see `bootleg/layers/attn_networks.py <../apidocs/bootleg.layers.html#module-bootleg.layers.attn_networks>`_) takes the sentence and embedding payload and outputs a score for each candidate for each mention.
-
-We use `transformer <https://papers.nips.cc/paper/7181-attention-is-all-you-need.pdf>`_ modules to learn patterns over phrases and entities. Specifically, we have three core modules (and one optional):
-
-#. Phrase Module: attention over the sentence and entity payloads
-#. Co-Occurrence Module: self-attention over the entity payloads
-#. KG Module: takes the sum of the output of the phrase and co-occurrence modules and leverages KG connectivity among candidates as weights in an attention
-#. Mention Module (Optional): attention over the mention word embeddings and the candidates for that mention.
-
-We use MLP softmax layers to score each mention and candidate independently, selecting the most likely candidate per mention.
+Like the entity encoder, our context encode takes the context of a mention and feeds it through a BERT Transformer. The ``[CLS]`` token is used as th e relevant mention embedding. To allow BERT to understand where the mention is, we separate it by ``[ENT_START]`` and ``[ENT_END]`` clauses. As shown above, you can specify the maximum sequence length for the context encoder and the maximum window length. All the relevant context encoder code is in `bootleg/dataset.py <../apidocs/bootleg.datasets.html>`_.
 
 .. _Input Data: input_data.html
 .. _Bootleg Config: config.html
-.. _Embedding Nuances: ../advanced/embedding_nuances.html

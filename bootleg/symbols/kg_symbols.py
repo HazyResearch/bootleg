@@ -16,6 +16,7 @@ class KGSymbols:
     def __init__(
         self,
         qid2relations: Dict[str, Dict[str, List[str]]],
+        relation_vocab: Optional[Dict[str, str]] = None,
         max_connections: Optional[int] = 150,
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
@@ -25,6 +26,18 @@ class KGSymbols:
         self.verbose = verbose
         self._qid2relations: Dict[str, Dict[str, List[str]]] = qid2relations
         self._all_relations = set()
+
+        # Mapping from human readable string to relation key ID
+        if relation_vocab is None:
+            all_relnames = set(
+                [t for reldict in qid2relations.values() for t in reldict.keys()]
+            )
+            # +1 to save space for the UNK type
+            self._relation_vocab: Dict[str, str] = {v: v for v in sorted(all_relnames)}
+        else:
+            self._relation_vocab: Dict[str, str] = relation_vocab
+        self._relation_vocab_inv = {v: i for i, v in self._relation_vocab.items()}
+
         # EDIT MODE ONLY: Storing inverse edges to quickly reidentify entities
         self._obj2head = None
         if self.edit_mode:
@@ -67,6 +80,10 @@ class KGSymbols:
             filename=os.path.join(save_dir, f"{prefix}qid2relations.json"),
             contents=self._qid2relations,
         )
+        utils.dump_json_file(
+            filename=os.path.join(save_dir, f"{prefix}relation_vocab.json"),
+            contents=self._relation_vocab,
+        )
         # For backwards compatability with model, dump the adjacency matrix, too
         with open(os.path.join(save_dir, f"{prefix}kg_adj.txt"), "w") as out_f:
             for qid in self._qid2relations:
@@ -91,7 +108,10 @@ class KGSymbols:
         qid2relations: Dict[str, Dict[str, List[str]]] = utils.load_json_file(
             filename=os.path.join(load_dir, f"{prefix}qid2relations.json")
         )
-        return cls(qid2relations, max_connections, edit_mode, verbose)
+        relation_vocab: Dict[str, str] = utils.load_json_file(
+            filename=os.path.join(load_dir, f"{prefix}relation_vocab.json")
+        )
+        return cls(qid2relations, relation_vocab, max_connections, edit_mode, verbose)
 
     def get_connections_by_relation(self, qid, relation):
         """Returns list of other_qids connected to ``qid`` by relation.
@@ -121,6 +141,16 @@ class KGSymbols:
         Returns: Set
         """
         return self._all_relations
+
+    def get_relation_name(self, relation):
+        """Returns human readable relation from vocab
+
+        Args:
+            relation: relation
+
+        Returns: string
+        """
+        return self._relation_vocab_inv[relation]
 
     def is_connected(self, qid1, qid2):
         """Checks if two QIDs are connected in KG.

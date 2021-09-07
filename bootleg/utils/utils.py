@@ -16,6 +16,7 @@ import yaml
 from tqdm import tqdm
 
 from bootleg import log_rank_0_info
+from bootleg.utils.classes.dotted_dict import DottedDict
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,24 @@ def load_yaml_file(filename):
     with open(filename) as f:
         contents = yaml.load(f, Loader=yaml.FullLoader)
     return contents
+
+
+def recurse_redict(d):
+    """
+    Casts all DottedDict values in a dictionary to be dictionaries. Useful for YAML
+    dumping.
+
+    Args:
+        d: Dict
+
+    Returns: Dict with no DottedDicts
+
+    """
+    d = dict(d)
+    for k, v in d.items():
+        if isinstance(v, (DottedDict, dict)):
+            d[k] = recurse_redict(dict(d[k]))
+    return d
 
 
 def assert_keys_in_dict(allowable_keys, d):

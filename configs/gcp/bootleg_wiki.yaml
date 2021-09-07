@@ -1,0 +1,75 @@
+emmental:
+  lr: 2e-5
+  n_steps: 428648 # Total dataset size 109733685 - this gives 2 epochs with batch size 32*16
+  evaluation_freq: 21432
+  warmup_percentage: 0.1
+  lr_scheduler: linear
+  log_path: /home/logs/bootleg_wiki
+  use_exact_log_path: true
+  checkpointing: true
+  checkpoint_all: true
+  checkpoint_freq: 1
+  counter_unit: batch
+  online_eval: false
+  clear_intermediate_checkpoints: false
+  checkpoint_metric: NED/Bootleg/dev/final_loss/acc_boot:max
+  l2: 0.01
+  grad_clip: 1.0
+  gradient_accumulation_steps: 1
+  fp16: true
+  writer: wandb
+  wandb_project_name: platelet
+  wandb_run_name: gcp_bootleg_wiki
+  write_loss_per_step: true
+run_config:
+  log_level: DEBUG
+  eval_batch_size: 16
+  dataloader_threads: 4
+  dataset_threads: 30
+  spawn_method: forkserver
+train_config:
+  batch_size: 32
+model_config:
+  hidden_size: 200
+  normalize: true
+  temperature: 0.01
+data_config:
+  data_dir: /home/data/bootleg-data/wiki_title_0122
+  data_prep_dir: prep
+  use_entity_desc: true
+  context_mask_perc: 0.0
+  entity_type_data:
+    use_entity_types: true
+    type_labels: type_mappings/wiki/qid2typeids.json
+    type_vocab: type_mappings/wiki/type_vocab.json
+  entity_kg_data:
+    use_entity_kg: true
+    kg_labels: kg_mappings/qid2relations.json
+    kg_vocab: kg_mappings/relation_vocab.json
+  entity_dir: /home/data/bootleg-data/wiki_title_0122/entity_db
+  max_seq_len: 128
+  max_seq_window_len: 64
+  max_ent_len: 128
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: merged_sample.jsonl
+    use_weak_label: true
+  test_dataset:
+    file: merged_sample.jsonl
+    use_weak_label: true
+  train_dataset:
+    file: train.jsonl
+    use_weak_label: true
+  train_in_candidates: true
+  eval_slices:
+    - unif_all
+    - unif_NS_all
+    - unif_HD
+    - unif_TO
+    - unif_TL
+    - unif_TS
+  word_embedding:
+    cache_dir: /home/data/bootleg-data/pretrained_bert_models
+    bert_model: bert-base-uncased
+    context_layers: 6
+    entity_layers: 6

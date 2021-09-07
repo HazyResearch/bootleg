@@ -114,6 +114,20 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     learner_config = parser.add_argument_group("Learning configuration")
 
     learner_config.add_argument(
+        "--emmental.optimizer_path",
+        type=nullable_string,
+        default=None,
+        help="Path to optimizer state",
+    )
+
+    learner_config.add_argument(
+        "--emmental.scheduler_path",
+        type=nullable_string,
+        default=None,
+        help="Path to lr scheduler state",
+    )
+
+    learner_config.add_argument(
         "--emmental.fp16",
         type=str2bool,
         default=False,
@@ -137,10 +151,32 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     )
 
     learner_config.add_argument(
+        "--emmental.epochs_learned", type=int, default=0, help="Learning epochs learned"
+    )
+
+    learner_config.add_argument(
         "--emmental.n_epochs",
         type=int,
         default=1,
         help="Total number of learning epochs",
+    )
+
+    learner_config.add_argument(
+        "--emmental.steps_learned", type=int, default=0, help="Learning steps learned"
+    )
+
+    learner_config.add_argument(
+        "--emmental.n_steps",
+        type=int,
+        default=None,
+        help="Total number of learning steps",
+    )
+
+    learner_config.add_argument(
+        "--emmental.skip_learned_data",
+        type=str2bool,
+        default=False,
+        help="Iterate through dataloader when steps or epochs learned is true",
     )
 
     learner_config.add_argument(
@@ -189,7 +225,7 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
     optimizer_config.add_argument(
         "--emmental.optimizer",
         type=nullable_string,
-        default=None,
+        default="adamw",
         choices=[
             "asgd",
             "adadelta",
@@ -826,8 +862,43 @@ def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser,
         "--emmental.writer",
         type=str,
         default="tensorboard",
-        choices=["json", "tensorboard"],
-        help="The writer format (json, tensorboard)",
+        choices=["json", "tensorboard", "wandb"],
+        help="The writer format (json, tensorboard, wandb)",
+    )
+
+    logging_config.add_argument(
+        "--emmental.write_loss_per_step",
+        type=bool,
+        default=False,
+        help="Whether to log loss per step",
+    )
+
+    logging_config.add_argument(
+        "--emmental.wandb_project_name",
+        type=nullable_string,
+        default=None,
+        help="Wandb project name",
+    )
+
+    logging_config.add_argument(
+        "--emmental.wandb_run_name",
+        type=nullable_string,
+        default=None,
+        help="Wandb run name",
+    )
+
+    logging_config.add_argument(
+        "--emmental.wandb_watch_model",
+        type=bool,
+        default=False,
+        help="Whether use wandb to watch model",
+    )
+
+    logging_config.add_argument(
+        "--emmental.wandb_model_watch_freq",
+        type=nullable_int,
+        default=None,
+        help="Wandb model watch frequency",
     )
 
     logging_config.add_argument(
@@ -925,10 +996,16 @@ def parse_args_to_config(args: DottedDict) -> Dict[str, Any]:
             "distributed_backend": args.distributed_backend,
         },
         "learner_config": {
+            "optimizer_path": args.optimizer_path,
+            "scheduler_path": args.scheduler_path,
             "fp16": args.fp16,
             "fp16_opt_level": args.fp16_opt_level,
             "local_rank": args.local_rank,
+            "epochs_learned": args.epochs_learned,
             "n_epochs": args.n_epochs,
+            "steps_learned": args.steps_learned,
+            "n_steps": args.n_steps,
+            "skip_learned_data": args.skip_learned_data,
             "train_split": args.train_split,
             "valid_split": args.valid_split,
             "test_split": args.test_split,
@@ -1067,7 +1144,15 @@ def parse_args_to_config(args: DottedDict) -> Dict[str, Any]:
         "logging_config": {
             "counter_unit": args.counter_unit,
             "evaluation_freq": args.evaluation_freq,
-            "writer_config": {"writer": args.writer, "verbose": True},
+            "writer_config": {
+                "verbose": True,
+                "writer": args.writer,
+                "write_loss_per_step": args.write_loss_per_step,
+                "wandb_project_name": args.wandb_project_name,
+                "wandb_run_name": args.wandb_run_name,
+                "wandb_watch_model": args.wandb_watch_model,
+                "wandb_model_watch_freq": args.wandb_model_watch_freq,
+            },
             "checkpointing": args.checkpointing,
             "checkpointer_config": {
                 "checkpoint_path": args.checkpoint_path,

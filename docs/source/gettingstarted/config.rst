@@ -51,68 +51,36 @@ An example training config is shown below
       batch_size: 32
     model_config:
       hidden_size: 512
-      num_heads: 16
-      num_model_stages: 2
-      ff_inner_size: 1024
-      attn_class: BootlegM2E
     data_config:
-      data_dir: bootleg-data/data/wiki
+      data_dir: bootleg-data/data/wiki_title_0122
       data_prep_dir: prep
-      emb_dir: bootleg-data/embs
-      ent_embeddings:
-           - key: learned
-             load_class: LearnedEntityEmb
-             freeze: false
-             cpu: false
-             args:
-               learned_embedding_size: 200
-               regularize_mapping: /data/data/wiki_title_0122/qid2reg_pow.csv # GENERATED IN bootleg/utils/preprocessing/build_regularization_mapping.py
-           - key: title_static
-             load_class: StaticEmb
-             freeze: false # Freeze the projection layer or not
-             cpu: false # Freeze projection layer or not
-             args:
-               emb_file: /data/data/wiki_title_0122/static_wiki_0122_title.pt # GENERATED IN bootleg/utils/preprocessing/build_static_embeddings.py
-               proj: 256
-           - key: learned_type
-             load_class: LearnedTypeEmb
-             freeze: false
-             args:
-               type_labels: hyena_types_1229.json
-               max_types: 3
-               type_dim: 128
-               merge_func: addattn
-               attn_hidden_size: 128
-           - key: learned_type_wiki
-             load_class: LearnedTypeEmb
-             freeze: false
-             args:
-               type_labels: wikidata_types_1229.json
-               max_types: 3
-               type_dim: 128
-               merge_func: addattn
-               attn_hidden_size: 128
-           - key: learned_type_relations
-             load_class: LearnedTypeEmb
-             freeze: false
-             args:
-               type_labels: kg_relation_types_1229.json
-               max_types: 50
-               type_dim: 128
-               merge_func: addattn
-               attn_hidden_size: 128
-           - key: adj_index
-             load_class: KGIndices
-             batch_on_the_fly: true
-             normalize: false
-             args:
-               kg_adj: kg_adj_1229.txt
-      entity_dir: bootleg-data/data/wiki/entity_db
+      use_entity_desc: true
+      entity_type_data:
+        use_entity_types: true
+        type_labels: type_mappings/wiki/qid2typeids.json
+        type_vocab: type_mappings/wiki/type_vocab.json
+      entity_kg_data:
+        use_entity_kg: true
+        kg_labels: kg_mappings/qid2relations.json
+        kg_vocab: kg_mappings/relation_vocab.json
+      entity_dir: bootleg-data/data/wiki_title_0122/entity_db
+      max_seq_len: 128
+      max_seq_window_len: 64
+      max_ent_len: 128
+      overwrite_preprocessed_data: false
+      dev_dataset:
+        file: dev.jsonl
+        use_weak_label: true
+      test_dataset:
+        file: test.jsonl
+        use_weak_label: true
+      train_dataset:
+        file: train.jsonl
+        use_weak_label: true
+      train_in_candidates: true
       word_embedding:
         cache_dir: bootleg-data/embs/pretrained_bert_models
-        freeze: true # FINE TUNE BERT OR NOT
-        layers: 12
-        bart_model: bert-base-cased
+        bert_model: bert-base-uncased
 
 Default Config
 _______________

@@ -15,7 +15,7 @@ config_args = {
         ),
         "eval_batch_size": (128, "batch size for eval"),
         "eval_accumulation_steps": (
-            100,
+            1000,
             "number of eval steps to accumulate the output tensors for before saving results to file",
         ),
         "dataloader_threads": (16, "data loader threads to feed gpus"),
@@ -34,18 +34,13 @@ config_args = {
         ),
     },
     # Parameters for hyperparameter tuning
-    "train_config": {"dropout": (0.1, "dropout"), "batch_size": (32, "batch size")},
+    "train_config": {
+        "batch_size": (32, "batch size"),
+    },
     "model_config": {
-        "attn_class": ("Bootleg", "AttnNetwork class to use"),
-        "hidden_size": (256, "hidden dimension"),
-        "num_heads": (8, "number of attention head"),
-        "ff_inner_size": (
-            512,
-            "inner size of the pointwise feedforward layers in attn blocks",
-        ),
-        "num_model_stages": (1, "number of model stages"),
-        "num_fc_layers": (1, "number of fully scoring layers at end"),
-        "custom_args": ("{}", "custom arguments for the model file"),
+        "hidden_size": (300, "hidden dimension for the embeddings before scoring"),
+        "normalize": (False, "normalize embeddings before dot product"),
+        "temperature": (1.0, "temperature for softmax in loss"),
     },
     "data_config": {
         "eval_slices": ([], "slices for evaluation"),
@@ -78,13 +73,26 @@ config_args = {
             "alias2id.json",
             "name of alias index map file, should be saved in entity_dir/entity_map_dir",
         ),
-        "emb_dir": ("embs", "where embeddings are stored"),
-        "max_seq_len": (100, "max token length sentences"),
-        "max_aliases": (10, "max aliases per sentence"),
+        "qid_cnt_map": (
+            "qid2cnt.json",
+            "name of alias index map file, should be saved in entity_dir/entity_map_dir",
+        ),
+        "max_seq_len": (128, "max token length sentences"),
+        "max_seq_window_len": (64, "max window around an entity"),
+        "max_ent_len": (128, "max token length for entire encoded entity"),
+        "context_mask_perc": (
+            0.0,
+            "mask percent for context tokens in addition to tail masking",
+        ),
+        "popularity_mask": (
+            True,
+            "whether to use popularity masking for training in the entity and context encoders",
+        ),
         "overwrite_preprocessed_data": (False, "overwrite preprocessed data"),
-        "print_examples_prep": (False, "whether to print examples during prep or not"),
-        "type_prediction": {
-            "use_type_pred": (False, "whether to add type prediction or not"),
+        "print_examples_prep": (True, "whether to print examples during prep or not"),
+        "use_entity_desc": (True, "whether to use entity descriptions or not"),
+        "entity_type_data": {
+            "use_entity_types": (False, "whether to use entity type data"),
             "type_labels": (
                 "types_coarse.json",
                 "type file from qid to list of type ids or type names",
@@ -93,8 +101,19 @@ config_args = {
                 "vocab_coarse.json",
                 "type vocab file from typename to type id",
             ),
-            "num_types": (5, "number of types for prediction"),
-            "dim": (128, "type dimension"),
+            "max_ent_type_len": (20, "max WORD length for type sequence"),
+        },
+        "entity_kg_data": {
+            "use_entity_kg": (False, "whether to use entity type data"),
+            "kg_labels": (
+                "qid2relations.json",
+                "type file from qid to json of kg relation id to list of tail qids",
+            ),
+            "kg_vocab": (
+                "relation_vocab.json",
+                "map from kg relation to textual title",
+            ),
+            "max_ent_kg_len": (60, "max WORD length for kg sequence"),
         },
         "train_dataset": {
             "file": ("train.jsonl", ""),
@@ -110,14 +129,12 @@ config_args = {
         },
         "word_embedding": {
             "bert_model": ("bert-base-uncased", ""),
-            "use_sent_proj": (True, ""),
-            "layers": (12, ""),
-            "freeze": (False, ""),
+            "context_layers": (12, ""),
+            "entity_layers": (12, ""),
             "cache_dir": (
                 "pretrained_bert_models",
                 "Directory where word embeddings are cached",
             ),
         },
-        "ent_embeddings": ([], "entity embeddings"),
     },
 }

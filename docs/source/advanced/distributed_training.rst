@@ -61,9 +61,9 @@ This allows for fp16 and making sure the ``nccl`` backend is used. Note that whe
 From the `Basic Training Tutorial`_, recall that the directory paths should be set to where we want to save our models and read the data, including:
 
 * ``cache_dir`` in ``data_config.word_embedding``
-* ``data_dir``, ``entity_dir``, and ``emb_dir`` in ``data_config``
+* ``data_dir`` and ``entity_dir`` in ``data_config``
 
-We have already set these directories in the provided Wikipedia config, but you will need to update ``data_dir``, ``entity_dir``, and ``emb_dir`` to where you downloaded the data in step 1 and may want to update ``log_dir`` to where you want to save the model checkpoints and logs.
+We have already set these directories in the provided Wikipedia config, but you will need to update ``data_dir`` and ``entity_dir`` to where you downloaded the data in step 1 and may want to update ``log_dir`` to where you want to save the model checkpoints and logs.
 
 3. Training the Model
 ---------------------
@@ -72,7 +72,7 @@ As we provide the Wikipedia data already prepped, we can jump immediately to tra
 
 .. code-block::
 
-   python3 -m torch.distributed.launch --nproc_per_node=8  bootleg/run.py --config_script configs/tutorial/wiki_uncased_ft.yaml
+   python3 -m torch.distributed.run --nproc_per_node=8  bootleg/run.py --config_script configs/tutorial/wiki_uncased_ft.yaml
 
 To train using DP, simply run
 

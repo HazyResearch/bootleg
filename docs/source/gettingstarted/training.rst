@@ -61,7 +61,6 @@ Our `Entity Profile`_ page details how to create the correct metadata for the en
 Requirements
 ~~~~~~~~~~~~
 
-
 #. There is a set of entities to consider as candidates for training and evaluation. There are entity ids (i.e. QIDs) and titles available for these entities. For instance, quantifier ids may be Wikidata QIDs or Unified Medical Language System (UMLS) Concept Unique Identifiers (CUI). For this tutorial, we refer to the entitiy ids by QID.
 #. There is a candidate mapping from aliases to entity candidates. The candidates must be in the set of entities above. If this is not provided, we apply a simple mining technique to generate this from the provided training dataset.
 
@@ -146,23 +145,33 @@ An example of the QID-to-type mapping can be found in `data/sample_entity_data/t
 KG Information
 ~~~~~~~~~~~~~~
 
-We describe the two components of KG data that we provide to the model---KG connectivity data and KG relation data.
+We assume the KG information, like the type information, is provided in a JSON file representing KG triples such that for each subject entity, we have a dictionary of its relationships and the objects of those relationships. We also have a relaiton vocab mapping to map from the relation in the triples to any human readible output for the entity encoder.
 
-*Connectivity Data*
-
-We assume that the connectivity information is provided in a simple text file where each line is a tab-separated QID pair, if an edge exists between the two QIDs in a relevant knowledge graph. For instance, Q60036 (Heidi Klum) and Q218091 (Seal) share an edge (spouse), so we would have the line below in the connectivity data.
+For instance, if we have a relation vocabulary of
 
 .. code-block::
 
-   Q60036  Q218091
+   {
+       "head of government": "P6",
+       "vessel class": "P289",
+       "member of sports team": "P54"
+   }
 
 
+then we may have an associated QID-to-relation mapping of
+
+.. code-block::
+
+   {
+       "Q60036": {"P289": ["Q31"]},
+       "Q218091": {"P289": ["Q893", "Q923"], "P54": ["Q1245"]},
+       "Q23768": {"P6": ["Q64"]}
+   }
+
+We also provide KG connectivity information in the entity profile although it is not used in the model at this time. This adjacency information is a simple text file where each line is a tab-separated QID pair, if an edge exists between the two QIDs in a relevant knowledge graph. For instance, Q60036 (Heidi Klum) and Q218091 (Seal) share an edge (spouse), so we would have the line below in the connectivity data.
 
 Check out `data/sample_entity_data/kg_mappings/kg_adj.txt <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/kg_mappings/kg_adj.txt>`_ as an example of QID connectivity from Wikidata.
 
-*Relation Data*
-
-We treat relation labels as types and assume the same format as type information. An example of a QID-to-relation mapping can be found in `data/sample_entity_data/type_mappings/relations/qid2typeids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/relations/qid2typeids.json>`_ with the associated relation vocabulary in `data/sample_entity_data/type_mappings/relations/type_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/relations/type_vocab.json>`_.
 
 Directory Structure
 ^^^^^^^^^^^^^^^^^^^
@@ -191,11 +200,13 @@ We assume the data above is saved in the following directory structure, where th
         kg_mappings/
             config.json
             qid2relations.json
+            relation_vocab.json
             kg_adj.txt
         entity_mappings/
             alias2qids.json
             qid2eid.json
             qid2title.json
+            qid2desc.json
             alias2id.json
             config.json
 
@@ -208,8 +219,8 @@ The config parameters are organized into five main groups:
 
 * ``emmental``: Emmental parameters.
 * ``run_config``: run time settings that aren't set in Emmental; e.g., eval batch size and number of dataloader threads.
-* ``train_config``: training parameters for hyperparameter tuning, such as dropout and learning rate.
-* ``model_config``: model parameters, such as number of attention heads or hidden dimension.
+* ``train_config``: training parameters of batch size.
+* ``model_config``: model parameters of hidden dimension.
 * ``data_config``: paths of text data, embedding data, and entity data to use for training and evaluation, as well as configuration details for the entity embeddings.
 
 We highlight a few parameters in the ``emmental``.
@@ -226,46 +237,40 @@ We now focus on the ``data_config`` parameters as these are the most unique to B
 Directories
 ^^^^^^^^^^^
 
-We define the paths to the directories through the ``data_dir``\ , ``emb_dir``\ , ``entity_dir``\ , and ``entity_map_dir`` config keys. The first three correspond to the top-level directories introduced in `Directory Structure <#directory-structure>`_. The ``entity_map_dir`` includes the entity JSON mappings produced in `Entities and Aliases <#entities-and-aliases>`_ and should be inside the ``entity_dir``. For example, to follow the directory structure set up in the ``data`` directory, we would have:
+We define the paths to the directories through the ``data_dir``\ , ``entity_dir``\, and ``entity_map_dir`` config keys. The first three correspond to the top-level directories introduced in `Directory Structure <#directory-structure>`_. The ``entity_map_dir`` includes the entity JSON mappings produced in `Entities and Aliases <#entities-and-aliases>`_ and should be inside the ``entity_dir``. For example, to follow the directory structure set up in the ``data`` directory, we would have:
 
 .. code-block::
 
    "data_dir": "data/sample_text_data",
-   "emb_dir": "data/sample_entity_data",
    "entity_dir": "data/sample_entity_data",
    "entity_map_dir": "entity_mappings"
 
-Entity Payloads
+Entity Encoder
 ^^^^^^^^^^^^^^^
 
-As described in the ``README``, Bootleg takes in a set of embeddings to form an **entity payload** for each candidate. These embeddings are concatenated together and projected down to Bootleg's hidden dimension. The embeddings which form the entity payload are defined in the ``ent_embeddings`` section of the config. We consider the entry below for ``ent_embeddings``.
+As described in the _Bootleg Model, Bootleg generates an embedding entity from an Transformer encoder. The resources which go in to the encoder input are defined in the config as shown below.
 
 .. code-block::
 
-   ent_embeddings:
-       - key: learned
-         load_class: LearnedEntityEmb
-         freeze: false
-         cpu: false
-         dropout2d: 0.6
-         args:
-           learned_embedding_size: 128
-       - key: learned_type
-         load_class: LearnedTypeEmb
-         freeze: false
-         args:
-           type_labels: type_mappings/wiki/qid2typeids.json
-           type_vocab: type_mappings/wiki/type_vocab.json
-           max_types: 3
-           type_dim: 128
-           merge_func: addattn
-           attn_hidden_size: 128
+    data_config:
+        ...
+        use_entity_desc: true
+        entity_type_data:
+          use_entity_types: true
+          type_labels: type_mappings/wiki/qid2typeids.json
+          type_vocab: type_mappings/wiki/type_vocab.json
+          max_ent_type_len: 20
+        entity_kg_data:
+          use_entity_kg: true
+          kg_labels: kg_mappings/qid2relations.json
+          kg_vocab: kg_mappings/relation_vocab.json
+          max_ent_kg_len: 60
+        max_seq_len: 128
+        max_seq_window_len: 64
+        max_ent_len: 128
 
-In this example, the entity payload consists of two embeddings, a learned entity embedding and a learned type embedding. Each embedding must have a unique ``key`` which identifies it, as well as a ``load_class`` that indicates which embedding class to use. Finally, each embedding may have custom args defined in the ``args`` key. See `Bootleg Model`_ for more information.
 
-The custom args are defined in the embedding class specified by ``load_class``. By looking at the corresponding embedding class, we can determine what custom args are available to set and how they are used. For example, by the ``load_class`` for this type embedding above, we know that the type embedding uses the LearnedTypeEmb class. If we look in `bootleg/embeddings/type_embs.py <https://github.com/HazyResearch/bootleg/tree/master/bootleg/embeddings/type_embs.py>`_\ , we can find the ``LearnedTypeEmb`` class. The ``emb_args`` parameter in ``__init__`` corresponds to the ``args`` dictionary in the config, and we can see how ``type_dim`` is used to set the dimension of the type embedding. We can repeat this process for each key in the custom args.
-
-The contents of the entity payload can easily be modified by adding more or fewer embeddings to the ``ent_embeddings`` list. For instance, if we want to define a new knowledge graph embedding, we can add a new class to ``bootleg/embeddings/kg_embs`` and then add an another entry in the ``ent_embeddings`` list for the new embedding.
+In this example, the entity input will have descriptions, types, and relations. You can control the total length of each resource by a ``max_ent_type_len`` and ``max_ent_kg_len`` param and the maximum entity length by ``max_ent_len``.
 
 Candidates and Aliases
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -274,11 +279,6 @@ Candidate Not in List
 ~~~~~~~~~~~~~~~~~~~~~
 
 Bootleg supports two types of candidate lists: (1) assume that the true entity must be in the candidate list, (2) use a NIL or "No Candidate" (NC) as another candidate, and does not require that the true candidate is the candidate list. Not that if using (1), during training, the gold candidate *must* be in the list or preprocessing with fail. The gold candidate does not have to be in the candidate set for evaluation. To switch between these two modes, we provide the ``train_in_candidates`` parameter (where True indicates (1)).
-
-Maximum Aliases
-~~~~~~~~~~~~~~~
-
-We can also specify the maximum number of aliases considered for each training example with ``max_aliases``. Similar to the maximum number of candidates (see discussion in `Entity Mappings <#entity-mappings>`_\ ), increasing this number will increase the memory required for training and inference. However, with more aliases, we may also have more signal to leverage for disambiguation. If we have more than ten aliases in a sentence, we use a windowing technique to generate multiple examples, with the aliases divided across them. This windowing process is done automatically during preprocessing.
 
 Multiple Candidate Maps
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,15 +300,15 @@ We define the train, dev, and test datasets in ``train_dataset``\ , ``dev_datase
 Word Embeddings
 ^^^^^^^^^^^^^^^
 
-Bootleg leverages existing word embeddings to embed sentence tokens. This is configured in the ``word_embedding`` section of the config. In particular, we currently support using BERT as the backbone for contextual word embeddings. We use Hugging Face for managing our BERT models, which will be saved in a directory that is specified by the ``cache_dir`` key. We also support freezing and finetuning BERT through the ``freeze`` param.
+Bootleg leverages BERT Transformers to encode the entities and mention context. This type of BERT model and its size is configured in the ``word_embedding`` section of the config. You can change which HuggingFace BERT model by the ``bert_model`` param, change its cached direction by ``cache_dir``, and the number of layers by ``context_layers`` and ``entity_layers``.
 
 
-Finally, in the ``data_config``\ , we define a maximum word token length through ``max_seq_len``. We typically use a length of 100--increasing this length will increase the memory required for training and inference.
+Finally, in the ``data_config``\ , we define a maximum word token length through ``max_seq_len`` and that max window length around a mention by ``max_seq_window_len``.
 
 Preprocessing the Data
 -------------------------
 
-Prior to training, if the data is not already prepared, we will preprocess or prep the data. This is where we convert the data to a memory-mapped format for the dataloader to quickly load during training and also create arrays to allow quick lookups into the embedding data. For instance we create a torch tensor to store the contents of qid2types JSON file to get indices into a type embedding. If the data does not change, this preprocessing only needs to happen once.
+Prior to training, if the data is not already prepared, we will preprocess or prep the data. This is where we convert the context and entity token data to a memory-mapped format for the dataloader to quickly load during training. If the data does not change, this preprocessing only needs to happen once.
 
 *Warning: errors may occur if the file contents change but the file names stay the same, since the preprocessed data uses the file name as a key and will be loaded based on the stale data. In these cases, we recommend removing the ``prep`` directories or assigning a new prep directory (by setting ``data_prep_dir`` or ``entity_prep_dir`` in the config) and repeating preprocessing.*
 
@@ -368,8 +368,6 @@ After the model is trained, we can also run eval to get test scores or to save p
 .. code-block::
 
    python3 bootleg/run.py --config_script configs/tutorial/sample_config.yaml --mode dump_preds --emmental.model_path logs/turtorial/2021_03_11/20_31_11/02b0bb73/last_model.pth
-
-You can replace ``configs/sample_config.json`` with ``llogs/turtorial/2021_03_11/20_31_11/02b0bb73/run_config.yaml`` if desired.
 
 This will generate a label file at ``logs/turtorial/2021_03_11/20_38_09/c5e204dc/dev/last_model/bootleg_labels.jsonl`` (path is printed). This can be read it for evaluation and error analysis. Check out the End-to-End Tutorial on our `Tutorials Page <https://github.com/HazyResearch/bootleg/tree/master/tutorials>`_ for seeing how to do this and for evaluating pretrained Bootleg models.
 

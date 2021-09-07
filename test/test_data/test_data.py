@@ -1,39 +1,57 @@
 import os
 import shutil
 import unittest
+from collections import defaultdict
 
 import numpy as np
 import torch
-from transformers import BertTokenizer
+from transformers import AutoTokenizer
 
-from bootleg.datasets.dataset import BootlegDataset
-from bootleg.symbols.constants import PAD_ID
+from bootleg.dataset import BootlegDataset, extract_context_windows
+from bootleg.symbols.constants import SPECIAL_TOKENS
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import utils
 from bootleg.utils.parser import parser_utils
-from bootleg.utils.sentence_utils import pad_sentence
 
 
-def adjust_sentence(sentence, max_len, is_bert, tokenizer, offset=0):
-    encoded = tokenizer.encode(sentence)
-    if len(encoded) > max_len:
-        if is_bert:
-            # Want to keep max_len tokens, ensuring 102 is last
-            encoded = [101] + encoded[offset + 1 : max_len - 2 + offset + 1] + [102]
-        else:
-            encoded = encoded[offset : max_len + offset]
-    if is_bert:
-        # BERT pad is 0
-        return pad_sentence(encoded, 0, max_len)
-    else:
-        return pad_sentence(encoded, PAD_ID, max_len)
+def adjust_sentence(sentence, max_len, max_window_len, span, tokenizer):
+    tokens = sentence.split()
+    prev_context, next_context = extract_context_windows(span, tokens, max_window_len)
+    context_tokens = (
+        prev_context
+        + ["[ent_start]"]
+        + tokens[span[0] : span[1]]
+        + ["[ent_end]"]
+        + next_context
+    )
+    new_span = [
+        context_tokens.index("[ent_start]"),
+        context_tokens.index("[ent_end]") + 1,
+    ]
+    encoded = tokenizer(
+        context_tokens,
+        is_split_into_words=True,
+        padding="max_length",
+        add_special_tokens=True,
+        truncation=True,
+        max_length=max_len,
+        return_overflowing_tokens=False,
+    )
+    return encoded, new_span
+
+
+def get_uniq_ids(sent_i, num_aliases, guid_dtype, max_aliases=1):
+    res = []
+    for i in range(num_aliases):
+        res.append(np.array((sent_i, i, [i]), dtype=guid_dtype(max_aliases)))
+    return res
 
 
 def assert_data_dicts_equal(dict_l, dict_r):
     for k in dict_l:
         assert k in dict_r, f"Key is {k}"
         if type(dict_l[k]) is torch.Tensor:
-            assert torch.equal(dict_l[k].float(), dict_r[k].float()), f"Key is {k}"
+            assert torch.allclose(dict_l[k].float(), dict_r[k].float()), f"Key is {k}"
         elif type(dict_l[k]) is np.ndarray:
             np.testing.assert_array_equal(dict_l[k], dict_r[k])
         elif type(dict_l[k]) is list:
@@ -62,11 +80,13 @@ class DataLoader(unittest.TestCase):
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args("test/run_args/test_data.json")
-        self.tokenizer = BertTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             "bert-base-cased",
             do_lower_case=False,
+            use_fast=True,
             cache_dir="test/data/emb_data/pretrained_bert_models",
         )
+        self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.is_bert = True
         self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
@@ -97,6 +117,75 @@ class DataLoader(unittest.TestCase):
         if os.path.exists(self.temp_file_name):
             os.remove(self.temp_file_name)
 
+    def prep_dicts(
+        self,
+        max_seq_len,
+        max_window_len,
+        gold_cand_idx,
+        gold_cand_idx_train,
+        use_weak,
+        input_data,
+    ):
+        X_dict, Y_dict = defaultdict(list), defaultdict(list)
+        for i, inp in enumerate(input_data):
+            guids = get_uniq_ids(i, len(inp["aliases"]), self.guid_dtype)
+            for j in range(len(inp["aliases"])):
+                if use_weak is False and inp["gold"][j] is False:
+                    continue
+                X_dict["guids"].append(guids[j])
+                tok_sent, new_span = adjust_sentence(
+                    inp["sentence"],
+                    max_seq_len,
+                    max_window_len,
+                    inp["spans"][j],
+                    self.tokenizer,
+                )
+                for k in tok_sent:
+                    X_dict[k].append(tok_sent[k])
+                X_dict["sent_idx"].append(i)
+                X_dict["subsent_idx"].append(j)
+                if inp["aliases"][j] not in self.entity_symbols.get_all_aliases():
+                    alias_idx = -2
+                else:
+                    alias_idx = self.entity_symbols.get_alias_idx(inp["aliases"][j])
+                X_dict["alias_idx"].append(alias_idx)
+                X_dict["alias_orig_list_pos"].append(j)
+                if gold_cand_idx[i][j] != -1:
+                    gold_eid = self.entity_symbols.get_eid(inp["qids"][j])
+                else:
+                    gold_eid = -1
+                X_dict["gold_eid"].append(gold_eid)
+
+                word_mask_scores = [-1 for _ in range(len(tok_sent["input_ids"]))]
+                if tok_sent.word_to_tokens(new_span[0]) is None:
+                    import pdb
+
+                    pdb.set_trace()
+                new_span_start = tok_sent.word_to_tokens(new_span[0]).start + 1
+                # -1 to index the [ent_end] token, not the token after
+                if tok_sent.word_to_tokens(new_span[1] - 1) is None:
+                    # -1 for CLS token
+                    new_span_end = len(tok_sent["input_ids"]) - 1
+                else:
+                    new_span_end = tok_sent.word_to_tokens(new_span[1] - 1).start
+                word_mask_scores[new_span_start:new_span_end] = [
+                    1 for _ in range(new_span_start, new_span_end)
+                ]
+                X_dict["word_qid_cnt_mask_score"].append(word_mask_scores)
+
+                X_dict["for_dump_gold_cand_K_idx_train"].append(
+                    gold_cand_idx_train[i][j]
+                )
+                Y_dict["gold_cand_K_idx"].append(gold_cand_idx[i][j])
+        for k in X_dict:
+            if k == "guids":
+                X_dict[k] = np.array(X_dict[k])
+                continue
+            X_dict[k] = torch.tensor(X_dict[k])
+        for k in Y_dict:
+            Y_dict[k] = torch.tensor(Y_dict[k])
+        return X_dict, Y_dict
+
     def test_simple_dataset(self):
         """ENTITY SYMBOLS
         {
@@ -106,61 +195,35 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 7
-        max_aliases = 4
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias1", "multi word alias2"],
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
-                "sentence": "alias1 or multi word alias2",
+                "sentence": "alias'-1 or multi word alias2",
                 "spans": [[0, 1], [2, 5]],
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
-                "end_span_idx": torch.tensor(
-                    [[2, 5, -1, -1]]
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias1"),
-                            self.entity_symbols.get_alias_idx("multi word alias2"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, 4, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 2, -1, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 2, -1, -1]]),
-            },
-        )
-        utils.write_jsonl(self.temp_file_name, input_data)
+        gold_cand_idx_train = [[0, 2]]
+        gold_cand_idx = [[0, 2]]
         use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
+        )
+
+        utils.write_jsonl(self.temp_file_name, input_data)
 
         dataset = BootlegDataset(
             self.args,
@@ -186,25 +249,27 @@ class DataLoader(unittest.TestCase):
         }
         """
         max_seq_len = 10
-        max_aliases = 4
+        max_aliases = 1
+        max_window_len = 7
         split = "train"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         # Test 1: the code fails because it's training and Q3 is not a candidate of multi word alias2
         input_data = [
             {
                 "aliases": ["alias1", "multi word alias2"],
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
-                "sentence": "alias1 or multi word alias2",
+                "sentence": "alias'-1 or multi word alias2",
                 "spans": [[0, 1], [2, 5]],
                 "gold": [True, True],
             }
         ]
-        utils.write_jsonl(self.temp_file_name, input_data)
         use_weak_label = True
+        utils.write_jsonl(self.temp_file_name, input_data)
         with self.assertRaises(Exception) as context:
-            dataset = BootlegDataset(
+            BootlegDataset(
                 self.args.data_config,
                 name="Bootleg_test",
                 dataset=self.temp_file_name,
@@ -224,53 +289,25 @@ class DataLoader(unittest.TestCase):
                 "aliases": ["alias1", "multi word alias2"],
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
-                "sentence": "alias1 or multi word alias2",
+                "sentence": "alias'-1 or multi word alias2",
                 "spans": [[0, 1], [2, 5]],
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
-                "end_span_idx": torch.tensor(
-                    [[2, 7, -1, -1]]
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias1"),
-                            self.entity_symbols.get_alias_idx("multi word alias2"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, 3, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, -2, -1, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -2, -1, -1]]),
-            },
+
+        gold_cand_idx_train = [[0, -2]]
+        gold_cand_idx = [[0, -2]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
         dataset = BootlegDataset(
             self.args,
             name="Bootleg_test",
@@ -294,53 +331,25 @@ class DataLoader(unittest.TestCase):
                 "aliases": ["alias1", "multi word alias2"],
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
-                "sentence": "alias1 or multi word alias2",
+                "sentence": "alias'-1 or multi word alias2",
                 "spans": [[0, 1], [2, 5]],
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
-                "end_span_idx": torch.tensor(
-                    [[2, 7, -1, -1]]
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias1"),
-                            self.entity_symbols.get_alias_idx("multi word alias2"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, 3, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[1, 0, -1, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[1, 0, -1, -1]]),
-            },
+
+        gold_cand_idx_train = [[1, 0]]
+        gold_cand_idx = [[1, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
         dataset = BootlegDataset(
             self.args,
             name="Bootleg_test",
@@ -355,90 +364,6 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
-    def test_single_mention_dataset(self):
-        """ENTITY SYMBOLS
-        {
-          "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
-          "alias1":[["Q1",10.0],["Q4",6.0]],
-          "alias3":[["Q1",30.0]],
-          "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
-        }
-        """
-        max_seq_len = 7
-        max_aliases = 1
-        self.args.data_config.max_aliases = max_aliases
-        self.args.data_config.max_seq_len = max_seq_len
-        input_data = [
-            {
-                "aliases": ["alias1", "multi word alias2"],
-                "qids": ["Q1", "Q4"],
-                "sent_idx_unq": 0,
-                "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
-                "gold": [True, True],
-            }
-        ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id_arr = [
-            np.array([(0, 0, [0])], dtype=self.guid_dtype(max_aliases)),
-            np.array([(0, 1, [1])], dtype=self.guid_dtype(max_aliases)),
-        ]
-        X_dict, Y_dict = (
-            {
-                "guids": uniq_id_arr,
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1], [4]]),
-                "end_span_idx": torch.tensor(
-                    [[2], [5]]
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [self.entity_symbols.get_alias_idx("alias1")],
-                        [self.entity_symbols.get_alias_idx("multi word alias2")],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0], [1]]),
-                "gold_eid": torch.tensor([[1], [4]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0], [2]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0], [2]]),
-            },
-        )
-        utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
-
-        dataset = BootlegDataset(
-            self.args,
-            name="Bootleg_test",
-            dataset=self.temp_file_name,
-            use_weak_label=use_weak_label,
-            tokenizer=self.tokenizer,
-            entity_symbols=self.entity_symbols,
-            dataset_threads=1,
-            split="train",
-            is_bert=True,
-        )
-        assert_data_dicts_equal(X_dict, dataset.X_dict)
-        assert_data_dicts_equal(Y_dict, dataset.Y_dict)
-
     def test_nonmatch_alias(self):
         """ENTITY SYMBOLS
         {
@@ -448,10 +373,12 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 7
-        max_aliases = 4
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias0", "multi word alias2"],
@@ -462,47 +389,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
-                "end_span_idx": torch.tensor(
-                    [[2, 5, -1, -1]]
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            -2,
-                            self.entity_symbols.get_alias_idx("multi word alias2"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias0 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, 4, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[-2, 2, -1, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[-2, 2, -1, -1]]),
-            },
-        )
-        utils.write_jsonl(self.temp_file_name, input_data)
+        gold_cand_idx_train = [[-2, 2]]
+        gold_cand_idx = [[-2, 2]]
         use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
+        )
+
+        utils.write_jsonl(self.temp_file_name, input_data)
 
         with self.assertRaises(Exception) as context:
             dataset = BootlegDataset(
@@ -545,8 +444,8 @@ class DataLoader(unittest.TestCase):
             split="test",
             is_bert=True,
         )
-        X_dict["for_dump_gold_cand_K_idx_train"] = torch.tensor([[-2, 3, -1, -1]])
-        Y_dict["gold_cand_K_idx"] = torch.tensor([[-2, 3, -1, -1]])
+        X_dict["for_dump_gold_cand_K_idx_train"] = torch.tensor([-2, 3])
+        Y_dict["gold_cand_K_idx"] = torch.tensor([-2, 3])
         assert_data_dicts_equal(X_dict, dataset.X_dict)
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
@@ -560,10 +459,12 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences
-        max_seq_len = 7
-        max_aliases = 4
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4"],
@@ -574,55 +475,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array(
-            [(0, 0, [0, -1, -1, -1])], dtype=self.guid_dtype(max_aliases)
-        )
-        uniq_id2 = np.array(
-            [(0, 1, [1, -1, -1, -1])], dtype=self.guid_dtype(max_aliases)
-        )
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, -1, -1, -1], [4, -1, -1, -1]]),
-                "end_span_idx": torch.tensor([[2, -1, -1, -1], [5, -1, -1, -1]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [self.entity_symbols.get_alias_idx("alias3"), -1, -1, -1],
-                        [self.entity_symbols.get_alias_idx("alias4"), -1, -1, -1],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 cat cat cat",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "cat cat cat alias4",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, -1, -1, -1], [1, -1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, -1, -1, -1], [4, -1, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor(
-                    [[0, -1, -1, -1], [0, -1, -1, -1]]
-                ),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1, -1, -1], [0, -1, -1, -1]]),
-            },
+        gold_cand_idx_train = [[0, 0]]
+        gold_cand_idx = [[0, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -639,10 +504,12 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 1: the sentence is long but there is only one alias, so the sentence gets windowed
-        max_seq_len = 7
-        max_aliases = 4
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4"],
@@ -653,46 +520,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id = np.array([(0, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]]),
-                "end_span_idx": torch.tensor([[2, 5, -1, -1]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 cat alias4 cat cat",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]]),
-                "gold_eid": torch.tensor([[1, 4, -1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0, -1, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 0, -1, -1]]),
-            },
+        gold_cand_idx_train = [[0, 0]]
+        gold_cand_idx = [[0, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -717,14 +557,12 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        # Test 1: there are more than max_aliases aliases in the sentence and it should be split into subparts
-        # the second subpart will have a repeat alias that should _not_ be
-        # backpropped (as it already is in the first subpart)
-        # Therefore, the true entity idx is -1
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -735,56 +573,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor([[1, 4], [-1, 1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 0], [-1, 0]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[0, 0, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -810,10 +611,12 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the gold of False should be untouched for train, with only one True gold
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -824,56 +627,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor([[1, 4], [-1, 1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 0], [-1, 0]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[0, 0, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -890,10 +656,12 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 2: the gold of False should be untouched for train, with all False golds
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -904,56 +672,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [False, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor([[1, 4], [-1, 1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 0], [-1, 0]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[0, 0, 0]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -971,11 +702,13 @@ class DataLoader(unittest.TestCase):
 
         # Test 3: with the split of "dev", the subsentences should remain unchanged
         # but the true index in Y_dict should be -1
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -986,64 +719,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor(
-                    [
-                        [
-                            1,
-                            -1,
-                        ],
-                        [-1, -1],
-                    ]
-                ),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1], [-1, -1]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[0, -1, -1]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -1060,11 +748,13 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 4: with the split of dev, all true indices should be -1 but the sentences should still be used
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1075,56 +765,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [False, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor([[-1, -1], [-1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[-1, -1], [-1, -1]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[-1, -1, -1]]
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -1150,10 +803,12 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 0: with all TRUE golds, use weak label of FALSE doesn't change anything
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1164,56 +819,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, True, True],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, 1])], dtype=self.guid_dtype(max_aliases))
-        uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1, uniq_id2],
-                "sent_idx": torch.tensor([0, 0]),
-                "subsent_idx": torch.tensor([0, 1]),
-                "start_span_idx": torch.tensor([[1, 3], [2, 4]]),
-                "end_span_idx": torch.tensor([[2, 4], [3, 5]]),
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias3"),
-                            self.entity_symbols.get_alias_idx("alias4"),
-                        ],
-                        [
-                            self.entity_symbols.get_alias_idx("alias4"),
-                            self.entity_symbols.get_alias_idx("alias3"),
-                        ],
-                    ]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        ),
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                            offset=1,
-                        ),
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1], [1, 2]]),
-                "gold_eid": torch.tensor([[1, 4], [-1, 1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 0], [-1, 0]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 0], [-1, 0]]),
-            },
+        gold_cand_idx_train = [[0, 0, 0]]
+        gold_cand_idx = [[0, 0, 0]]
+        use_weak_label = False
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = False
 
         dataset = BootlegDataset(
             self.args,
@@ -1230,10 +848,12 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 1: now that weak label is set to False, the golds of False should be removed for split of "train"
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1244,39 +864,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, -1]]),
-                "end_span_idx": torch.tensor([[2, -1]]),
-                "alias_idx": torch.tensor(
-                    [[self.entity_symbols.get_alias_idx("alias3"), -1]]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, -1]]),
-                "gold_eid": torch.tensor([[1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1]]),
-            },
+        gold_cand_idx_train = [[0, -1, -1]]
+        gold_cand_idx = [[0, -1, -1]]
+        use_weak_label = False
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = False
 
         dataset = BootlegDataset(
             self.args,
@@ -1294,10 +894,12 @@ class DataLoader(unittest.TestCase):
 
         # Test 2: now that weak label is set to False, the sentence with all golds of False
         # should be removed for "train".
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1316,36 +918,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True],
             },
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(1, 0, [0, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1],
-                "sent_idx": torch.tensor([1]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, -1]]),
-                "end_span_idx": torch.tensor([[2, -1]]),
-                "alias_idx": torch.tensor(
-                    [[self.entity_symbols.get_alias_idx("alias3"), -1]]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3", max_seq_len, self.is_bert, self.tokenizer
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, -1]]),
-                "gold_eid": torch.tensor([[1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1]]),
-            },
+        gold_cand_idx_train = [[-1, -1, -1], [0]]
+        gold_cand_idx = [[-1, -1, -1], [0]]
+        use_weak_label = False
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = False
 
         dataset = BootlegDataset(
             self.args,
@@ -1362,11 +947,13 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 3: with the split of "dev", nothing should change from test 1 above where we were using "train"
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1377,40 +964,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True, False, False],
             }
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(0, 0, [0, -1])], dtype=self.guid_dtype(max_aliases))
-        # uniq_id2 = np.array([(0, 1, [1, 2])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1],
-                "sent_idx": torch.tensor([0]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, -1]]),
-                "end_span_idx": torch.tensor([[2, -1]]),
-                "alias_idx": torch.tensor(
-                    [[self.entity_symbols.get_alias_idx("alias3"), -1]]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3 alias4 alias3",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, -1]]),
-                "gold_eid": torch.tensor([[1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1]]),
-            },
+        gold_cand_idx_train = [[0, -1, -1]]
+        gold_cand_idx = [[0, -1, -1]]
+        use_weak_label = False
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = False
 
         dataset = BootlegDataset(
             self.args,
@@ -1427,11 +993,13 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 4: with the split of dev, all true indices should be -1 but the sentences should still be used
-        max_seq_len = 7
-        max_aliases = 2
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias3", "alias4", "alias3"],
@@ -1450,36 +1018,19 @@ class DataLoader(unittest.TestCase):
                 "gold": [True],
             },
         ]
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id1 = np.array([(1, 0, [0, -1])], dtype=self.guid_dtype(max_aliases))
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id1],
-                "sent_idx": torch.tensor([1]),
-                "subsent_idx": torch.tensor([0]),
-                "start_span_idx": torch.tensor([[1, -1]]),
-                "end_span_idx": torch.tensor([[2, -1]]),
-                "alias_idx": torch.tensor(
-                    [[self.entity_symbols.get_alias_idx("alias3"), -1]]
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias3", max_seq_len, self.is_bert, self.tokenizer
-                        )
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, -1]]),
-                "gold_eid": torch.tensor([[1, -1]]),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, -1]]),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, -1]]),
-            },
+        gold_cand_idx_train = [[-1, -1, -1], [0]]
+        gold_cand_idx = [[-1, -1, -1], [0]]
+        use_weak_label = False
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = False
 
         dataset = BootlegDataset(
             self.args,
@@ -1505,68 +1056,37 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the gold of False should be untouched for train
-        max_seq_len = 7
-        max_aliases = 4
+        max_seq_len = 15
+        max_window_len = 4
+        max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
+        self.args.data_config.max_seq_window_len = max_window_len
         input_data = [
             {
                 "aliases": ["alias1", "multi word alias2"],
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": i,
-                "sentence": "alias1 or multi word alias2",
+                "sentence": "alias'-1 or multi word alias2",
                 "spans": [[0, 1], [2, 5]],
                 "gold": [True, True],
             }
             for i in range(53)
         ]
         assert len(input_data) == 53
-        # UNIQ_ID is sent_id, subsent_idx, and alias_orig_list_pos
-        uniq_id_get = lambda s: np.array(
-            [(s, 0, [0, 1, -1, -1])], dtype=self.guid_dtype(max_aliases)
-        )
-        X_dict, Y_dict = (
-            {
-                "guids": [uniq_id_get(i) for i in range(53)],
-                "sent_idx": torch.arange(53),
-                "subsent_idx": torch.tensor([0] * 53),
-                "start_span_idx": torch.tensor([[1, 4, -1, -1]] * 53),
-                "end_span_idx": torch.tensor(
-                    [[2, 5, -1, -1]] * 53
-                ),  # the end span gets -1 to be inclusive
-                "alias_idx": torch.tensor(
-                    [
-                        [
-                            self.entity_symbols.get_alias_idx("alias1"),
-                            self.entity_symbols.get_alias_idx("multi word alias2"),
-                            -1,
-                            -1,
-                        ]
-                    ]
-                    * 53
-                ),
-                "token_ids": torch.tensor(
-                    [
-                        adjust_sentence(
-                            "alias1 or multi word alias2",
-                            max_seq_len,
-                            self.is_bert,
-                            self.tokenizer,
-                        )
-                        for _ in range(53)
-                    ]
-                ),
-                "alias_orig_list_pos": torch.tensor([[0, 1, -1, -1]] * 53),
-                "gold_eid": torch.tensor([[1, 4, -1, -1]] * 53),
-                "for_dump_gold_cand_K_idx_train": torch.tensor([[0, 2, -1, -1]] * 53),
-            },
-            {
-                "gold_cand_K_idx": torch.tensor([[0, 2, -1, -1]] * 53),
-            },
+        gold_cand_idx_train = [[0, 2]] * 53
+        gold_cand_idx = [[0, 2]] * 53
+        use_weak_label = True
+        X_dict, Y_dict = self.prep_dicts(
+            max_seq_len,
+            max_window_len,
+            gold_cand_idx,
+            gold_cand_idx_train,
+            use_weak_label,
+            input_data,
         )
 
         utils.write_jsonl(self.temp_file_name, input_data)
-        use_weak_label = True
 
         dataset = BootlegDataset(
             self.args,
@@ -1580,7 +1100,10 @@ class DataLoader(unittest.TestCase):
             is_bert=True,
         )
         # Using multiple threads will make data in random sorted chunk order
-        sort_idx = np.argsort(dataset.X_dict["sent_idx"])
+        sort_arr = np.array(np.zeros(53 * 2), dtype=[("x", "<i8"), ("y", "<i8")])
+        sort_arr["x"] = dataset.X_dict["sent_idx"]
+        sort_arr["y"] = dataset.X_dict["subsent_idx"]
+        sort_idx = np.argsort(sort_arr, order=["x", "y"])
         for key in list(dataset.X_dict.keys()):
             dataset.X_dict[key] = dataset.X_dict[key][sort_idx]
         for key in list(dataset.Y_dict.keys()):
