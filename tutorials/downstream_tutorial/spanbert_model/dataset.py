@@ -371,8 +371,10 @@ def convert_examples_to_features(
         if rel_ents is not None:
             assert len(input_rel_ent_ids) == max_seq_length
 
-        if num_shown_examples < 20:
-            if (ex_index < 5) or (label_id > 0):
+        if num_shown_examples < 200:
+            if str(example.guid).endswith(
+                "59c"
+            ):  # if (ex_index < 5) or (label_id > 0):
                 num_shown_examples += 1
                 logger.info("*** Example ***")
                 logger.info("guid:        %s" % (example.guid))

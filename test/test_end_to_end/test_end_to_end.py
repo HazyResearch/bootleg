@@ -8,7 +8,6 @@ import ujson
 import emmental
 from bootleg.run import run_model
 from bootleg.utils import utils
-from bootleg.utils.classes.dotted_dict import DottedDict
 from bootleg.utils.parser import parser_utils
 
 
@@ -38,6 +37,7 @@ class TestEnd2End(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_end2end_withkg(self):
+        self.args.data_config.entity_kg_data.use_entity_kg = True
         # For the collate and dataloaders to play nicely, the spawn must be fork (this is set in run.py)
         torch.multiprocessing.set_start_method("fork", force=True)
 
@@ -45,7 +45,7 @@ class TestEnd2End(unittest.TestCase):
 
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"
@@ -60,15 +60,12 @@ class TestEnd2End(unittest.TestCase):
         assert 19 == len(results)  # 18 total sentences
         assert os.path.exists(out_emb_file)
 
-    def test_end2end_withoutkg(self):
-        # KG IS LAST EMBEDDING SO WE REMOVE IT
-        self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:-1]
+    def test_end2end_onealias(self):
         # Just setting this for testing pipelines
-        self.args.data_config.max_aliases = 1
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"
@@ -87,17 +84,14 @@ class TestEnd2End(unittest.TestCase):
         assert os.path.exists(out_emb_file)
 
     def test_end2end_withtype_singlethread(self):
-        self.args.data_config.type_prediction.use_type_pred = True
-        self.args.model_config.hidden_size = 20
+        self.args.data_config.entity_type_data.use_entity_types = True
         # Just setting this for testing pipelines
         self.args.data_config.eval_accumulation_steps = 2
-        # unfreezing the word embedding helps the type prediction task
-        self.args.data_config.word_embedding.freeze = False
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
         # losses from two tasks contribute to this
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"
@@ -116,24 +110,14 @@ class TestEnd2End(unittest.TestCase):
         assert os.path.exists(out_emb_file)
 
     # Doubling up a test here to also test accumulation steps
-    def test_end2end_withtitle_accstep(self):
-        self.args.data_config.ent_embeddings.append(
-            DottedDict(
-                {
-                    "key": "title1",
-                    "load_class": "TitleEmb",
-                    "send_through_bert": True,
-                    "args": {"proj": 6},
-                }
-            )
-        )
+    def test_end2end_accstep(self):
         # Just setting this for testing pipelines
         self.args.data_config.eval_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"
@@ -152,28 +136,15 @@ class TestEnd2End(unittest.TestCase):
         assert os.path.exists(out_emb_file)
 
     # Doubling up a test here to also test greater than 1 eval batch size
-    def test_end2end_withreg_evalbatch(self):
-        reg_file = "test/temp/reg_file.csv"
-        utils.ensure_dir("test/temp")
-        reg_data = [
-            ["qid", "regularization"],
-            ["Q1", "0.5"],
-            ["Q2", "0.3"],
-            ["Q3", "0.2"],
-            ["Q4", "0.9"],
-        ]
+    def test_end2end_evalbatch(self):
         self.args.data_config.eval_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
         self.args.run_config.eval_batch_size = 2
-        with open(reg_file, "w") as out_f:
-            for item in reg_data:
-                out_f.write(",".join(item) + "\n")
 
-        self.args.data_config.ent_embeddings[0]["args"]["regularize_mapping"] = reg_file
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"
@@ -195,18 +166,11 @@ class TestEnd2End(unittest.TestCase):
 
     # Doubling up a test here to also test long context
     def test_end2end_bert_long_context(self):
-        self.args.model_config.attn_class = "BERTNED"
-        # Only take the learned entity embeddings for BERTNED
-        self.args.data_config.ent_embeddings = self.args.data_config.ent_embeddings[:1]
-        # Set the learned embedding to hidden size for BERTNED
-        self.args.data_config.ent_embeddings[0].args.learned_embedding_size = 20
-        self.args.data_config.word_embedding.use_sent_proj = False
-        self.args.data_config.max_seq_len = 100
-        self.args.data_config.max_aliases = 10
+        self.args.data_config.max_seq_len = 256
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 0.5
+        assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
             "model_path"

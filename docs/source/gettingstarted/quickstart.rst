@@ -5,7 +5,7 @@ Getting started is easy. Run the following. This will download our default model
 
 .. note::
 
-    You will need at least 130 GB of disk space, 12 GB of GPU memory, and 40 GB of CPU memory to run our model. When running for the first time, it will take 10 plus minutes for everything to download and load correctly, depending on network speeds.
+    You will need at least XXX GB of disk space, 12 GB of GPU memory, and XX GB of CPU memory to run our model. When running for the first time, it will take 10 plus minutes for everything to download and load correctly, depending on network speeds.
 
 .. code-block::
 
@@ -19,7 +19,7 @@ You can also pass in multiple sentences::
 
 Or, you can decide to use a different model (the choices are bootleg_cased, bootleg_uncased, bootleg_cased_mini, and bootleg_uncased_mini - default is bootleg_uncased)::
 
-    ann = BootlegAnnotator(model_name="bootleg_cased")
+    ann = BootlegAnnotator(model_name="bootleg_uncased")
     ann.label_mentions("How many people are in Lincoln")["titles"]
 
 Other initialization parameters are at `bootleg/end2end/bootleg_annotator.py <../apidocs/bootleg.end2end.html#module-bootleg.end2end.bootleg_annotator>`_.

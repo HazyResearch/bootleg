@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 import emmental
 from bootleg.run import run_model
-from bootleg.symbols.entity_profile import KG_SUBFOLDER, TYPE_SUBFOLDER, EntityProfile
+from bootleg.symbols.entity_profile import EntityProfile
 from bootleg.utils.parser import parser_utils
 
 
@@ -43,6 +43,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -53,6 +54,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q345",
                 "mentions": [["cat", 10.0], ["catt", 7.0], ["animal", 3.0]],
                 "title": "Cat",
+                "description": "Cat",
                 "types": {"hyena": ["animal"], "wiki": ["cat"]},
                 "relations": [{"relation": "sibling", "object": "Q123"}],
             },
@@ -61,6 +63,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q567",
                 "mentions": [["catt", 6.5], ["animal", 3.3]],
                 "title": "Catt",
+                "description": "Catt",
                 "types": {"hyena": ["animal", "animall"]},
                 "relations": [{"relation": "sibling", "object": "Q123"}],
             },
@@ -73,6 +76,7 @@ class EntityProfileTest(unittest.TestCase):
         ]
         self.write_data(self.profile_file, data)
         gold_qid2title = {"Q123": "Dog", "Q345": "Cat", "Q567": "Catt", "Q789": "Dogg"}
+        gold_qid2desc = {"Q123": "Dog", "Q345": "Cat", "Q567": "Catt", "Q789": ""}
         gold_alias2qids = {
             "dog": [["Q123", 10.0]],
             "dogg": [["Q123", 7.0]],
@@ -97,12 +101,14 @@ class EntityProfileTest(unittest.TestCase):
         }
         (
             qid2title,
+            qid2desc,
             alias2qids,
             type_systems,
             qid2relations,
         ) = EntityProfile._read_profile_file(self.profile_file)
 
         self.assertDictEqual(gold_qid2title, qid2title)
+        self.assertDictEqual(gold_qid2desc, qid2desc)
         self.assertDictEqual(gold_alias2qids, alias2qids)
         self.assertDictEqual(gold_type_systems, type_systems)
         self.assertDictEqual(gold_qid2relations, qid2relations)
@@ -129,6 +135,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": 123,
                 "mentions": [["dog"], ["dogg"], ["animal"]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -147,6 +154,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -229,6 +237,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -282,6 +291,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -328,6 +338,7 @@ class EntityProfileTest(unittest.TestCase):
             "entity_id": "Q789",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
+            "description": "Snake",
             "types": {"hyena": ["animal"], "new_sys": ["snakey"]},
             "relations": [{"relation": "sibling", "object": "Q123"}],
         }
@@ -344,6 +355,7 @@ class EntityProfileTest(unittest.TestCase):
             "entity_id": "Q789",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
+            "description": "Snake",
             "types": {"hyena": ["animal"]},
             "relations": [{"relatiion": "sibbbling", "object": "Q123"}],
         }
@@ -361,6 +373,7 @@ class EntityProfileTest(unittest.TestCase):
             "entity_id": "Q789",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
+            "description": "Snake",
             "types": {"hyena": ["animal"]},
             "relations": [{"relation": "sibbbling", "object": "Q123"}],
         }
@@ -378,6 +391,7 @@ class EntityProfileTest(unittest.TestCase):
             "entity_id": "Q789",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
+            "description": "Snake",
             "types": {"hyena": ["animal"]},
             "relations": [{"relation": "sibling", "object": "Q123"}],
         }
@@ -385,6 +399,7 @@ class EntityProfileTest(unittest.TestCase):
         entity_profile.add_entity(new_entity)
         self.assertTrue(entity_profile.qid_exists("Q789"))
         self.assertEqual(entity_profile.get_title("Q789"), "Snake")
+        self.assertEqual(entity_profile.get_desc("Q789"), "Snake")
         self.assertListEqual(
             entity_profile.get_mentions_with_scores("Q789"),
             [["snake", 10.0], ["animal", 3.0]],
@@ -402,6 +417,7 @@ class EntityProfileTest(unittest.TestCase):
         entity_profile2.add_entity(new_entity)
         self.assertTrue(entity_profile2.qid_exists("Q789"))
         self.assertEqual(entity_profile2.get_title("Q789"), "Snake")
+        self.assertEqual(entity_profile2.get_desc("Q789"), "Snake")
         self.assertListEqual(
             entity_profile2.get_mentions_with_scores("Q789"),
             [["snake", 10.0], ["animal", 3.0]],
@@ -418,6 +434,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -451,6 +468,7 @@ class EntityProfileTest(unittest.TestCase):
         self.assertTrue(entity_profile.qid_exists("Q911"))
         self.assertFalse(entity_profile.qid_exists("Q123"))
         self.assertEqual(entity_profile.get_title("Q911"), "Dog")
+        self.assertEqual(entity_profile.get_desc("Q911"), "Dog")
         self.assertListEqual(
             entity_profile.get_mentions_with_scores("Q911"),
             [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
@@ -470,6 +488,7 @@ class EntityProfileTest(unittest.TestCase):
         self.assertTrue(entity_profile2.qid_exists("Q911"))
         self.assertFalse(entity_profile2.qid_exists("Q123"))
         self.assertEqual(entity_profile2.get_title("Q911"), "Dog")
+        self.assertEqual(entity_profile2.get_desc("Q911"), "Dog")
         self.assertListEqual(
             entity_profile2.get_mentions_with_scores("Q911"),
             [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
@@ -487,6 +506,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -554,6 +574,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q123",
                 "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
                 "title": "Dog",
+                "description": "Dog",
                 "types": {"hyena": ["animal"], "wiki": ["dog"]},
                 "relations": [
                     {"relation": "sibling", "object": "Q345"},
@@ -564,6 +585,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q345",
                 "mentions": [["cat", 10.0], ["catt", 7.0], ["animal", 3.0]],
                 "title": "Cat",
+                "description": "Cat",
                 "types": {"hyena": ["animal"], "wiki": ["cat"]},
                 "relations": [{"relation": "sibling", "object": "Q123"}],
             },
@@ -572,6 +594,7 @@ class EntityProfileTest(unittest.TestCase):
                 "entity_id": "Q567",
                 "mentions": [["catt", 6.5], ["animal", 3.3]],
                 "title": "Catt",
+                "description": "Catt",
                 "types": {"hyena": ["animal", "animall"]},
                 "relations": [{"relation": "sibling", "object": "Q123"}],
             },
@@ -605,48 +628,20 @@ class EntityProfileTest(unittest.TestCase):
                 "n_epochs": 1,
             },
             "run_config": {
-                "dataloader_threads": 1,
+                "dataloader_threads": 0,
                 "dataset_threads": 1,
             },
+            "model_config": {"hidden_size": 10},
             "train_config": {"batch_size": 2},
-            "model_config": {"hidden_size": 20, "num_heads": 1},
             "data_config": {
                 "entity_dir": str(self.save_dir),
                 "max_seq_len": 7,
-                "max_aliases": 2,
                 "data_dir": str(self.data_dir),
-                "emb_dir": str(self.save_dir),
                 "word_embedding": {
-                    "layers": 1,
-                    "freeze": True,
+                    "context_layers": 1,
+                    "entity_layers": 1,
                     "cache_dir": str(self.save_dir / "retrained_bert_model"),
                 },
-                "ent_embeddings": [
-                    {
-                        "key": "learned",
-                        "freeze": False,
-                        "load_class": "LearnedEntityEmb",
-                        "args": {"learned_embedding_size": 10},
-                    },
-                    {
-                        "key": "learned_type",
-                        "load_class": "LearnedTypeEmb",
-                        "freeze": True,
-                        "args": {
-                            "type_labels": f"{TYPE_SUBFOLDER}/wiki/qid2typeids.json",
-                            "type_vocab": f"{TYPE_SUBFOLDER}/wiki/type_vocab.json",
-                            "max_types": 2,
-                            "type_dim": 10,
-                        },
-                    },
-                    {
-                        "key": "kg_adj",
-                        "load_class": "KGIndices",
-                        "batch_on_the_fly": True,
-                        "normalize": False,
-                        "args": {"kg_adj": f"{KG_SUBFOLDER}/kg_adj.txt"},
-                    },
-                ],
                 "train_dataset": {"file": "train.jsonl"},
                 "dev_dataset": {"file": "train.jsonl"},
                 "test_dataset": {"file": "train.jsonl"},
@@ -661,6 +656,9 @@ class EntityProfileTest(unittest.TestCase):
         if not os.path.exists(emmental.Meta.log_path):
             os.makedirs(emmental.Meta.log_path)
 
+        # ======================
+        # PART 2: RUN MODEL
+        # ======================
         scores = run_model(mode="train", config=args)
         saved_model_path1 = f"{emmental.Meta.log_path}/last_model.pth"
         assert type(scores) is dict
@@ -679,7 +677,6 @@ class EntityProfileTest(unittest.TestCase):
 
         # Modify arg paths
         args["data_config"]["entity_dir"] = str(self.save_dir2)
-        args["data_config"]["emb_dir"] = str(self.save_dir2)
 
         # Load pretrained model
         args["model_config"]["model_path"] = f"{emmental.Meta.log_path}/last_model.pth"
@@ -690,29 +687,11 @@ class EntityProfileTest(unittest.TestCase):
         if not os.path.exists(emmental.Meta.log_path):
             os.makedirs(emmental.Meta.log_path)
         scores = run_model(mode="train", config=args)
-        saved_model_path2 = f"{emmental.Meta.log_path}/last_model.pth"
         assert type(scores) is dict
 
         # ======================
         # PART 4: VERIFY CHANGES IN THE MODEL WERE AS EXPECTED
         # ======================
-        # Check that type mappings are different in the right way...we remove "dog"
-        # from EID 1 and added "cat". "dog" is not longer a type.
-        eid2typeids_table1, type2row_dict1, num_types_with_unk1 = torch.load(
-            self.save_dir / "prep" / "type_table_type_mappings_wiki_qid2typeids_2.pt"
-        )
-        eid2typeids_table2, type2row_dict2, num_types_with_unk2 = torch.load(
-            self.save_dir2 / "prep" / "type_table_type_mappings_wiki_qid2typeids_2.pt"
-        )
-        # Modify mapping 2 to become mapping 1
-        # Row 1 is Q123, Col 0 is type (this was "cat")
-        eid2typeids_table2[1][0] = entity_profile._type_systems["wiki"]._type_vocab[
-            "dog"
-        ]
-        self.assertEqual(num_types_with_unk1, num_types_with_unk2)
-        self.assertDictEqual({1: 1, 2: 2}, type2row_dict1)
-        self.assertDictEqual({1: 1}, type2row_dict2)
-        assert torch.equal(eid2typeids_table1, eid2typeids_table2)
         # Check that the alias mappings are different
         alias2entity_table1 = torch.from_numpy(
             np.memmap(
@@ -1062,14 +1041,6 @@ class EntityProfileTest(unittest.TestCase):
             ]
         )
         assert torch.equal(alias2entity_table2, gold_alias2entity_table2)
-
-        # The type embeddings were frozen so they should be the same
-        model1 = torch.load(saved_model_path1)
-        model2 = torch.load(saved_model_path2)
-        assert torch.equal(
-            model1["model"]["module_pool"]["learned_type"]["type_emb.weight"],
-            model2["model"]["module_pool"]["learned_type"]["type_emb.weight"],
-        )
 
 
 if __name__ == "__main__":

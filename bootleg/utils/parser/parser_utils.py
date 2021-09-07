@@ -165,7 +165,8 @@ def flatten_nested_args_for_parser(args, new_args, groups, prefix):
                 )
             else:
                 new_args.append(f"--{prefix}{key}")
-                new_args.append(f"{ujson.dumps(vars(args)[key])}")
+                # print("HERE2", vars(args))
+                new_args.append(f"{ujson.dumps(args[key])}")
         elif isinstance(args[key], list):
             for v in args[key]:
                 new_args.append(f"--{prefix}{key}")
@@ -256,7 +257,6 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
             type(config) is dict
         ), f"We only support loading configs that are paths to json/yaml files or preloaded configs."
         params = config
-
     all_keys = list(recursive_keys(parser_hierarchy))
     new_params = flatten_nested_args_for_parser(params, [], groups=all_keys, prefix="")
     # update with new args
@@ -267,7 +267,9 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     )
     for idx in range(1, len(unknown), 2):
         # allow passing -1 for emmental.device argument
-        assert not unknown[idx].startswith(("-", "--")) or (unknown[idx-1] == "emmental.device" and unknown[idx] == "-1")
+        assert not unknown[idx].startswith(("-", "--")) or (
+            unknown[idx - 1] == "emmental.device" and unknown[idx] == "-1"
+        )
     for idx in range(0, len(unknown), 2):
         arg = unknown[idx]
         # If override one you already have in json

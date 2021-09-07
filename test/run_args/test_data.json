@@ -1,37 +1,29 @@
 {
     "run_config": {
-        "dataloader_threads": 1,
+        "dataloader_threads": 0,
         "dataset_threads": 1,
         "spawn_method": "fork"
     },
     "train_config": {
         "batch_size": 1,
     },
-    "model_config": {
-        "hidden_size": 10,
-        "num_heads": 1
-    },
     "data_config": {
         "entity_dir": "test/data/entity_loader/entity_data",
         "train_in_candidates": true,
         "max_seq_len": 5,
-        "max_aliases": 4,
         "data_dir": "test/data/data_loader",
         "overwrite_preprocessed_data": true,
-        "emb_dir": "test/data/emb_data",
-        "type_prediction": {
-            "use_type_pred": false,
-            "num_types": 3,
-            "type_labels": "type_pred_mapping.json"
+        "entity_type_data": {
+            "use_entity_types": true,
+            "type_labels": "type_pred_mapping.json",
+            "type_vocab": "type_pred_vocab.json",
+            "max_ent_type_len": 5,
         },
         "word_embedding":
         {
-            "layers": 1,
-            "freeze": true,
+            "context_layers": 1,
+            "entity_layers": 1,
             "cache_dir": "test/data/emb_data/pretrained_bert_models"
         },
-        "ent_embeddings": [
-            {"key": "learned","load_class": "entity_embs.LearnedEntityEmb"}
-        ]
     }
 }

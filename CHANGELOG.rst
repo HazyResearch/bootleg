@@ -1,3 +1,9 @@
+Unreleased 1.1.0dev0
+---------------------
+Changed
+^^^^^^^^^
+We did an architectural change and switched to a biencoder model. This changes our task flow and dataprep. This new model uses less CPU storage and uses the standard BERT architecture. Our entity encoder now takes a textual input of an entity that contains its title, description, KG relationships, and types.
+
 1.0.5 - 2021-08-20
 ---------------------
 Fixed
@@ -5,6 +11,8 @@ Fixed
 * Fixed -1 command line argparse error
 * Adjusted requirements
 
+1.0.4 - 2021-07-12
+---------------------
 Added
 ^^^^^^
 * Tutorial to generate contextualized entity embeddings that perform better downstream

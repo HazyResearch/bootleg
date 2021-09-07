@@ -2,12 +2,9 @@
 import logging
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
 
 from bootleg import log_rank_0_debug
-from bootleg.symbols.constants import FINAL_LOSS
 from emmental import Meta
 
 logger = logging.getLogger(__name__)
@@ -149,151 +146,15 @@ def normalize_matrix(mat, dim=3, p=2):
     return mat_divided
 
 
-def emb_1d_dropout(training, mask_perc, tensor):
-    """Standard 1D dropout of tensor.
+def get_max_candidates(entity_symbols, data_config):
+    """Returns the maximum number of candidates used in the model, taking into
+    account train_in_candidates If train_in_canddiates is False, we add a NC
+    entity candidate (for null candidate)
 
     Args:
-        training: if the model is in train mode or not
-        mask_perc: percent to dropout
-        tensor: tensor to dropout
-
-    Returns: tensor after 1D dropout
-    """
-    return nn.functional.dropout(tensor, p=mask_perc, training=training)
-
-
-# Masks an entire row of the embedding (2d mask). Each row gets masked with probability mask_perc.
-def emb_2d_dropout(training, mask_perc, tensor):
-    """2D dropout of tensor where entire row gets zero-ed out with prob
-    mask_perc.
-
-    Args:
-        training: if the model is in train mode or not
-        mask_perc: percent to dropout
-        tensor: tensor to dropout
-
-    Returns: tensor after 2D dropout
-    """
-    batch, M, K, dim = tensor.shape
-    if training and mask_perc > 0:
-        # reshape for masking
-        tensor = tensor.contiguous().reshape(batch * M * K, dim)
-        # randomly mask each entity embedding
-        bern_prob = (torch.ones(batch * M * K, 1) * mask_perc).to(tensor.device)
-        zero_mask = torch.bernoulli(bern_prob) > 0
-        tensor = tensor.masked_fill(zero_mask, 0)
-        tensor = tensor.contiguous().reshape(batch, M, K, dim)
-    return tensor
-
-
-#
-# This tensor is the probability of something being masked
-def emb_dropout_by_tensor(training, regularization_tensor, tensor):
-    """This applied 2D dropout each row of an embedding matrix (type, kg, ...)
-    based on the weights in the regularization tensor.
-
-    Args:
-        training: if the model is in train mode or not
-        mask_perc: tensor of dropout weights with shape (*)
-        tensor: tensor to dropout with shape (*, dim)
-
-    Returns: tensor after dropout
-    """
-    assert list(regularization_tensor.size()) == list(
-        tensor.size()[:-1]
-    ), f"{regularization_tensor.size()} should be the same size as {tensor.size()[:-1]}"
-    if training:
-        # randomly mask each entity embedding
-        zero_mask = (torch.bernoulli(regularization_tensor) > 0).unsqueeze(-1)
-        tensor = tensor.masked_fill(zero_mask, 0)
-    return tensor
-
-
-def max_score_context_matrix(context_matrix_dict, prediction_head):
-    """For each context matrix value in a dict of matrices, project to batch x
-    M x K and take max as final score.
-
-    Args:
-        context_matrix_dict: Dict of batch x M x K x H matrices of embeddings for each candidate
-        prediction_head: projection layer that transforms each matrix to batch x M x K for scoring
-
-    Return:
-        batch x M x K tensor with the max score along along the -1 dimension for each batch and mention
-    """
-    batch_size, M, K, H = list(context_matrix_dict.values())[0].shape
-    preds_to_cat = []
-    for key in context_matrix_dict:
-        pred = prediction_head(context_matrix_dict[key])
-        pred = pred.squeeze(2).reshape(batch_size, M, K)
-        preds_to_cat.append(pred.unsqueeze(3))
-    score = torch.max(torch.cat(preds_to_cat, dim=-1), dim=-1)[0]
-    return score
-
-
-def generate_final_context_matrix(context_matrix_dict, ending_key_to_exclude="_nokg"):
-    """Takes the average of the context matrices where their key does not end
-    in ending_key_to_exclude.
-
-    Args:
-        context_matrix_dict: Dict of batch x M x K x H matrices of embeddings for each candidate
-        ending_key_to_exclude: key to exclude from average
+        entity_symbols: entity symbols
+        data_config: data config
 
     Returns:
-        tensor average of call tensors in context_matrix_dict unless key ends in ending_key_to_exclude
     """
-    new_ctx = []
-    for key, val in context_matrix_dict.items():
-        if not key.endswith(ending_key_to_exclude):
-            new_ctx.append(val)
-    assert len(new_ctx) > 0, (
-        f"You have provided a context matrix dict with only keys ending with _nokg. We average the context matrices "
-        f"that do not end in _nokg as the final context matrix. Please rename the final matrix."
-    )
-    return torch.sum(torch.stack(new_ctx), dim=0) / len(new_ctx)
-
-
-def init_embeddings_to_vec(module, pad_idx, vec=None):
-    """Initializes module of nn.Embedding to have the value specified in vec.
-
-    Args:
-        module: nn.Embedding module to initialize
-        pad_idx: pad index
-        vec: vector to intialize (will randomly generate if None)
-
-    Returns: the vector to initialize
-    """
-    assert (
-        pad_idx == 0 or pad_idx == -1
-    ), f"Only accept pads of 0 or -1; you gave {pad_idx}"
-    assert isinstance(module, (nn.Embedding))
-    embedding_dim = module.embedding_dim
-
-    if vec is None:
-        # Follows how nn.Embedding intializes their weights
-        vec = torch.Tensor(1, embedding_dim)
-        init.normal_(vec)
-    # Copy the pad row via clone
-    pad_row = module.weight.data[pad_idx].clone()
-    test_equal = False
-    if not torch.equal(pad_row, vec):
-        test_equal = True
-    module.weight.data[:] = vec
-    module.weight.data[pad_idx] = pad_row
-    # Assert the pad row is different from the vec
-    if test_equal:
-        assert not torch.equal(pad_row, vec)
-    # We want the pad row to stay the same as it was before (i.e., all zeros) and not become a tail embedding
-    assert torch.equal(pad_row, module.weight.data[pad_idx][:])
-    return vec
-
-
-def get_stage_head_name(layer_idx):
-    """Wrapper function for giving a name to each layer in the model. These are
-    used as keys to store intermediate outputs.
-
-    Args:
-        layer_idx: layer index
-
-    Returns: name of layer
-    """
-    return f"{FINAL_LOSS}_stage_{layer_idx}"
+    return entity_symbols.max_candidates + int(not data_config.train_in_candidates)
