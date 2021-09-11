@@ -167,6 +167,9 @@ def find_aliases_in_sentence_tag(
         for gram_words in grams:
             j_st += 1
             j_end += 1
+            if j_st not in new_to_old_span or j_end not in new_to_old_span:
+                print(f"Parse error for: {sentence}. Skipping")
+                return [], []
             j_st_adjusted = new_to_old_span[j_st]
             j_end_adjusted = new_to_old_span[j_end]
             # Check if nlp has split the word and we are looking at a subword mention - which we don't want
