@@ -24,6 +24,7 @@ from bootleg.task_config import NED_TASK, NED_TASK_TO_LABEL, TYPE_PRED_TASK
 from bootleg.tasks import ned_task, type_pred_task
 from bootleg.utils import sentence_utils
 from bootleg.utils.embedding_utils import get_max_candidates
+from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
 from emmental.model import EmmentalModel
@@ -398,8 +399,6 @@ class BootlegAnnotator(object):
         total_final_exs = 0
         dropped_by_thresh = 0
 
-        final_char_spans = []
-
         batch_example_qid_cands = []
         batch_example_eid_cands = []
         batch_example_aliases_locs_start = []
@@ -408,6 +407,7 @@ class BootlegAnnotator(object):
         batch_example_true_entities = []
         batch_word_indices = []
         batch_spans_arr = []
+        batch_char_spans_arr = []
         batch_example_aliases = []
         batch_idx_unq = []
         batch_subsplit_idx = []
@@ -425,10 +425,7 @@ class BootlegAnnotator(object):
                 sample["qids"] = ["Q-1" for _ in range(len(sample["aliases"]))]
                 sample["gold"] = [True for _ in range(len(sample["aliases"]))]
             total_start_exs += len(sample["aliases"])
-            char_spans = self.get_char_spans(sample["spans"], sample["sentence"])
-
-            final_char_spans.append(char_spans)
-
+            char_spans = get_char_spans(sample["spans"], sample["sentence"])
             (
                 idxs_arr,
                 aliases_to_predict_per_split,
@@ -451,6 +448,7 @@ class BootlegAnnotator(object):
             old_spans_arr = [
                 [sample["spans"][idx] for idx in idxs] for idxs in idxs_arr
             ]
+            char_spans_arr = [[char_spans[idx] for idx in idxs] for idxs in idxs_arr]
             qids_arr = [[sample["qids"][idx] for idx in idxs] for idxs in idxs_arr]
             word_indices_arr = [
                 self.tokenizer.convert_tokens_to_ids(pt) for pt in phrase_tokens_arr
@@ -559,6 +557,7 @@ class BootlegAnnotator(object):
                 batch_example_aliases.append(aliases_arr[sub_idx])
                 # Add the orginal sample spans because spans_arr is w.r.t BERT subword token
                 batch_spans_arr.append(old_spans_arr[sub_idx])
+                batch_char_spans_arr.append(char_spans_arr[sub_idx])
                 batch_idx_unq.append(idx_unq)
                 batch_subsplit_idx.append(sub_idx)
 
@@ -578,6 +577,7 @@ class BootlegAnnotator(object):
         final_entity_cand_embs = [[] for _ in range(num_exs)]
         final_titles = [[] for _ in range(num_exs)]
         final_spans = [[] for _ in range(num_exs)]
+        final_char_spans = [[] for _ in range(num_exs)]
         final_aliases = [[] for _ in range(num_exs)]
         for b_i in tqdm(
             range(0, batch_word_indices.shape[0], ebs),
@@ -648,6 +648,9 @@ class BootlegAnnotator(object):
                             final_spans[idx_unq].append(
                                 batch_spans_arr[b_i + ex_i][alias_idx]
                             )
+                            final_char_spans[idx_unq].append(
+                                batch_char_spans_arr[b_i + ex_i][alias_idx]
+                            )
                             final_titles[idx_unq].append(
                                 self.entity_db.get_title(pred_qid)
                                 if pred_qid != "NC"
@@ -667,6 +670,7 @@ class BootlegAnnotator(object):
             "cands": final_all_cands,
             "cand_probs": final_cand_probs,
             "spans": final_spans,
+            "char_spans": final_char_spans,
             "aliases": final_aliases,
         }
         if self.return_embs:
@@ -720,26 +724,3 @@ class BootlegAnnotator(object):
             "batch_on_the_fly_kg_adj": kg_prepped_embs,
         }
         return X_dict
-
-    def get_char_spans(self, spans, text):
-        """Helper function to get character spans instead of default word
-        spans.
-
-        Args:
-            spans: word spans
-            text: text
-
-        Returns: character spans
-        """
-        query_toks = text.split()
-        char_spans = []
-        for span in spans:
-            space_btwn_toks = (
-                len(" ".join(query_toks[0 : span[0] + 1]))
-                - len(" ".join(query_toks[0 : span[0]]))
-                - len(query_toks[span[0]])
-            )
-            char_b = len(" ".join(query_toks[0 : span[0]])) + space_btwn_toks
-            char_e = char_b + len(" ".join(query_toks[span[0] : span[1]]))
-            char_spans.append([char_b, char_e])
-        return char_spans
