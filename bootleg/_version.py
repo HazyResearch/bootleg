@@ -1,2 +1,2 @@
 """Bootleg version."""
-__version__ = "1.0.3dev0"
+__version__ = "1.0.5"

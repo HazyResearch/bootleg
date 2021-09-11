@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="bootleg",
-    version="1.0.3dev0",
+    version="1.0.5",
     description="Bootleg NED System",
     packages=find_packages(),
     url="https://github.com/HazyResearch/bootleg",
@@ -18,7 +18,7 @@ setup(
         "numpy~=1.19.0",
         "pandas~=1.2.3",
         "progressbar==2.5",
-        "pydantic==1.7.1",
+        "pydantic~=1.7",
         "rich==10.1.0",
         "scikit_learn~=0.24.1",
         "scipy~=1.6.1",
@@ -26,10 +26,10 @@ setup(
         "spacy==3.0.*",
         "tagme==0.1.3",
         "tensorboardX==2.1.*",
-        "tensorboard==2.4.*",
-        "torch~=1.7.0",
+        "tensorboard==2.5.*",
+        "torch>=1.7.0,<1.10.0",
         "tqdm>=4.27",
         "transformers>=4.0.0,<5.0.0",
-        "ujson==4.0.2",
+        "ujson~=4.1",
     ],
 )

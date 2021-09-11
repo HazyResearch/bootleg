@@ -1,4 +1,21 @@
-Unreleased 1.0.3dev0
+1.0.5 - 2021-08-20
+---------------------
+Fixed
+^^^^^^^^
+* Fixed -1 command line argparse error
+* Adjusted requirements
+
+Added
+^^^^^^
+* Tutorial to generate contextualized entity embeddings that perform better downstream
+
+1.0.4 - 2021-07-12
+---------------------
+Fixed
+^^^^^^^^
+* Bump version of Pydantic to 1.7.4
+
+1.0.3 - 2021-06-29
 ---------------------
 Fixed
 ^^^^^^^
