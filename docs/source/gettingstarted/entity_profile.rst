@@ -80,7 +80,7 @@ Inside the saved folder for the profile, all the mappings needed to run a Bootle
     * ``qid2typeids.json``: Mapping from entity QID to a list of type ids.
     * ``config.json``: Contains metadata of the maximum number of types allowed for an entity.
 * ``kg_mappings``: This folder contains relationship entity data.
-    * ``type_vocab.json``: Mapping from type name to internal type id. This id mapping is offset by 1 to reserve the 0 type id for the UNK type.
+    * ``relation_vocab.json``: Mapping from human-readable relation name to relation ID used in qid2relations. Used to generate entity text input.
     * ``qid2relations.json``: Mapping from head entity QID to a dictionary of relation -> list of tail entities.
     * ``kg_adj.txt``: List of all connected entities separated by a tab. This is an unlabeled adjacency matrix.
     * ``config.json``: Contains metadata of the maximum number of tail connections allowed for a particular head entity and relation.

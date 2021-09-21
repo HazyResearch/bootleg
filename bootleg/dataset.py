@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -236,6 +237,9 @@ def get_entity_string(
         "[ent_desc] " + entity_symbols.get_desc(qid) if constants["use_desc"] else ""
     )
     title_str = entity_symbols.get_title(qid) if entity_symbols.qid_exists(qid) else ""
+
+    # To encourage mention similarity, we remove the (<type>) from titles
+    title_str = re.sub(r"(\(.*\))", r"", title_str).strip()
 
     # To add kgs, sep by "[ent_kg]" and then truncate to max_ent_kg_len
     # Then merge with description text

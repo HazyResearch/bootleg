@@ -69,6 +69,8 @@ def parse_args():
     parser.add_argument("--min_alias_len", type=int, default=1)
     parser.add_argument("--max_alias_len", type=int, default=6)
     parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--num_chunks", type=int, default=8)
+    parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
 
 
@@ -167,6 +169,10 @@ def find_aliases_in_sentence_tag(
         for gram_words in grams:
             j_st += 1
             j_end += 1
+            if j_st not in new_to_old_span or j_end not in new_to_old_span:
+                print("BAD")
+                print(sentence)
+                return [], []
             j_st_adjusted = new_to_old_span[j_st]
             j_end_adjusted = new_to_old_span[j_end]
             # Check if nlp has split the word and we are looking at a subword mention - which we don't want
@@ -385,6 +391,7 @@ def extract_mentions(
     min_alias_len=1,
     max_alias_len=6,
     num_workers=8,
+    num_chunks=None,
     verbose=False,
 ):
     """Extracts mentions from file.
@@ -396,6 +403,7 @@ def extract_mentions(
         min_alias_len: minimum alias length (in words)
         max_alias_len: maximum alias length (in words)
         num_workers: number of multiprocessing workers
+        num_chunks: number of subchunks to feed to workers
         verbose: verbose boolean
 
     Returns:
@@ -403,6 +411,8 @@ def extract_mentions(
     assert os.path.exists(in_filepath), f"{in_filepath} does not exist"
     candidate_map = ujson.load(open(cand_map_file))
     all_aliases_trie = get_all_aliases(candidate_map, verbose)
+    if num_chunks is None:
+        num_chunks = num_workers
     start_time = time.time()
     # multiprocessing
     if num_workers > 1:
@@ -416,8 +426,8 @@ def extract_mentions(
         num_lines = get_num_lines(in_filepath)
         num_processes = min(num_workers, int(multiprocessing.cpu_count()))
         logger.debug(f"Using {num_processes} workers...")
-        chunk_size = int(np.ceil(num_lines / (num_processes)))
-        num_chunks = int(np.ceil(num_lines / chunk_size))
+        chunk_size = int(np.ceil(num_lines / (num_chunks)))
+        assert num_chunks == int(np.ceil(num_lines / chunk_size))
         chunk_file_path = os.path.join(prep_dir, "data_chunk")
         chunk_infiles = [
             f"{chunk_file_path}_{chunk_id}_in.jsonl" for chunk_id in range(num_chunks)
@@ -482,6 +492,7 @@ def main():
     out_file = args.out_file
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    print(args)
     extract_mentions(
         in_file,
         out_file,
@@ -489,6 +500,8 @@ def main():
         min_alias_len=args.min_alias_len,
         max_alias_len=args.max_alias_len,
         num_workers=args.num_workers,
+        num_chunks=args.num_chunks,
+        verbose=args.verbose,
     )
 
 
