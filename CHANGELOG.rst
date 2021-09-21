@@ -17,8 +17,6 @@ Added
 ^^^^^^
 * Tutorial to generate contextualized entity embeddings that perform better downstream
 
-1.0.4 - 2021-07-12
----------------------
 Fixed
 ^^^^^^^^
 * Bump version of Pydantic to 1.7.4

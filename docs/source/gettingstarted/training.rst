@@ -272,6 +272,12 @@ As described in the _Bootleg Model, Bootleg generates an embedding entity from a
 
 In this example, the entity input will have descriptions, types, and relations. You can control the total length of each resource by a ``max_ent_type_len`` and ``max_ent_kg_len`` param and the maximum entity length by ``max_ent_len``.
 
+Entity Masking
+^^^^^^^^^^^^^^^
+A secret sauce to getting our Bootleg encoder to pay attention to the types and relationships is to apply masking of the mention and entity title. Without masking, the model will rely heavily on mention-title memorization and ignore more subtle structural cues required for the tail. To overcome this, we mask entity titles in the entity encoder and mentions in the context encoder. By default, we mask titles and mentions 50% of the time, with more popular entities being masked up to 95% of the time. To turn this off, in ``data_config``, set ``popularity_mask`` to be ``false``.
+
+If desired, we also support MLM style masking of the context input. By default, we do not use this masking, but you can turn it on by setting ``context_mask_perc`` to be between 0.0 and 1.0 in ``data_config``.
+
 Candidates and Aliases
 ^^^^^^^^^^^^^^^^^^^^^^
 
