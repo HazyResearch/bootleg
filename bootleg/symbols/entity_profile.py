@@ -10,6 +10,7 @@ from bootleg.symbols.constants import check_qid_exists, edit_op
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.symbols.kg_symbols import KGSymbols
 from bootleg.symbols.type_symbols import TypeSymbols
+from bootleg.utils.utils import get_lnrm
 
 logger = logging.getLogger(__name__)
 
@@ -245,9 +246,11 @@ class EntityProfile:
                 qid2desc[ent.entity_id] = ent.description
                 # For each [mention, score] value, create a value of mention -> [qid, score] in the alias2qid dict
                 for men_pair in ent.mentions:
-                    if men_pair[0] not in alias2qids:
-                        alias2qids[men_pair[0]] = []
-                    alias2qids[men_pair[0]].append([ent.entity_id, men_pair[1]])
+                    # Lower case mentions for mention extraction
+                    new_men = get_lnrm(men_pair[0], strip=True, lower=True)
+                    if new_men not in alias2qids:
+                        alias2qids[new_men] = []
+                    alias2qids[new_men].append([ent.entity_id, men_pair[1]])
                 # Add type systems of type_sys -> QID -> list of type names
                 for type_sys in ent.types:
                     if type_sys not in type_systems:
@@ -604,8 +607,12 @@ class EntityProfile:
             if rel_pair["relation"] not in parsed_rels:
                 parsed_rels[rel_pair["relation"]] = []
             parsed_rels[rel_pair["relation"]].append(rel_pair["object"])
+        # Lower case mentions for mention extraction
+        mentions = [
+            [get_lnrm(men[0], strip=True, lower=True), men[1]] for men in ent.mentions
+        ]
         self._entity_symbols.add_entity(
-            ent.entity_id, ent.mentions, ent.title, ent.description
+            ent.entity_id, mentions, ent.title, ent.description
         )
         for type_sys in self._type_systems:
             self._type_systems[type_sys].add_entity(
@@ -672,6 +679,8 @@ class EntityProfile:
         for men in self.get_mentions(ent.entity_id):
             self._entity_symbols.remove_alias(ent.entity_id, men)
         for men in ent.mentions:
+            # Lower case mentions for mention extraction
+            men = [get_lnrm(men[0], strip=True, lower=True), men[1]]
             self._entity_symbols.add_alias(ent.entity_id, men)
         # Update title
         self._entity_symbols.set_title(ent.entity_id, ent.title)
