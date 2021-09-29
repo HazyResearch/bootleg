@@ -219,6 +219,81 @@ def score_line(
     return rows
 
 
+def score_line(line, abbr, preds, title_map, entity_profile):
+    rows = []
+    sent_idx = line["sent_idx_unq"]
+    gold_qids = line["qids"]
+    pred_qids = preds[sent_idx]["qids"]
+    assert len(gold_qids) == len(pred_qids), "Gold and pred QIDs have different lengths"
+    # for each alias, append a row in the merged result table
+    for alias_idx in range(len(gold_qids)):
+        res = {
+            "sentence": line["sentence"],
+            "sent_idx": line["sent_idx_unq"],
+            "aliases": line["aliases"],
+            "span": line["spans"][alias_idx],
+            "slices": line.get("slices", {}),
+            "alias": line["aliases"][alias_idx],
+            "alias_idx": alias_idx,
+            "is_gold_label": line["gold"][alias_idx],
+            "gold_qid": gold_qids[alias_idx],
+            "pred_qid": pred_qids[alias_idx],
+            "gold_title": title_map[gold_qids[alias_idx]]
+            if gold_qids[alias_idx] != "Q-1"
+            else "Q-1",
+            "pred_title": title_map.get(pred_qids[alias_idx], "CouldnotFind")
+            if pred_qids[alias_idx] != "NC"
+            else "NC",
+            "expandedAbbr": line["expandedAbbr"][alias_idx] if abbr else "",
+            "all_gold_qids": gold_qids,
+            "all_pred_qids": pred_qids,
+            "gold_label_aliases": [
+                al for i, al in enumerate(line["aliases"]) if line["gold"][i] is True
+            ],
+            "all_is_gold_labels": line["gold"],
+            "all_spans": line["spans"],
+        }
+        slices = []
+        if "slices" in line:
+            for sl_name in line["slices"]:
+                if (
+                    str(alias_idx) in line["slices"][sl_name]
+                    and line["slices"][sl_name][str(alias_idx)] > 0.5
+                ):
+                    slices.append(sl_name)
+        res["slices"] = slices
+        if entity_profile is not None:
+            res["cands"] = [
+                tuple(
+                    [
+                        q[0],
+                        title_map[q[0]],
+                        preds[sent_idx]["cand_probs"][alias_idx][i],
+                    ]
+                )
+                for i, q in enumerate(
+                    entity_profile.get_qid_count_cands(line["aliases"][alias_idx])
+                )
+            ]
+        for type_sym in entity_profile.get_all_typesystems():
+            gold_types = entity_profile.get_types(gold_qids[alias_idx], type_sym)
+            pred_types = entity_profile.get_types(pred_qids[alias_idx], type_sym)
+            res[f"{type_sym}_gld"] = gold_types
+            res[f"{type_sym}_pred"] = pred_types
+
+        connected_pairs_gld = []
+        connected_pairs_pred = []
+        for alias_idx2 in range(len(gold_qids)):
+            if entity_profile.is_connected(gold_qids[alias_idx], gold_qids[alias_idx2]):
+                connected_pairs_gld.append(gold_qids[alias_idx2])
+            if entity_profile.is_connected(pred_qids[alias_idx], pred_qids[alias_idx2]):
+                connected_pairs_pred.append(pred_qids[alias_idx2])
+        res[f"kg_gld"] = connected_pairs_gld
+        res[f"kg_pred"] = connected_pairs_pred
+        rows.append(res)
+    return rows
+
+
 def load_mentions(file):
     lines = []
     with jsonlines.open(file) as f:
