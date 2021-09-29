@@ -566,6 +566,13 @@ class EntitySymbolTest(unittest.TestCase):
             "Q4": "nonalias4",
         }
 
+        trueqid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
+
         # the non-candidate class is included in entity_dump
         trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
         truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
@@ -575,6 +582,7 @@ class EntitySymbolTest(unittest.TestCase):
             max_candidates=3,
             alias2qids=truealias2qids,
             qid2title=trueqid2title,
+            qid2desc=trueqid2desc,
         )
         tri_as_dict = {}
         for k in entity_symbols._alias_trie:
@@ -585,6 +593,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
         self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
         self.assertDictEqual(tri_as_dict, truealiastrie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
@@ -600,6 +609,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
         self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
         self.assertDictEqual(tri_as_dict, truealiastrie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
@@ -611,6 +621,7 @@ class EntitySymbolTest(unittest.TestCase):
             max_candidates=3,
             alias2qids=truealias2qids,
             qid2title=trueqid2title,
+            qid2desc=trueqid2desc,
             edit_mode=True,
         )
         trueqid2aliases = {
@@ -637,10 +648,18 @@ class EntitySymbolTest(unittest.TestCase):
             "Q4": "nonalias4",
         }
 
+        trueqid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
+
         entity_symbols = EntitySymbols(
             max_candidates=3,
             alias2qids=truealias2qids,
             qid2title=trueqid2title,
+            qid2desc=trueqid2desc,
         )
 
         self.assertEqual(entity_symbols.get_qid(1), "Q1")
@@ -658,6 +677,7 @@ class EntitySymbolTest(unittest.TestCase):
             entity_symbols.get_eid_cands("alias1", max_cand_pad=True), [1, 4, -1]
         )
         self.assertEqual(entity_symbols.get_title("Q1"), "alias1")
+        self.assertEqual(entity_symbols.get_desc("Q1"), "d alias1")
         self.assertEqual(entity_symbols.get_alias_idx("alias1"), 0)
         self.assertEqual(entity_symbols.get_alias_from_idx(1), "alias3")
         self.assertEqual(entity_symbols.alias_exists("alias3"), True)
@@ -678,6 +698,13 @@ class EntitySymbolTest(unittest.TestCase):
             "Q4": "nonalias4",
         }
 
+        qid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
+
         max_candidates = 3
 
         # the non-candidate class is included in entity_dump
@@ -695,6 +722,7 @@ class EntitySymbolTest(unittest.TestCase):
             max_candidates=max_candidates,
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
         )
         tri_as_dict = {}
         for k in entity_symbols._alias_trie:
@@ -705,6 +733,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, qid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
         self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
         self.assertDictEqual(tri_as_dict, truealiastrie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
@@ -719,6 +748,7 @@ class EntitySymbolTest(unittest.TestCase):
             max_candidates=max_candidates,
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
             edit_mode=True,
         )
 
@@ -736,6 +766,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2title, qid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
         self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
@@ -934,12 +965,19 @@ class EntitySymbolTest(unittest.TestCase):
             "Q3": "word alias3",
             "Q4": "nonalias4",
         }
+        qid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
         max_candidates = 3
 
         entity_symbols = EntitySymbols(
             max_candidates=max_candidates,
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
             edit_mode=True,
         )
 
@@ -968,6 +1006,8 @@ class EntitySymbolTest(unittest.TestCase):
             entity_symbols._eid2qid, {v: i for i, v in trueqid2eid.items()}
         )
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
+        self.assertDictEqual(entity_symbols._qid2title, qid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
         self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
@@ -981,8 +1021,22 @@ class EntitySymbolTest(unittest.TestCase):
 
         # Add entity
         entity_symbols.add_entity(
-            "Q5", [["multi word alias2", 1.5], ["alias5", 20.0]], "Snake"
+            "Q5", [["multi word alias2", 1.5], ["alias5", 20.0]], "Snake", "d Snake"
         )
+        qid2title = {
+            "Q1": "alias1",
+            "Q2": "multi alias2",
+            "Q3": "word alias3",
+            "Q4": "nonalias4",
+            "Q5": "Snake",
+        }
+        qid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+            "Q5": "d Snake",
+        }
         trueqid2aliases = {
             "Q1": {"alias1", "multi word alias2", "alias3"},
             "Q2": {"multi word alias2", "alias4"},
@@ -1050,12 +1104,19 @@ class EntitySymbolTest(unittest.TestCase):
             "Q3": "word alias3",
             "Q4": "nonalias4",
         }
+        qid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
         max_candidates = 3
 
         entity_symbols = EntitySymbols(
             max_candidates=max_candidates,
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
             edit_mode=True,
         )
         entity_symbols.reidentify_entity("Q1", "Q7")
@@ -1083,6 +1144,8 @@ class EntitySymbolTest(unittest.TestCase):
             entity_symbols._eid2qid, {v: i for i, v in trueqid2eid.items()}
         )
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
+        self.assertDictEqual(entity_symbols._qid2title, qid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
         self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
@@ -1106,15 +1169,30 @@ class EntitySymbolTest(unittest.TestCase):
             "Q3": "word alias3",
             "Q4": "nonalias4",
         }
+        qid2desc = {
+            "Q1": "d alias1",
+            "Q2": "d multi alias2",
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
         max_candidates = 3
 
         entity_symbols = EntitySymbols(
             max_candidates=max_candidates,
             alias2qids=alias2qids,
             qid2title=qid2title,
+            qid2desc=qid2desc,
             edit_mode=True,
         )
         entity_symbols.prune_to_entities({"Q3", "Q4"})
+        trueqid2title = {
+            "Q3": "word alias3",
+            "Q4": "nonalias4",
+        }
+        trueqid2desc = {
+            "Q3": "d word alias3",
+            "Q4": "d nonalias4",
+        }
         trueqid2aliases = {
             "Q3": {"alias4"},
             "Q4": {"alias1", "multi word alias2", "alias4"},
@@ -1137,6 +1215,8 @@ class EntitySymbolTest(unittest.TestCase):
             entity_symbols._eid2qid, {v: i for i, v in trueqid2eid.items()}
         )
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
+        self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
         self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)

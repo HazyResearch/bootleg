@@ -16,7 +16,6 @@ from tqdm import tqdm
 
 import emmental
 from bootleg import log_rank_0_debug
-from bootleg.symbols.constants import PRED_LAYER
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
@@ -104,19 +103,6 @@ def map_candidate_qids_to_eid(candidate_qids, qid2eid):
                     res_cands.append(qid2eid[q][0][0])
         res.append(res_cands)
     return res
-
-
-def select_embs(embs, pred_cands, M):
-    """Select the embeddings for the predicted indices.
-
-    Args:
-        embs: embedding tensor (M x K x H)
-        pred_cands: indices into the K candidates to select (M)
-        M: M
-
-    Returns: selected embedding (M x H)
-    """
-    return embs[torch.arange(M).unsqueeze(0), pred_cands]
 
 
 def get_eval_folder(file):
@@ -373,14 +359,14 @@ def batched_pred_iter(
                     #     [
                     #         ("sent_idx", "i8", 1),
                     #         ("subsent_idx", "i8", 1),
-                    #         ("alias_orig_list_pos", "i8", (data_config.max_aliases,)),
+                    #         ("alias_orig_list_pos", "i8", 1),
                     #     ]
                     # )
                     # ============================
                     # Index 0 -> sent_idx, Index 1 -> subsent_idx, Index 2 -> List of aliases positions
                     # (-1 means no mention in train example)
                     sent_idx = uid_bdict[task_name][ex_idx][0]
-                    # Only incredment for NED TASK
+                    # Only increment for NED TASK
                     if task_name == NED_TASK:
                         # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
                         # skip) for scoring. This will be different than the mentions seen by the model as we window
@@ -389,23 +375,16 @@ def batched_pred_iter(
                         alias_pos_for_eval = out_bdict[task_name][
                             "_input__for_dump_gold_cand_K_idx_train"
                         ][ex_idx]
-                        assert len(alias_pos_for_eval) == len(
-                            uid_bdict[task_name][ex_idx][2]
-                        )
+                        # This is the number of mentions - there should only be 1
+                        assert len(uid_bdict[task_name][ex_idx][2]) == 1
+                        alias_pos_in_og_list = uid_bdict[task_name][ex_idx][2][0]
                         if sent_idx not in cur_sentidx2_nummentions:
                             cur_sentidx2_nummentions[sent_idx] = set()
                         # Index 2 is index of alias positions in original list (-1 means no mention)
-                        cur_sentidx2_nummentions[sent_idx].update(
-                            set(
-                                [
-                                    i
-                                    for j, i in enumerate(
-                                        uid_bdict[task_name][ex_idx][2]
-                                    )
-                                    if alias_pos_for_eval[j] != -1
-                                ]
-                            )
-                        )
+                        if alias_pos_for_eval == -1:
+                            print("ALIAS POST WAS -1 AT", sent_idx)
+                        if alias_pos_for_eval != -1:
+                            cur_sentidx2_nummentions[sent_idx].add(alias_pos_in_og_list)
                     uid_dict[task_name][sent_idx].extend(
                         uid_bdict[task_name][ex_idx : ex_idx + 1]
                     )
@@ -582,7 +561,6 @@ def disambig_dump_preds(
     unmerged_entity_emb_file = os.path.join(save_folder, f"entity_embs.pt")
     merged_entity_emb_file = os.path.join(save_folder, f"entity_embs_unmerged.pt")
     emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
-    M = config.data_config.max_aliases
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
     if dump_embs:
         unmerged_storage_type = np.dtype(
@@ -592,12 +570,12 @@ def disambig_dump_preds(
                 ("hidden_size", int),
                 ("sent_idx", int),
                 ("subsent_idx", int),
-                ("alias_list_pos", int, (M,)),
-                ("entity_emb", float, M * config.model_config.hidden_size),
-                ("final_loss_true", int, (M,)),
-                ("final_loss_pred", int, (M,)),
-                ("final_loss_prob", float, (M,)),
-                ("final_loss_cand_probs", float, M * K),
+                ("alias_list_pos", int, 1),
+                ("entity_emb", float, config.model_config.hidden_size),
+                ("final_loss_true", int, 1),
+                ("final_loss_pred", int, 1),
+                ("final_loss_prob", float, 1),
+                ("final_loss_cand_probs", float, K),
             ]
         )
         merged_storage_type = np.dtype(
@@ -620,11 +598,11 @@ def disambig_dump_preds(
                 ("hidden_size", int),
                 ("sent_idx", int),
                 ("subsent_idx", int),
-                ("alias_list_pos", int, (M,)),
-                ("final_loss_true", int, (M,)),
-                ("final_loss_pred", int, (M,)),
-                ("final_loss_prob", float, (M,)),
-                ("final_loss_cand_probs", float, M * K),
+                ("alias_list_pos", int, 1),
+                ("final_loss_true", int, 1),
+                ("final_loss_pred", int, 1),
+                ("final_loss_prob", float, 1),
+                ("final_loss_cand_probs", float, K),
             ]
         )
         merged_storage_type = np.dtype(
@@ -671,19 +649,18 @@ def disambig_dump_preds(
         gold_cand_K_idx_train = disambig_res_dict["outputs"][
             "_input__for_dump_gold_cand_K_idx_train"
         ][i]
-        output_embeddings = disambig_res_dict["outputs"][f"{PRED_LAYER}_ent_embs"][i]
-        mmap_file[i]["M"] = M
+        output_embeddings = disambig_res_dict["outputs"][f"entity_encoder_0"][i]
         mmap_file[i]["K"] = K
         mmap_file[i]["hidden_size"] = config.model_config.hidden_size
         mmap_file[i]["sent_idx"] = sent_idx
         mmap_file[i]["subsent_idx"] = subsent_idx
         mmap_file[i]["alias_list_pos"] = alias_orig_list_pos
         # This will give all aliases seen by the model during training, independent of if it's gold or not
-        mmap_file[i][f"final_loss_true"] = gold_cand_K_idx_train.reshape(M)
+        mmap_file[i][f"final_loss_true"] = gold_cand_K_idx_train
 
-        # get max for each alias, probs is M x K
-        max_probs = probs.max(axis=1)
-        pred_cands = probs.argmax(axis=1)
+        # get max for each alias, probs is K
+        max_probs = probs.max(axis=0)
+        pred_cands = probs.argmax(axis=0)
 
         mmap_file[i]["final_loss_pred"] = pred_cands
         mmap_file[i]["final_loss_prob"] = max_probs
@@ -692,12 +669,9 @@ def disambig_dump_preds(
         all_sent_idx.add(str(sent_idx))
         # final_entity_embs is M x K x hidden_size, pred_cands is M
         if dump_embs:
-            chosen_entity_embs = select_embs(
-                embs=output_embeddings, pred_cands=pred_cands, M=M
-            )
-
+            chosen_entity_embs = output_embeddings[pred_cands]
             # write chosen entity embs to file for contextualized entity embeddings
-            mmap_file[i]["entity_emb"] = chosen_entity_embs.reshape(1, -1)
+            mmap_file[i]["entity_emb"] = chosen_entity_embs
 
     # for i in range(len(mmap_file)):
     #     si = mmap_file[i]["sent_idx"]
@@ -799,7 +773,6 @@ def merge_subsentences(
     total_num_mentions = cur_offset
     # print("TOTAL", total_num_mentions)
     full_pred_data = np.memmap(to_read_file, dtype=to_read_storage, mode="r")
-    M = int(full_pred_data[0]["M"])
     K = int(full_pred_data[0]["K"])
     hidden_size = int(full_pred_data[0]["hidden_size"])
     # print("TOTAL MENS", total_num_mentions)
@@ -814,7 +787,6 @@ def merge_subsentences(
     start = time.time()
     if num_processes == 1:
         seen_ids = merge_subsentences_single(
-            M,
             K,
             hidden_size,
             dump_embs,
@@ -829,7 +801,7 @@ def merge_subsentences(
         utils.ensure_dir(trie_folder)
         trie_file = os.path.join(trie_folder, "sentidx.marisa")
         utils.create_single_item_trie(sentidx2offset, out_file=trie_file)
-        # Chunk up date
+        # Chunk up data
         chunk_size = int(np.ceil(len(full_pred_data) / num_processes))
         row_idx_set_chunks = [
             all_ids[ids : ids + chunk_size]
@@ -837,7 +809,7 @@ def merge_subsentences(
         ]
         # Start pool
         input_args = [
-            [M, K, hidden_size, dump_embs, chunk] for chunk in row_idx_set_chunks
+            [K, hidden_size, dump_embs, chunk] for chunk in row_idx_set_chunks
         ]
         log_rank_0_debug(
             logger, f"Merging sentences together with {num_processes} processes"
@@ -863,7 +835,7 @@ def merge_subsentences(
                     emb_id not in seen_ids
                 ), f"{emb_id} already seen, something went wrong with sub-sentences"
                 seen_ids.add(emb_id)
-    # filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
+    filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
     # for i in range(len(filt_emb_data)):
     #     si = filt_emb_data[i]["sent_idx"]
     #     al_test = filt_emb_data[i]["alias_list_pos"]
@@ -899,9 +871,8 @@ def merge_subsentences_initializer(
 
 def merge_subsentences_hlp(args):
     """merge_subsentences multiprocessing subprocess helper."""
-    M, K, hidden_size, dump_embs, r_idx_set = args
+    K, hidden_size, dump_embs, r_idx_set = args
     return merge_subsentences_single(
-        M,
         K,
         hidden_size,
         dump_embs,
@@ -913,7 +884,6 @@ def merge_subsentences_hlp(args):
 
 
 def merge_subsentences_single(
-    M,
     K,
     hidden_size,
     dump_embs,
@@ -926,7 +896,6 @@ def merge_subsentences_single(
     merge_subsentences single process. Will flatted out the results from `full_pred_data` so each line of
      `filt_emb_data` is one alias prediction.
     Args:
-        M: number aliases
         K: number candidates
         hidden_size: hidden size
         dump_embs: dump embedding flag
@@ -950,37 +919,30 @@ def merge_subsentences_single(
             sent_start_idx = sentidx2offset[sent_idx][0][0]
         # print("R IDS", r_idx, row["sent_idx"], "START", sent_start_idx)
         # for each VALID mention, need to write into original alias list pos in list
-        for i, (true_val, alias_orig_pos) in enumerate(
-            zip(row["final_loss_true"], row["alias_list_pos"])
-        ):
-            # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for
-            # padded mentions or sub-sentence mentions
-            if true_val != -1:
-                # print(
-                #     "INSIDE MERGE", "I", i, "SENT", sent_idx, "TRUE", true_val, "ALIAS ORIG POS", alias_orig_pos,
-                #     "START SENT IDX", sent_start_idx, "EMB ID", sent_start_idx + alias_orig_pos
-                # )
-                # id in condensed embedding
-                emb_id = sent_start_idx + alias_orig_pos
-                assert (
-                    emb_id not in seen_ids
-                ), f"{emb_id} already seen, something went wrong with sub-sentences"
-                seen_ids.add(emb_id)
-                if dump_embs:
-                    filt_emb_data["entity_emb"][emb_id] = row["entity_emb"].reshape(
-                        M, hidden_size
-                    )[i]
-                filt_emb_data["sent_idx"][emb_id] = sent_idx
-                filt_emb_data["alias_list_pos"][emb_id] = alias_orig_pos
-                filt_emb_data["final_loss_pred"][emb_id] = row[
-                    "final_loss_pred"
-                ].reshape(M)[i]
-                filt_emb_data["final_loss_prob"][emb_id] = row[
-                    "final_loss_prob"
-                ].reshape(M)[i]
-                filt_emb_data["final_loss_cand_probs"][emb_id] = row[
-                    "final_loss_cand_probs"
-                ].reshape(M, K)[i]
+        true_val = row["final_loss_true"]
+        alias_orig_pos = row["alias_list_pos"]
+        # bc we are are using the mentions which includes both true and false golds, true_val == -1 only for
+        # padded mentions or sub-sentence mentions
+        if true_val != -1:
+            # print(
+            #     "INSIDE MERGE", "I", i, "SENT", sent_idx, "TRUE", true_val, "ALIAS ORIG POS", alias_orig_pos,
+            #     "START SENT IDX", sent_start_idx, "EMB ID", sent_start_idx + alias_orig_pos
+            # )
+            # id in condensed embedding
+            emb_id = sent_start_idx + alias_orig_pos
+            assert (
+                emb_id not in seen_ids
+            ), f"{emb_id} already seen, something went wrong with sub-sentences"
+            seen_ids.add(emb_id)
+            if dump_embs:
+                filt_emb_data["entity_emb"][emb_id] = row["entity_emb"]
+            filt_emb_data["sent_idx"][emb_id] = sent_idx
+            filt_emb_data["alias_list_pos"][emb_id] = alias_orig_pos
+            filt_emb_data["final_loss_pred"][emb_id] = row["final_loss_pred"]
+            filt_emb_data["final_loss_prob"][emb_id] = row["final_loss_prob"]
+            filt_emb_data["final_loss_cand_probs"][emb_id] = row[
+                "final_loss_cand_probs"
+            ]
     return seen_ids
 
 

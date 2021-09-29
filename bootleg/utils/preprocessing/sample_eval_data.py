@@ -42,12 +42,12 @@ def parse_args():
         help="Where files saved",
     )
     parser.add_argument(
-        "--sample_perc", type=float, default=0.01, help="Perc of each slice to sample"
+        "--sample_perc", type=float, default=0.005, help="Perc of each slice to sample"
     )
     parser.add_argument(
         "--min_sample_size",
         type=int,
-        default=10000,
+        default=5000,
         help="Min number of mentions per slice",
     )
     parser.add_argument(
@@ -100,7 +100,7 @@ def get_slice_stats(num_processes, file):
         for k in cnt_res:
             final_counts[k] += cnt_res[k]
         for k in slice_to_sent:
-            final_slice_to_sent[k].update(slice_to_sent[k])
+            final_slice_to_sent[k].update(set(slice_to_sent[k]))
         for k in sent_to_slices:
             final_sent_to_slices[k].update(sent_to_slices[k])
     shutil.rmtree(temp_out_dir)
@@ -133,6 +133,9 @@ def get_slice_stats_hlp(args):
         os.path.join(temp_out_dir, f"{FINAL_SENT_TO_SLICE_PREFIX}_{i}.json"),
         sent_to_slices,
     )
+    # Turn into list for dumping
+    for slice_name in slice_to_sent:
+        slice_to_sent[slice_name] = list(slice_to_sent[slice_name])
     utils.dump_json_file(
         os.path.join(temp_out_dir, f"{FINAL_SLICE_TO_SENT_PREFIX}_{i}.json"),
         slice_to_sent,

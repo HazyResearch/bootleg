@@ -12,6 +12,7 @@ The database of entity data starts with a simple ``jsonl`` file of data associat
         "entity_id": "Q16240866",
         "mentions": [["benin national u20 football team",1],["benin national under20 football team",1]],
         "title": "Forbidden fruit",
+        "description": "A fruit that once was considered not to be eaten",
         "types": {"hyena": ["<wordnet_football_team_108080025>"],
                   "wiki": ["national association football team"],
                   "relations":["country for sport","sport"]},
@@ -69,6 +70,7 @@ Inside the saved folder for the profile, all the mappings needed to run a Bootle
 * ``entity_mappings``: This folder contains non-structural entity data.
     * ``qid2eid.json``: This is a mapping from entity id (we refer to this as QID) to an entity index used internally to extract embeddings. Note that these entity ids start at 1 (0 index is reserved for a "not in candidate list" entity). We use Wikidata QIDs in our tutorials and documentation but any string identifier will work.
     * ``qid2title.json``: This is a mapping from entity QID to entity Wikipedia title.
+    * ``qid2desc.json``: This is a mapping from entity QID to entity Wikipedia description.
     * ``alias2qids.json``: This is a mapping from possible mentions (or aliases) to a list possible candidates. We restrict our candidate lists to be a predefined max length, typically 30. Each item in the list is a pair of [QID, QID score] values. The QID score is used for sorting candidates before filtering to the top 30. The scores are otherwise not used in Bootleg. This mapping is mined from both Wikipedia and Wikidata (reach out with a github issue if you want to know more).
     * ``alias2id.json``: This is a mapping from alias to alias index used internally by the model.
     * ``config.json``: This gives metadata associated with the entity data. Specifically, the maximum number of candidates.
@@ -78,40 +80,36 @@ Inside the saved folder for the profile, all the mappings needed to run a Bootle
     * ``qid2typeids.json``: Mapping from entity QID to a list of type ids.
     * ``config.json``: Contains metadata of the maximum number of types allowed for an entity.
 * ``kg_mappings``: This folder contains relationship entity data.
-    * ``type_vocab.json``: Mapping from type name to internal type id. This id mapping is offset by 1 to reserve the 0 type id for the UNK type.
+    * ``relation_vocab.json``: Mapping from human-readable relation name to relation ID used in qid2relations. Used to generate entity text input.
     * ``qid2relations.json``: Mapping from head entity QID to a dictionary of relation -> list of tail entities.
     * ``kg_adj.txt``: List of all connected entities separated by a tab. This is an unlabeled adjacency matrix.
     * ``config.json``: Contains metadata of the maximum number of tail connections allowed for a particular head entity and relation.
 
 .. note::
 
-    In Bootleg, we treat the relationships an entity participates in, whether as a head or tail entity, as types and use the unlabeled adjacency matrix as the KG connections in the model. This means one of our type systems is ``relations``.
+    In Bootleg, we add types from a selected type system and add KG relationship triples to our entity encoder.
 
 .. note::
 
     In our public ``entity_db`` provided to run Bootleg models, we also provide a few extra files. The first is ``alias2qids_unfiltered.json`` which provides our unfiltered, raw candidate mappings. We filter noisy aliases before running mention extraction. We lastly provide ``type_vocab_to_wikidataqid.json`` in the ``wiki`` type system folder which maps our type names to their own Wikidata QIDs (all Wikidata types *are* QIDs).
 
-Given this metadata, you simply need to specify the type, relation mappings and correct folder structures in a Bootleg training `config <config.html>`_. Specifically, these are the config parameters that need to be set to be associated with an entity profile.
+Given this metadata, you simply need to specify the types, relation mappings and correct folder structures in a Bootleg training `config <config.html>`_. Specifically, these are the config parameters that need to be set to be associated with an entity profile.
 
 .. code-block::
 
     data_config:
-      emb_dir: data/sample_entity_data
       entity_dir: data/sample_entity_data
-      ent_embeddings:
-           - key: learned_type
-             load_class: LearnedTypeEmb
-             args:
-               type_labels: type_mappings/wiki/qid2typeids.json
-               type_vocab: type_mappings/wiki/type_vocab.json
-           ...
-           - key: adj_index
-             load_class: KGIndices
-             args:
-               kg_adj: kg_mappings/kg_adj.txt
+      use_entity_desc: true
+      entity_type_data:
+        use_entity_types: true
+        type_labels: type_mappings/wiki/qid2typeids.json
+        type_vocab: type_mappings/wiki/type_vocab.json
+      entity_kg_data:
+        use_entity_kg: true
+        kg_labels: kg_mappings/qid2relations.json
+        kg_vocab: kg_mappings/relation_vocab.json
 
 See our `example config <https://github.com/HazyResearch/bootleg/tree/master/configs/tutorial/sample_config.yaml>`_
 for a full reference, and see our `entity profile tutorial <https://github
 .com/HazyResearch/bootleg/tree/master/tutorials/entity_profile_tutorial.ipynb>`_ for some methods to help modify
-configs
-to map to the entity profile correctly.
+configs to map to the entity profile correctly.

@@ -56,7 +56,7 @@ class BootlegSlicedScorer:
 
         Returns: dictionary of tensorboard compatible keys and metrics
         """
-        batch, M = golds.shape
+        batch = golds.shape[0]
         NO_MENTION = -1
         NOT_IN_CANDIDATES = -2 if self.train_in_candidates else 0
         res = {}
@@ -70,32 +70,31 @@ class BootlegSlicedScorer:
             len(uids) == batch
         ), f"Length of uids {len(uids)} does not match batch {batch} in scorer"
         for row in range(batch):
-            for col in range(M):
-                gold = golds[row, col]
-                pred = preds[row, col]
-                uid = uids[row]
-                pop_cand = 0 + int(not self.train_in_candidates)
-                if gold == NO_MENTION:
-                    continue
-                # Slices is dictionary of slice_name -> incidence array. Each array value is 1/0 for if in slice or not
-                slices = self.get_slices(uid)
-                for slice_name in slices:
-                    assert (
-                        slices[slice_name][col] != -1
-                    ), f"Something went wrong with slices {slices} and uid {uid}"
-                    # Check if alias is in slice
-                    if slices[slice_name][col] == 1:
-                        total[slice_name] += 1
+            gold = golds[row]
+            pred = preds[row]
+            uid = uids[row]
+            pop_cand = 0 + int(not self.train_in_candidates)
+            if gold == NO_MENTION:
+                continue
+            # Slices is dictionary of slice_name -> incidence array. Each array value is 1/0 for if in slice or not
+            slices = self.get_slices(uid)
+            for slice_name in slices:
+                assert (
+                    slices[slice_name][0] != -1
+                ), f"Something went wrong with slices {slices} and uid {uid}"
+                # Check if alias is in slice
+                if slices[slice_name][0] == 1:
+                    total[slice_name] += 1
+                    if gold != NOT_IN_CANDIDATES:
+                        total_in_cand[slice_name] += 1
+                    if gold == pred:
+                        correct_boot[slice_name] += 1
                         if gold != NOT_IN_CANDIDATES:
-                            total_in_cand[slice_name] += 1
-                        if gold == pred:
-                            correct_boot[slice_name] += 1
-                            if gold != NOT_IN_CANDIDATES:
-                                correct_boot_in_cand[slice_name] += 1
-                        if gold == pop_cand:
-                            correct_pop_cand[slice_name] += 1
-                            if gold != NOT_IN_CANDIDATES:
-                                correct_pop_cand_in_cand[slice_name] += 1
+                            correct_boot_in_cand[slice_name] += 1
+                    if gold == pop_cand:
+                        correct_pop_cand[slice_name] += 1
+                        if gold != NOT_IN_CANDIDATES:
+                            correct_pop_cand_in_cand[slice_name] += 1
         for slice_name in total:
             res[f"{slice_name}/total_men"] = total[slice_name]
             res[f"{slice_name}/total_notNC_men"] = total_in_cand[slice_name]

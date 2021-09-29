@@ -121,13 +121,12 @@ def get_slice_values(slice_names, line):
 
 
 def create_examples_initializer(
-    data_config, slice_names, use_weak_label, max_aliases, split, train_in_candidates
+    data_config, slice_names, use_weak_label, split, train_in_candidates
 ):
     global constants_global
     constants_global = {
         "slice_names": slice_names,
         "use_weak_label": use_weak_label,
-        "max_aliases": max_aliases,
         "split": split,
         "train_in_candidates": train_in_candidates,
     }
@@ -170,7 +169,6 @@ def create_examples(
         constants_dict = {
             "slice_names": slice_names,
             "use_weak_label": use_weak_label,
-            "max_aliases": data_config.max_aliases,
             "split": split,
             "train_in_candidates": data_config.train_in_candidates,
         }
@@ -215,7 +213,6 @@ def create_examples(
                 data_config,
                 slice_names,
                 use_weak_label,
-                data_config.max_aliases,
                 split,
                 data_config.train_in_candidates,
             ],
@@ -336,11 +333,11 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
                     split != "train" or not use_weak_label
                 ), f"As all anchors are false, this must happen if you are evaling or training and using weak labels"
             # TODO: optimizer here
-            # for i in range(0, num_alias2pred, max_aliases):
+            # for i in range(0, num_alias2pred, 1):
             #     subset_slices = {}
             #     for slice_name in list(slices.keys()):
             #         subset_slices[slice_name] = dict(str(j):slice[slice_name][str(j)] for
-            #                                                       j in range(i:i+max_aliases))
+            #                                                       j in range(i:i+1))
             #     ex = InputExample(
             #         sent_idx=sent_idx,
             #         subslice_idx=i,

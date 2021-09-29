@@ -3,7 +3,6 @@ Install
 `Bootleg <https://github.com/HazyResearch/bootleg>`_ requires Python 3.6 or later. We recommend using `pip` to install.::
 
     pip install bootleg
-    python3 -m spacy download en_core_web_sm
 
 or if you are downloading from source::
 
@@ -15,4 +14,4 @@ Note that the requirements assume CUDA 10.2. To use CUDA 10.1, you will need to 
 
 .. note::
 
-    You will need at least 130 GB of disk space, 12 GB of GPU memory, and 40 GB of CPU memory to run our model.
+    You will need at least XXX GB of disk space, 12 GB of GPU memory, and XXX GB of CPU memory to run our model.

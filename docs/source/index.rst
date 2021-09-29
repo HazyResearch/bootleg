@@ -28,7 +28,6 @@ submit your contributions as a pull request.
     :caption: Advanced
 
     advanced/distributed_training
-    advanced/embedding_nuances
 
 .. toctree::
     :maxdepth: 2

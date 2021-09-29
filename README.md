@@ -11,6 +11,8 @@ Bootleg is a self-supervised named entity disambiguation (NED) system for Englis
 
 Note that Bootleg is *actively under development* and feedback is welcome. Submit bugs on the Issues page or feel free to submit your contributions as a pull request.
 
+**Update 9-25-2021**: We changed our architecture to be a biencoder. Our entity textual input still has all the goodness of types and KG relations, but our model now requires less storage space and has improved performance. A secret to getting the biencoder to work over the tail was heavy masking of the mention in the context encoder and entity title in the entity encoder.
+
 **Update 2-15-2021**: We made a major rewrite of the codebase and moved to using Emmental for training--check out the [changelog](CHANGELOG.rst) for details)
 
 # Getting Started
@@ -24,14 +26,11 @@ pip install bootleg
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
 
 ## Models
-We have four different Bootleg models you can download. Each download comes with the saved model and config to run the model. We show in our [quickstart guide](https://bootleg.readthedocs.io/en/latest/gettingstarted/quickstart.html) and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
+Below is the link to download the English Bootleg model. The download comes with the saved model and config to run the model. We show in our [quickstart guide](https://bootleg.readthedocs.io/en/latest/gettingstarted/quickstart.html) and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
 
 | Model               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| BootlegCased        | All entity embeddings with type, KG, and title embeddings. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased.tar.gz) |
-| BootlegCasedSmall   | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. | 187M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz) |
-| BootlegUncased      | All entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
-| BootlegUncasedSmall | Top 5 percent most popular entity embeddings with type, KG, and title embeddings. Trained on uncased data. | 187M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz) |
+| BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
@@ -39,8 +38,7 @@ We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
 # Bootleg Overview
 Given an input sentence, Bootleg takes the sentence and outputs a predicted entity for each detected mention. Bootleg first extracts mentions in the
 sentence, and for each mention, we extract its set of possible candidate entities
-and any structural information about that entity, e.g., type information or knowledge graph (KG) information. Bootleg leverages these embeddings as *entity payloads* along with the sentence information as *word embeddings* to predict which entity (possibly the NIL entity)
-is associated with each mention.
+and any structural information about that entity, e.g., type information or knowledge graph (KG) information. Bootleg leverages this information to generate an entity embedding through a Transformer entity encoder. The mention and its surrounding context is encoded in a context encoder. The entity with the highest dot product with the context is selected for each mention.
 
 ![Dataflow](web/images/bootleg_dataflow.png "Bootleg Dataflow")
 

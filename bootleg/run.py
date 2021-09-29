@@ -6,26 +6,27 @@ import os
 import shutil
 import subprocess
 import sys
-from functools import partial
+from copy import copy
 
 import numpy as np
 import torch
 from rich.logging import RichHandler
+from transformers import AutoTokenizer
 
 import emmental
 from bootleg import log_rank_0_debug, log_rank_0_info
-from bootleg.data import get_dataloader_embeddings, get_dataloaders, get_slicedatasets
-from bootleg.optimizers.sparsedenseadam import SparseDenseAdamW
+from bootleg.data import get_dataloaders, get_slicedatasets
 from bootleg.symbols.constants import DEV_SPLIT, TEST_SPLIT, TRAIN_SPLIT
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import NED_TASK, TYPE_PRED_TASK
-from bootleg.tasks import ned_task, type_pred_task
-from bootleg.utils import eval_utils, utils
+from bootleg.task_config import NED_TASK
+from bootleg.tasks import ned_task
+from bootleg.utils import data_utils, eval_utils, utils
 from bootleg.utils.model_utils import count_parameters
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import (
     dump_yaml_file,
     load_yaml_file,
+    recurse_redict,
     try_rmtree,
     write_to_file,
 )
@@ -62,13 +63,7 @@ def parse_cmdline_args():
         "--mode",
         type=str,
         default="train",
-        choices=["train", "eval", "dump_preds", "dump_embs"],
-    )
-    cli_parser.add_argument(
-        "--local_rank",
-        type=int,
-        default=-1,
-        help="When using torch.distributed it passes local_rank as command arg. We must capture it here.",
+        choices=["train", "eval_batch_cands", "eval", "dump_preds", "dump_embs"],
     )
 
     # you can add other args that will override those in the config_script
@@ -81,7 +76,7 @@ def parse_cmdline_args():
     config = parse_boot_and_emm_args(cli_args.config_script, unknown)
 
     #  Modify the local rank param from the cli args
-    config.learner_config.local_rank = cli_args.local_rank
+    config.learner_config.local_rank = int(os.getenv("LOCAL_RANK", -1))
     mode = cli_args.mode
     return mode, config, cli_args.config_script
 
@@ -118,6 +113,8 @@ def setup(config, run_config_path=None):
     emmental.Meta.init_distributed_backend()
 
     cmd_msg = " ".join(sys.argv)
+    # Recast to dictionaries for emmental - will remove Dotteddicts
+    emmental.Meta.config = recurse_redict(copy(emmental.Meta.config))
     # Log configuration into filess
     if config.learner_config.local_rank in [0, -1]:
         write_to_file(f"{emmental.Meta.log_path}/cmd.txt", cmd_msg)
@@ -146,7 +143,7 @@ def setup(config, run_config_path=None):
     log_rank_0_info(logger, f"Git Hash: {git_hash}")
 
 
-def configure_optimizer(config):
+def configure_optimizer():
     """Configures the optimizer for Bootleg. By default, we use
     SparseDenseAdam. We always change the parameter group for layer norms
     following standard BERT finetuning methods.
@@ -156,21 +153,6 @@ def configure_optimizer(config):
 
     Returns:
     """
-    # Set default Bootleg optimizer if config doesn't override it
-    if config.learner_config.optimizer_config.optimizer is None:
-        log_rank_0_debug(logger, f"Setting default optimizer to be SparseDenseAdam")
-        custom_optimizer = partial(
-            SparseDenseAdamW,
-            lr=config.learner_config.optimizer_config.lr,
-            weight_decay=config.learner_config.optimizer_config.l2,
-            betas=config.learner_config.optimizer_config.adamw_config.betas,
-            eps=config.learner_config.optimizer_config.adamw_config.eps,
-        )
-        custom_optim_config = {
-            "learner_config": {"optimizer_config": {"optimizer": custom_optimizer}}
-        }
-        emmental.Meta.update_config(custom_optim_config)
-
     # Specify parameter group for Adam BERT
     def grouped_parameters(model):
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
@@ -198,6 +180,7 @@ def configure_optimizer(config):
     emmental.Meta.config["learner_config"]["optimizer_config"][
         "parameters"
     ] = grouped_parameters
+    return
 
 
 # TODO: optimize slices so we split them based on max aliases (save A LOT of memory)
@@ -227,15 +210,13 @@ def run_model(mode, config, run_config_path=None):
     )
     # Create tasks
     tasks = [NED_TASK]
-    if config.data_config.type_prediction.use_type_pred is True:
-        tasks.append(TYPE_PRED_TASK)
 
     # Create splits for data loaders
     data_splits = [TRAIN_SPLIT, DEV_SPLIT, TEST_SPLIT]
     # Slices are for eval so we only split on test/dev
     slice_splits = [DEV_SPLIT, TEST_SPLIT]
     # If doing eval, only run on test data
-    if mode in ["eval", "dump_preds", "dump_embs"]:
+    if mode in ["eval_batch_cands", "eval", "dump_preds", "dump_embs"]:
         data_splits = [TEST_SPLIT]
         slice_splits = [TEST_SPLIT]
         # We only do dumping if weak labels is True
@@ -245,44 +226,41 @@ def run_model(mode, config, run_config_path=None):
                     f"When calling dump_preds or dump_embs, we require use_weak_label to be True."
                 )
 
-    # Gets embeddings that need to be prepped during data prep or in the __get_item__ method
-    batch_on_the_fly_kg_adj = get_dataloader_embeddings(config, entity_symbols)
+    # Batch cands is for training and eval_batch_cands
+    use_batch_cands = mode in ["train", "eval_batch_cands"]
+
+    # Create tokenizer
+    context_tokenizer = AutoTokenizer.from_pretrained(
+        config.data_config.word_embedding.bert_model
+    )
+    data_utils.add_special_tokens(context_tokenizer)
+
     # Gets dataloaders
     dataloaders = get_dataloaders(
         config,
         tasks,
+        use_batch_cands,
         data_splits,
         entity_symbols,
-        batch_on_the_fly_kg_adj,
+        context_tokenizer,
     )
     slice_datasets = get_slicedatasets(config, slice_splits, entity_symbols)
 
-    configure_optimizer(config)
+    configure_optimizer()
 
     # Create models and add tasks
-    if config.model_config.attn_class == "BERTNED":
-        log_rank_0_info(logger, f"Starting NED-Base Model")
-        assert (
-            config.data_config.type_prediction.use_type_pred is False
-        ), f"NED-Base does not support type prediction"
-        assert (
-            config.data_config.word_embedding.use_sent_proj is False
-        ), f"NED-Base requires word_embeddings.use_sent_proj to be False"
-        model = EmmentalModel(name="NED-Base")
-        model.add_tasks(ned_task.create_task(config, entity_symbols, slice_datasets))
-    else:
-        log_rank_0_info(logger, f"Starting Bootleg Model")
-        model = EmmentalModel(name="Bootleg")
-        # TODO: make this more general for other tasks -- iterate through list of tasks
-        # and add task for each
-        model.add_task(ned_task.create_task(config, entity_symbols, slice_datasets))
-        if TYPE_PRED_TASK in tasks:
-            model.add_task(
-                type_pred_task.create_task(config, entity_symbols, slice_datasets)
-            )
-            # Add the mention type embedding to the embedding payload
-            type_pred_task.update_ned_task(model)
+    log_rank_0_info(logger, f"Starting Bootleg Model")
+    model_name = "Bootleg"
+    model = EmmentalModel(name=model_name)
 
+    model.add_task(
+        ned_task.create_task(
+            config,
+            use_batch_cands,
+            len(context_tokenizer),
+            slice_datasets,
+        )
+    )
     # Print param counts
     if mode == "train":
         log_rank_0_debug(logger, "PARAMS WITH GRAD\n" + "=" * 30)
@@ -296,20 +274,19 @@ def run_model(mode, config, run_config_path=None):
     if config["model_config"]["model_path"] is not None:
         model.load(config["model_config"]["model_path"])
 
-    # Barrier
-    if config["learner_config"]["local_rank"] == 0:
-        torch.distributed.barrier()
-
     # Train model
     if mode == "train":
         emmental_learner = EmmentalLearner()
         emmental_learner._set_optimizer(model)
+        # Save first checkpoint
+        if config.learner_config.local_rank in [0, -1]:
+            model.save(f"{emmental.Meta.log_path}/checkpoint_0.0.model.pth")
         emmental_learner.learn(model, dataloaders)
         if config.learner_config.local_rank in [0, -1]:
             model.save(f"{emmental.Meta.log_path}/last_model.pth")
 
     # Multi-gpu DataParallel eval (NOT distributed)
-    if mode in ["eval", "dump_embs", "dump_preds"]:
+    if mode in ["eval_batch_cands", "eval", "dump_embs", "dump_preds"]:
         # This happens inside EmmentalLearner for training
         if (
             config["learner_config"]["local_rank"] == -1
@@ -318,23 +295,24 @@ def run_model(mode, config, run_config_path=None):
             model._to_dataparallel()
 
     # If just finished training a model or in eval mode, run eval
-    if mode in ["train", "eval"]:
-        if mode == "train":
-            # Skip the TRAIN dataloader
-            scores = model.score(dataloaders[1:])
-        else:
-            scores = model.score(dataloaders)
-        # Save metrics and models
-        log_rank_0_info(logger, f"Saving metrics to {emmental.Meta.log_path}")
-        log_rank_0_info(logger, f"Metrics: {scores}")
-        scores["log_path"] = emmental.Meta.log_path
+    if mode in ["train", "eval_batch_cands", "eval"]:
         if config.learner_config.local_rank in [0, -1]:
+            if mode == "train":
+                # Skip the TRAIN dataloader
+                scores = model.score(dataloaders[1:])
+            else:
+                scores = model.score(dataloaders)
+            # Save metrics and models
+            log_rank_0_info(logger, f"Saving metrics to {emmental.Meta.log_path}")
+            log_rank_0_info(logger, f"Metrics: {scores}")
+            scores["log_path"] = emmental.Meta.log_path
             write_to_file(f"{emmental.Meta.log_path}/{mode}_metrics.txt", scores)
             eval_utils.write_disambig_metrics_to_csv(
                 f"{emmental.Meta.log_path}/{mode}_disambig_metrics.csv", scores
             )
+        else:
+            scores = {}
         return scores
-
     # If you want detailed dumps, save model outputs
     assert mode in [
         "dump_preds",

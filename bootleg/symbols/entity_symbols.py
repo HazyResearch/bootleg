@@ -20,6 +20,7 @@ class EntitySymbols:
         self,
         alias2qids: Dict[str, list],
         qid2title: Dict[str, str],
+        qid2desc: Dict[str, str] = None,
         qid2eid: Optional[Dict[str, int]] = None,
         alias2id: Optional[Dict[str, int]] = None,
         max_candidates: int = 30,
@@ -34,9 +35,16 @@ class EntitySymbols:
         self.max_candidates = max_candidates
         self.edit_mode = edit_mode
         self.verbose = verbose
-        # Used if we need to do any string searching for aliases. This keep track of the largest n-gram needed.
+        # Used if we need to do any string searching for aliases. This keep track of
+        # the largest n-gram needed.
         self._alias2qids: Dict[str, list] = alias2qids
         self._qid2title: Dict[str, str] = qid2title
+        self._qid2desc: Dict[str, str] = qid2desc
+        # Add empty description for entities
+        if self._qid2desc is not None:
+            for qid in self._qid2title:
+                if qid not in self._qid2desc:
+                    self._qid2desc[qid] = ""
         # Sort by score and filter to max candidates
         self._sort_alias_cands()
         for al in list(self._alias2qids.keys()):
@@ -44,8 +52,8 @@ class EntitySymbols:
 
         if qid2eid is None:
             # Add 1 for the noncand class
-            # We only make these inside the else because of json ordering being nondeterministic
-            # If we load stuff up in self.load() and regenerate these, the eid values may be nondeterministic
+            # If we load stuff up in self.load() and regenerate these,
+            # the eid values may be nondeterministic
             self._qid2eid: Dict[str, int] = {v: i + 1 for i, v in enumerate(qid2title)}
         else:
             self._qid2eid = qid2eid
@@ -60,9 +68,10 @@ class EntitySymbols:
 
         self._id2alias: Dict[int, str] = {id: al for al, id in self._alias2id.items()}
         self._eid2qid: Dict[int, str] = {eid: qid for qid, eid in self._qid2eid.items()}
-        assert len(self._qid2eid) == len(
-            self._eid2qid
-        ), f"The qid2eid mapping is not invertable. This means there is a duplicate id value."
+        assert len(self._qid2eid) == len(self._eid2qid), (
+            f"The qid2eid mapping is not invertable. "
+            f"This means there is a duplicate id value."
+        )
         assert -1 not in self._eid2qid, f"-1 can't be an eid"
         assert (
             0 not in self._eid2qid
@@ -115,6 +124,11 @@ class EntitySymbols:
         utils.dump_json_file(
             filename=os.path.join(save_dir, "qid2title.json"), contents=self._qid2title
         )
+        if self._qid2desc is not None:
+            utils.dump_json_file(
+                filename=os.path.join(save_dir, "qid2desc.json"),
+                contents=self._qid2desc,
+            )
         utils.dump_json_file(
             filename=os.path.join(save_dir, "qid2eid.json"), contents=self._qid2eid
         )
@@ -151,6 +165,11 @@ class EntitySymbols:
         qid2title: Dict[str, str] = utils.load_json_file(
             filename=os.path.join(load_dir, "qid2title.json")
         )
+        qid2desc = None
+        if os.path.exists(os.path.join(load_dir, "qid2desc.json")):
+            qid2desc: Dict[str, str] = utils.load_json_file(
+                filename=os.path.join(load_dir, "qid2desc.json")
+            )
         qid2eid: Dict[str, int] = utils.load_json_file(
             filename=os.path.join(load_dir, "qid2eid.json")
         )
@@ -160,6 +179,7 @@ class EntitySymbols:
         return cls(
             alias2qids,
             qid2title,
+            qid2desc,
             qid2eid,
             alias2id,
             max_candidates,
@@ -341,6 +361,18 @@ class EntitySymbols:
         assert id in self._qid2title
         return self._qid2title[id]
 
+    def get_desc(self, id):
+        """Gets description for QID.
+
+        Args:
+            id: QID string
+
+        Returns: title string
+        """
+        if self._qid2desc is None:
+            return ""
+        return self._qid2desc.get(id, "")
+
     def get_alias_idx(self, alias):
         """Gets the numeric index of an alias.
 
@@ -365,6 +397,34 @@ class EntitySymbols:
     # ============================================================
     # EDIT MODE OPERATIONS
     # ============================================================
+
+    @edit_op
+    def set_title(self, qid: str, title: str):
+        """
+        Sets the title for a QID
+
+        Args:
+            qid: QID
+            title: title
+
+        Returns:
+        """
+        assert qid in self._qid2eid
+        self._qid2title[qid] = title
+
+    @edit_op
+    def set_desc(self, qid: str, desc: str):
+        """
+        Sets the description for a QID
+
+        Args:
+            qid: QID
+            desc: description
+
+        Returns:
+        """
+        assert qid in self._qid2eid
+        self._qid2desc[qid] = desc
 
     @edit_op
     def set_score(self, qid: str, mention: str, score: float):
@@ -482,8 +542,8 @@ class EntitySymbols:
                 mention not in self._alias2qids and mention not in self._alias2id
             ), f"Removal of no candidates mention {mention} failed"
             # msg = f"You have removed all candidates for an existing mention, which will now be removed.
-            # You MUST reprep you data for this to take effect. Set data_config.overwrite_preprocessed_data
-            # to be True. This warning will now be supressed."
+            # You MUST reprep you data for this to take effect. Set data_config.overwrite_preprocessed_data to be
+            # True. This warning will now be supressed."
             # logger.warning(msg)
             # warnings.filterwarnings("ignore", message=msg)
 
@@ -495,13 +555,14 @@ class EntitySymbols:
         return
 
     @edit_op
-    def add_entity(self, qid, mentions, title):
+    def add_entity(self, qid, mentions, title, desc=""):
         """Add entity QID to our mappings with its mentions and title.
 
         Args:
             qid: QID
             mentions: List of tuples [mention, score]
             title: title
+            desc: description
 
         Returns:
         """
@@ -515,6 +576,8 @@ class EntitySymbols:
         self._eid2qid[new_eid] = qid
         # Update title
         self._qid2title[qid] = title
+        # Update description
+        self._qid2desc[qid] = desc
         # Make empty list to add in add_mention
         self._qid2aliases[qid] = set()
         # Update mentions
@@ -549,6 +612,9 @@ class EntitySymbols:
         # Update qid2title
         self._qid2title[new_qid] = self._qid2title[old_qid]
         del self._qid2title[old_qid]
+        # Update qid2desc
+        self._qid2desc[new_qid] = self._qid2desc[old_qid]
+        del self._qid2desc[old_qid]
         # Update qid2aliases
         self._qid2aliases[new_qid] = self._qid2aliases[old_qid]
         del self._qid2aliases[old_qid]
@@ -572,6 +638,10 @@ class EntitySymbols:
         self._qid2title = {
             k: v for k, v in self._qid2title.items() if k in entities_to_keep
         }
+        if self._qid2desc is not None:
+            self._qid2desc = {
+                k: v for k, v in self._qid2desc.items() if k in entities_to_keep
+            }
         self._qid2aliases = {
             k: v for k, v in self._qid2aliases.items() if k in entities_to_keep
         }

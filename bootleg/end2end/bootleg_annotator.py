@@ -9,22 +9,23 @@ import numpy as np
 import torch
 import ujson
 from tqdm import tqdm
-from transformers import BertTokenizer
+from transformers import AutoTokenizer
 
 import emmental
-from bootleg.data import get_dataloader_embeddings
+from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
 from bootleg.end2end.extract_mentions import (
     find_aliases_in_sentence_tag,
     get_all_aliases,
 )
-from bootleg.symbols.constants import PAD_ID, PRED_LAYER
+from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import NED_TASK, NED_TASK_TO_LABEL, TYPE_PRED_TASK
-from bootleg.tasks import ned_task, type_pred_task
-from bootleg.utils import sentence_utils
-from bootleg.utils.embedding_utils import get_max_candidates
+from bootleg.task_config import CANDS_LABEL, NED_TASK
+from bootleg.tasks import ned_task
+from bootleg.utils import data_utils
+from bootleg.utils.data_utils import read_in_relations, read_in_types
 from bootleg.utils.eval_utils import get_char_spans
+from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
 from emmental.model import EmmentalModel
@@ -32,10 +33,7 @@ from emmental.model import EmmentalModel
 logger = logging.getLogger(__name__)
 
 BOOTLEG_MODEL_PATHS = {
-    "bootleg_cased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased.tar.gz",
-    "bootleg_cased_mini": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_cased_mini.tar.gz",
     "bootleg_uncased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
-    "bootleg_uncased_mini": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_mini.tar.gz",
 }
 
 
@@ -81,7 +79,6 @@ def create_config(model_path, data_path, model_name):
     config_args["data_config"]["alias_cand_map"] = "alias2qids.json"
 
     # set the embedding paths
-    config_args["data_config"]["emb_dir"] = str(data_path / "entity_db")
     config_args["data_config"]["word_embedding"]["cache_dir"] = str(
         data_path / "pretrained_bert_models"
     )
@@ -181,14 +178,8 @@ class BootlegAnnotator(object):
             model_name = "bootleg_uncased"
 
         assert model_name in {
-            "bootleg_cased",
-            "bootleg_cased_mini",
             "bootleg_uncased",
-            "bootleg_uncased_mini",
-        }, (
-            f"model_name must be one of [bootleg_cased, bootleg_cased_mini, "
-            f"bootleg_uncased_mini, bootleg_uncased]. You have {model_name}."
-        )
+        }, f"model_name must be bootleg_uncased. You have {model_name}."
 
         if not config:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -201,9 +192,6 @@ class BootlegAnnotator(object):
                 config = parse_boot_and_emm_args(config)
             self.config = config
             # Ensure some of the critical annotator args are the correct type
-            self.config.data_config.max_aliases = int(
-                self.config.data_config.max_aliases
-            )
             self.config.run_config.eval_batch_size = int(
                 self.config.run_config.eval_batch_size
             )
@@ -244,31 +232,41 @@ class BootlegAnnotator(object):
             alias_cand_map_file=self.config.data_config.alias_cand_map,
             alias_idx_file=self.config.data_config.alias_idx_map,
         )
+
+        add_entity_type = self.config.data_config.entity_type_data.use_entity_types
+        self.qid2typenames = {}
+        if add_entity_type:
+            logger.debug("Reading entity database")
+            self.qid2typenames = read_in_types(self.config.data_config, self.entity_db)
+
+        add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
+        self.qid2relations = {}
+        if add_entity_kg:
+            self.qid2relations = read_in_relations(
+                self.config.data_config, self.entity_db
+            )
+
         logger.debug("Reading word tokenizers")
-        self.tokenizer = BertTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(
             self.config.data_config.word_embedding.bert_model,
             do_lower_case=True
             if "uncased" in self.config.data_config.word_embedding.bert_model
             else False,
             cache_dir=self.config.data_config.word_embedding.cache_dir,
         )
+        data_utils.add_special_tokens(self.tokenizer)
 
-        # Create tasks
-        tasks = [NED_TASK]
-        if self.config.data_config.type_prediction.use_type_pred is True:
-            tasks.append(TYPE_PRED_TASK)
-        self.task_to_label_dict = {t: NED_TASK_TO_LABEL[t] for t in tasks}
+        # Create tasks - CANDS_LABEL as we are not doing batch cands in annotator
+        self.task_to_label_dict = {NED_TASK: CANDS_LABEL}
 
         # Create tasks
         self.model = EmmentalModel(name="Bootleg")
-        task_to_add = ned_task.create_task(self.config, self.entity_db)
+        task_to_add = ned_task.create_task(
+            self.config, use_batch_cands=False, len_context_tok=len(self.tokenizer)
+        )
         # As we manually keep track of the aliases for scoring, we only need the embeddings as action outputs
-        task_to_add.action_outputs = [(PRED_LAYER, "ent_embs")]
+        task_to_add.action_outputs = [("entity_encoder", 0)]
         self.model.add_task(task_to_add)
-        if TYPE_PRED_TASK in tasks:
-            self.model.add_task(type_pred_task.create_task(self.config, self.entity_db))
-            # Add the mention type embedding to the embedding payload
-            type_pred_task.update_ned_task(self.model)
 
         logger.debug("Loading model")
         # Load the best model from the pretrained model
@@ -284,11 +282,6 @@ class BootlegAnnotator(object):
             alias_map = ujson.load(open(cand_map))
 
         self.all_aliases_trie = get_all_aliases(alias_map, verbose)
-
-        # get batch_on_the_fly embeddings
-        self.batch_on_the_fly_embs = get_dataloader_embeddings(
-            self.config, self.entity_db
-        )
 
     def extract_mentions(self, text, label_func):
         """Wrapper function for mention extraction.
@@ -394,23 +387,23 @@ class BootlegAnnotator(object):
             num_exs = len(text_list)
 
         ebs = int(self.config.run_config.eval_batch_size)
-        self.config.data_config.max_aliases = int(self.config.data_config.max_aliases)
         total_start_exs = 0
         total_final_exs = 0
         dropped_by_thresh = 0
 
         batch_example_qid_cands = []
         batch_example_eid_cands = []
-        batch_example_aliases_locs_start = []
-        batch_example_aliases_locs_end = []
-        batch_example_alias_list_pos = []
         batch_example_true_entities = []
         batch_word_indices = []
+        batch_word_token_types = []
+        batch_word_attention = []
+        batch_ent_indices = []
+        batch_ent_token_types = []
+        batch_ent_attention = []
         batch_spans_arr = []
         batch_char_spans_arr = []
         batch_example_aliases = []
         batch_idx_unq = []
-        batch_subsplit_idx = []
         for idx_unq in tqdm(
             range(num_exs),
             desc="Prepping data",
@@ -425,149 +418,93 @@ class BootlegAnnotator(object):
                 sample["qids"] = ["Q-1" for _ in range(len(sample["aliases"]))]
                 sample["gold"] = [True for _ in range(len(sample["aliases"]))]
             total_start_exs += len(sample["aliases"])
-            char_spans = get_char_spans(sample["spans"], sample["sentence"])
-            (
-                idxs_arr,
-                aliases_to_predict_per_split,
-                spans_arr,
-                phrase_tokens_arr,
-                pos_idxs,
-            ) = sentence_utils.split_sentence(
-                max_aliases=self.config.data_config.max_aliases,
-                phrase=sample["sentence"],
-                spans=sample["spans"],
-                aliases=sample["aliases"],
-                aliases_seen_by_model=list(range(len(sample["aliases"]))),
-                seq_len=self.config.data_config.max_seq_len,
-                is_bert=True,
-                tokenizer=self.tokenizer,
-            )
-            aliases_arr = [
-                [sample["aliases"][idx] for idx in idxs] for idxs in idxs_arr
-            ]
-            old_spans_arr = [
-                [sample["spans"][idx] for idx in idxs] for idxs in idxs_arr
-            ]
-            char_spans_arr = [[char_spans[idx] for idx in idxs] for idxs in idxs_arr]
-            qids_arr = [[sample["qids"][idx] for idx in idxs] for idxs in idxs_arr]
-            word_indices_arr = [
-                self.tokenizer.convert_tokens_to_ids(pt) for pt in phrase_tokens_arr
-            ]
-            # iterate over each sample in the split
-            for sub_idx in range(len(idxs_arr)):
+            char_spans_arr = get_char_spans(sample["spans"], sample["sentence"])
+            for men_idx in range(len(sample["aliases"])):
                 # ====================================================
-                # GENERATE MODEL INPUTS
+                # GENERATE TEXT INPUTS
                 # ====================================================
-                aliases_to_predict_arr = aliases_to_predict_per_split[sub_idx]
+                inputs = self.get_sentence_tokens(sample, men_idx)
 
-                assert (
-                    len(aliases_to_predict_arr) >= 0
-                ), f"There are no aliases to predict for an example. This should not happen at this point."
-                assert (
-                    len(aliases_arr[sub_idx]) <= self.config.data_config.max_aliases
-                ), f"{sample} should have no more than {self.config.data_config.max_aliases} aliases."
-
-                example_aliases_locs_start = (
-                    np.ones(self.config.data_config.max_aliases) * PAD_ID
-                )
-                example_aliases_locs_end = (
-                    np.ones(self.config.data_config.max_aliases) * PAD_ID
-                )
-                example_alias_list_pos = (
-                    np.ones(self.config.data_config.max_aliases) * PAD_ID
-                )
-                example_true_entities = (
-                    np.ones(self.config.data_config.max_aliases) * PAD_ID
-                )
+                # ====================================================
+                # GENERATE CANDIDATE INPUTS
+                # ====================================================
                 example_qid_cands = [
-                    [
-                        "-1"
-                        for _ in range(
-                            get_max_candidates(self.entity_db, self.config.data_config)
-                        )
-                    ]
-                    for _ in range(self.config.data_config.max_aliases)
+                    "-1"
+                    for _ in range(
+                        get_max_candidates(self.entity_db, self.config.data_config)
+                    )
                 ]
                 example_eid_cands = [
-                    [
-                        -1
-                        for _ in range(
-                            get_max_candidates(self.entity_db, self.config.data_config)
-                        )
-                    ]
-                    for _ in range(self.config.data_config.max_aliases)
+                    -1
+                    for _ in range(
+                        get_max_candidates(self.entity_db, self.config.data_config)
+                    )
                 ]
-                for mention_idx, alias in enumerate(aliases_arr[sub_idx]):
-                    span_start_idx, span_end_idx = spans_arr[sub_idx][mention_idx]
-                    # generate indexes into alias table.
-                    alias_qids = np.array(sample["cands"][mention_idx])
-                    # first entry is the non candidate class (NC and eid 0) - used when train in cands is false
-                    # if we train in candidates, this gets overwritten
-                    example_qid_cands[mention_idx][0] = "NC"
-                    example_qid_cands[mention_idx][
-                        (not self.config.data_config.train_in_candidates) : len(
-                            alias_qids
-                        )
-                        + (not self.config.data_config.train_in_candidates)
-                    ] = sample["cands"][mention_idx]
-                    example_eid_cands[mention_idx][0] = 0
-                    example_eid_cands[mention_idx][
-                        (not self.config.data_config.train_in_candidates) : len(
-                            alias_qids
-                        )
-                        + (not self.config.data_config.train_in_candidates)
-                    ] = [
-                        self.entity_db.get_eid(q) for q in sample["cands"][mention_idx]
-                    ]
-                    if not qids_arr[sub_idx][mention_idx] in alias_qids:
-                        # assert not data_args.train_in_candidates
-                        if not self.config.data_config.train_in_candidates:
-                            # set class label to be "not in candidate set"
-                            true_entity_idx = 0
-                        else:
-                            true_entity_idx = -2
+                # generate indexes into alias table.
+                alias_qids = np.array(sample["cands"][men_idx])
+                # first entry is the non candidate class (NC and eid 0) - used when train in cands is false
+                # if we train in candidates, this gets overwritten
+                example_qid_cands[0] = "NC"
+                example_qid_cands[
+                    (not self.config.data_config.train_in_candidates) : len(alias_qids)
+                    + (not self.config.data_config.train_in_candidates)
+                ] = sample["cands"][men_idx]
+                example_eid_cands[0] = 0
+                example_eid_cands[
+                    (not self.config.data_config.train_in_candidates) : len(alias_qids)
+                    + (not self.config.data_config.train_in_candidates)
+                ] = [self.entity_db.get_eid(q) for q in sample["cands"][men_idx]]
+                if not sample["qids"][men_idx] in alias_qids:
+                    # assert not data_args.train_in_candidates
+                    if not self.config.data_config.train_in_candidates:
+                        # set class label to be "not in candidate set"
+                        true_entity_idx = 0
                     else:
-                        # Here we are getting the correct class label for training.
-                        # Our training is "which of the max_entities entity candidates is the right one
-                        # (class labels 1 to max_entities) or is it none of these (class label 0)".
-                        # + (not discard_noncandidate_entities) is to ensure label 0 is
-                        # reserved for "not in candidate set" class
-                        true_entity_idx = np.nonzero(
-                            alias_qids == qids_arr[sub_idx][mention_idx]
-                        )[0][0] + (not self.config.data_config.train_in_candidates)
-                    example_aliases_locs_start[mention_idx] = span_start_idx
-                    # The span_idxs are [start, end). We want [start, end]. So subtract 1 from end idx.
-                    example_aliases_locs_end[mention_idx] = span_end_idx - 1
-                    example_alias_list_pos[mention_idx] = idxs_arr[sub_idx][mention_idx]
-                    # leave as -1 if it's not an alias we want to predict; we get these if we split a sentence
-                    # and need to only predict subsets
-                    if mention_idx in aliases_to_predict_arr:
-                        example_true_entities[mention_idx] = true_entity_idx
+                        true_entity_idx = -2
+                else:
+                    # Here we are getting the correct class label for training.
+                    # Our training is "which of the max_entities entity candidates is the right one
+                    # (class labels 1 to max_entities) or is it none of these (class label 0)".
+                    # + (not discard_noncandidate_entities) is to ensure label 0 is
+                    # reserved for "not in candidate set" class
+                    true_entity_idx = np.nonzero(alias_qids == sample["qids"][men_idx])[
+                        0
+                    ][0] + (not self.config.data_config.train_in_candidates)
 
-                # get word indices
-                word_indices = word_indices_arr[sub_idx]
+                # Get candidate tokens
+                entity_tokens = [
+                    self.get_entity_tokens(cand_qid) for cand_qid in example_qid_cands
+                ]
+                example_cand_input_ids = [
+                    ent_toks["input_ids"] for ent_toks in entity_tokens
+                ]
+                example_cand_token_type_ids = [
+                    ent_toks["token_type_ids"] for ent_toks in entity_tokens
+                ]
+                example_cand_attention_mask = [
+                    ent_toks["attention_mask"] for ent_toks in entity_tokens
+                ]
 
+                # ====================================================
+                # ACCUMULATE
+                # ====================================================
                 batch_example_qid_cands.append(example_qid_cands)
                 batch_example_eid_cands.append(example_eid_cands)
-                batch_example_aliases_locs_start.append(example_aliases_locs_start)
-                batch_example_aliases_locs_end.append(example_aliases_locs_end)
-                batch_example_alias_list_pos.append(example_alias_list_pos)
-                batch_example_true_entities.append(example_true_entities)
-                batch_word_indices.append(word_indices)
-                batch_example_aliases.append(aliases_arr[sub_idx])
+                batch_example_true_entities.append(true_entity_idx)
+                batch_word_indices.append(inputs["input_ids"])
+                batch_word_token_types.append(inputs["token_type_ids"])
+                batch_word_attention.append(inputs["attention_mask"])
+                batch_ent_indices.append(example_cand_input_ids)
+                batch_ent_token_types.append(example_cand_token_type_ids)
+                batch_ent_attention.append(example_cand_attention_mask)
+                batch_example_aliases.append(sample["aliases"][men_idx])
                 # Add the orginal sample spans because spans_arr is w.r.t BERT subword token
-                batch_spans_arr.append(old_spans_arr[sub_idx])
-                batch_char_spans_arr.append(char_spans_arr[sub_idx])
+                batch_spans_arr.append(sample["spans"][men_idx])
+                batch_char_spans_arr.append(char_spans_arr[men_idx])
                 batch_idx_unq.append(idx_unq)
-                batch_subsplit_idx.append(sub_idx)
 
         batch_example_eid_cands = torch.tensor(batch_example_eid_cands).long()
-        batch_example_aliases_locs_start = torch.tensor(
-            batch_example_aliases_locs_start
-        )
-        batch_example_aliases_locs_end = torch.tensor(batch_example_aliases_locs_end)
         batch_example_true_entities = torch.tensor(batch_example_true_entities)
-        batch_word_indices = torch.tensor(batch_word_indices)
 
         final_pred_cands = [[] for _ in range(num_exs)]
         final_all_cands = [[] for _ in range(num_exs)]
@@ -580,19 +517,22 @@ class BootlegAnnotator(object):
         final_char_spans = [[] for _ in range(num_exs)]
         final_aliases = [[] for _ in range(num_exs)]
         for b_i in tqdm(
-            range(0, batch_word_indices.shape[0], ebs),
+            range(0, len(batch_word_indices), ebs),
             desc="Evaluating model",
             disable=not self.verbose,
         ):
-            start_span_idx = batch_example_aliases_locs_start[b_i : b_i + ebs]
-            end_span_idx = batch_example_aliases_locs_end[b_i : b_i + ebs]
-            word_indices = batch_word_indices[b_i : b_i + ebs]
-            eid_cands = batch_example_eid_cands[b_i : b_i + ebs]
             x_dict = self.get_forward_batch(
-                start_span_idx, end_span_idx, word_indices, eid_cands
+                input_ids=torch.tensor(batch_word_indices)[b_i : b_i + ebs],
+                token_type_ids=torch.tensor(batch_word_token_types)[b_i : b_i + ebs],
+                attention_mask=torch.tensor(batch_word_attention)[b_i : b_i + ebs],
+                entity_token_ids=torch.tensor(batch_ent_indices)[b_i : b_i + ebs],
+                entity_type_ids=torch.tensor(batch_ent_token_types)[b_i : b_i + ebs],
+                entity_attention_mask=torch.tensor(batch_ent_attention)[
+                    b_i : b_i + ebs
+                ],
+                entity_cand_eid=batch_example_eid_cands[b_i : b_i + ebs],
             )
             x_dict["guid"] = torch.arange(b_i, b_i + ebs, device=self.torch_device)
-
             with torch.no_grad():
                 res = self.model(  # type: ignore
                     uids=x_dict["guid"],
@@ -604,7 +544,7 @@ class BootlegAnnotator(object):
             del x_dict
             if self.return_embs:
                 (uid_bdict, _, prob_bdict, _, out_bdict) = res
-                output_embs = out_bdict[NED_TASK][f"{PRED_LAYER}_ent_embs"]
+                output_embs = out_bdict[NED_TASK][f"entity_encoder_0"]
             else:
                 output_embs = None
                 (uid_bdict, _, prob_bdict, _) = res
@@ -613,52 +553,41 @@ class BootlegAnnotator(object):
             # ====================================================
             # recover predictions
             probs = prob_bdict[NED_TASK]
-            max_probs = probs.max(2)
-            max_probs_indices = probs.argmax(2)
+            max_probs = probs.max(1)
+            max_probs_indices = probs.argmax(1)
             for ex_i in range(probs.shape[0]):
                 idx_unq = batch_idx_unq[b_i + ex_i]
                 entity_cands = batch_example_qid_cands[b_i + ex_i]
                 # batch size is 1 so we can reshape
-                probs_ex = probs[ex_i].reshape(
-                    self.config.data_config.max_aliases, probs.shape[2]
-                )
-                for alias_idx, true_entity_pos_idx in enumerate(
-                    batch_example_true_entities[b_i + ex_i]
-                ):
-                    if true_entity_pos_idx != PAD_ID:
-                        pred_idx = max_probs_indices[ex_i][alias_idx]
-                        pred_prob = max_probs[ex_i][alias_idx].item()
-                        all_cands = entity_cands[alias_idx]
-                        pred_qid = all_cands[pred_idx]
-                        if pred_prob > self.threshold:
-                            final_all_cands[idx_unq].append(all_cands)
-                            final_cand_probs[idx_unq].append(probs_ex[alias_idx])
-                            final_pred_cands[idx_unq].append(pred_qid)
-                            final_pred_probs[idx_unq].append(pred_prob)
-                            if self.return_embs:
-                                final_entity_embs[idx_unq].append(
-                                    output_embs[ex_i][alias_idx][pred_idx]
-                                )
-                                final_entity_cand_embs[idx_unq].append(
-                                    output_embs[ex_i][alias_idx]
-                                )
-                            final_aliases[idx_unq].append(
-                                batch_example_aliases[b_i + ex_i][alias_idx]
+                probs_ex = probs[ex_i]
+                true_entity_pos_idx = batch_example_true_entities[b_i + ex_i]
+                if true_entity_pos_idx != PAD_ID:
+                    pred_idx = max_probs_indices[ex_i]
+                    pred_prob = max_probs[ex_i].item()
+                    pred_qid = entity_cands[pred_idx]
+                    if pred_prob > self.threshold:
+                        final_all_cands[idx_unq].append(entity_cands)
+                        final_cand_probs[idx_unq].append(probs_ex)
+                        final_pred_cands[idx_unq].append(pred_qid)
+                        final_pred_probs[idx_unq].append(pred_prob)
+                        if self.return_embs:
+                            final_entity_embs[idx_unq].append(
+                                output_embs[ex_i][pred_idx]
                             )
-                            final_spans[idx_unq].append(
-                                batch_spans_arr[b_i + ex_i][alias_idx]
-                            )
-                            final_char_spans[idx_unq].append(
-                                batch_char_spans_arr[b_i + ex_i][alias_idx]
-                            )
-                            final_titles[idx_unq].append(
-                                self.entity_db.get_title(pred_qid)
-                                if pred_qid != "NC"
-                                else "NC"
-                            )
-                            total_final_exs += 1
-                        else:
-                            dropped_by_thresh += 1
+                            final_entity_cand_embs[idx_unq].append(output_embs[ex_i])
+                        final_aliases[idx_unq].append(batch_example_aliases[b_i + ex_i])
+                        final_spans[idx_unq].append(batch_spans_arr[b_i + ex_i])
+                        final_char_spans[idx_unq].append(
+                            batch_char_spans_arr[b_i + ex_i]
+                        )
+                        final_titles[idx_unq].append(
+                            self.entity_db.get_title(pred_qid)
+                            if pred_qid != "NC"
+                            else "NC"
+                        )
+                        total_final_exs += 1
+                    else:
+                        dropped_by_thresh += 1
         assert total_final_exs + dropped_by_thresh == total_start_exs, (
             f"Something went wrong and we have predicted fewer mentions than extracted. "
             f"Start {total_start_exs}, Out {total_final_exs}, No cand {dropped_by_thresh}"
@@ -678,20 +607,81 @@ class BootlegAnnotator(object):
             res_dict["cand_embs"] = final_entity_cand_embs
         return res_dict
 
+    def get_sentence_tokens(self, sample, men_idx):
+        span = sample["spans"][men_idx]
+        tokens = sample["sentence"].split()
+        prev_context, next_context = extract_context_windows(
+            span, tokens, self.config.data_config.max_seq_window_len
+        )
+        context_tokens = (
+            prev_context
+            + ["[ent_start]"]
+            + tokens[span[0] : span[1]]
+            + ["[ent_end]"]
+            + next_context
+        )
+        context = " ".join(context_tokens)
+        inputs = self.tokenizer(
+            context,
+            padding="max_length",
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.config.data_config.max_seq_len,
+            return_overflowing_tokens=False,
+        )
+        return inputs
+
+    def get_entity_tokens(self, qid):
+        constants = {
+            "max_ent_len": self.config.data_config.max_ent_len,
+            "max_ent_type_len": self.config.data_config.entity_type_data.max_ent_type_len,
+            "max_ent_kg_len": self.config.data_config.entity_kg_data.max_ent_kg_len,
+            "use_types": self.config.data_config.entity_type_data.use_entity_types,
+            "use_kg": self.config.data_config.entity_kg_data.use_entity_kg,
+            "use_desc": self.config.data_config.use_entity_desc,
+        }
+        ent_str, title_spans, over_type_len, over_kg_len = get_entity_string(
+            qid,
+            constants,
+            self.entity_db,
+            self.qid2relations,
+            self.qid2typenames,
+        )
+        inputs = self.tokenizer(
+            ent_str,
+            padding="max_length",
+            add_special_tokens=True,
+            truncation=True,
+            max_length=constants["max_ent_len"],
+        )
+        return inputs
+
     def get_forward_batch(
-        self, start_span_idx, end_span_idx, token_ids, entity_cand_eid
+        self,
+        input_ids,
+        token_type_ids,
+        attention_mask,
+        entity_token_ids,
+        entity_type_ids,
+        entity_attention_mask,
+        entity_cand_eid,
     ):
-        """Preps the forward batch for disambiguation.
+        """
+        Generates emmental batch
 
         Args:
-            start_span_idx: start span tensor
-            end_span_idx: end span tensor
-            token_ids: word token tensor
-            eid_cands: candidate eids
+            input_ids: word token ids
+            token_type_ids: word token type ids
+            attention_mask: work attention mask
+            entity_token_ids: entity token ids
+            entity_type_ids: entity type ids
+            entity_attention_mask: entity attention mask
+            entity_cand_eid: entity candidate eids
 
-        Returns: X_dict used in Emmental
+        Returns: X_dict for emmental
+
         """
-        entity_cand_eid_mask = entity_cand_eid == -1
+        entity_cand_eval_mask = entity_cand_eid == -1
         entity_cand_eid_noneg = torch.where(
             entity_cand_eid >= 0,
             entity_cand_eid,
@@ -700,27 +690,15 @@ class BootlegAnnotator(object):
                 * (self.entity_db.num_entities_with_pad_and_nocand - 1)
             ),
         )
-
-        kg_prepped_embs = {}
-        for emb_key in self.batch_on_the_fly_embs:
-            kg_adj = self.batch_on_the_fly_embs[emb_key]["kg_adj"]
-            prep_func = self.batch_on_the_fly_embs[emb_key]["kg_adj_process_func"]
-            batch_prep = []
-            for j in range(entity_cand_eid_noneg.shape[0]):
-                batch_prep.append(
-                    prep_func(entity_cand_eid_noneg[j].cpu(), kg_adj).reshape(1, -1)
-                )
-            kg_prepped_embs[emb_key] = torch.tensor(
-                batch_prep, device=self.torch_device
-            )
-
         X_dict = {
             "guids": [],
-            "start_span_idx": start_span_idx.to(self.torch_device),
-            "end_span_idx": end_span_idx.to(self.torch_device),
-            "token_ids": token_ids.to(self.torch_device),
+            "input_ids": input_ids.to(self.torch_device),
+            "token_type_ids": token_type_ids.to(self.torch_device),
+            "attention_mask": attention_mask.to(self.torch_device),
+            "entity_cand_input_ids": entity_token_ids.to(self.torch_device),
+            "entity_cand_token_type_ids": entity_type_ids.to(self.torch_device),
+            "entity_cand_attention_mask": entity_attention_mask.to(self.torch_device),
             "entity_cand_eid": entity_cand_eid_noneg.to(self.torch_device),
-            "entity_cand_eid_mask": entity_cand_eid_mask.to(self.torch_device),
-            "batch_on_the_fly_kg_adj": kg_prepped_embs,
+            "entity_cand_eval_mask": entity_cand_eval_mask.to(self.torch_device),
         }
         return X_dict
