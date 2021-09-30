@@ -424,10 +424,10 @@ def extract_mentions(
 
         # chunk file for multiprocessing
         num_lines = get_num_lines(in_filepath)
+        num_chunks = min(num_chunks, num_lines)
         num_processes = min(num_workers, int(multiprocessing.cpu_count()))
         logger.debug(f"Using {num_processes} workers...")
         chunk_size = int(np.ceil(num_lines / (num_chunks)))
-        assert num_chunks == int(np.ceil(num_lines / chunk_size))
         chunk_file_path = os.path.join(prep_dir, "data_chunk")
         chunk_infiles = [
             f"{chunk_file_path}_{chunk_id}_in.jsonl" for chunk_id in range(num_chunks)
