@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import DistributedSampler, RandomSampler
 
 from bootleg import log_rank_0_info
-from bootleg.dataset import BootlegDataset
+from bootleg.dataset import BootlegDataset, BootlegEntityDataset
 from bootleg.slicing.slice_dataset import BootlegSliceDataset
 from bootleg.task_config import BATCH_CANDS_LABEL, CANDS_LABEL
 from emmental import Meta
@@ -128,6 +128,66 @@ def get_dataloaders(
         )
 
     return dataloaders
+
+
+def get_entity_dataloaders(
+    args,
+    tasks,
+    entity_symbols,
+    tokenizer,
+):
+    """Gets the dataloaders.
+
+    Args:
+        args: main args
+        tasks: task names
+        entity_symbols: entity symbols
+
+    Returns: list of dataloaders
+    """
+    task_to_label_dict = {t: CANDS_LABEL for t in tasks}
+    split = "test"
+
+    dataset_path = os.path.join(
+        args.data_config.data_dir, args.data_config[f"{split}_dataset"].file
+    )
+    dataset = BootlegEntityDataset(
+        main_args=args,
+        name=f"Bootleg",
+        dataset=dataset_path,
+        tokenizer=tokenizer,
+        entity_symbols=entity_symbols,
+        dataset_threads=args.run_config.dataset_threads,
+        split=split,
+    )
+    dataset_sampler = None
+    if Meta.config["learner_config"]["local_rank"] != -1:
+        log_rank_0_info(
+            logger,
+            f"You are using distributed computing for eval. We are not using a distributed sampler. "
+            f"Please use DataParallel and not DDP.",
+        )
+    dataloader = EmmentalDataLoader(
+        task_to_label_dict=task_to_label_dict,
+        dataset=dataset,
+        sampler=dataset_sampler,
+        split=split,
+        collate_fn=emmental_collate_fn,
+        batch_size=args.train_config.batch_size
+        if split in args.learner_config.train_split
+        or args.run_config.eval_batch_size is None
+        else args.run_config.eval_batch_size,
+        num_workers=args.run_config.dataloader_threads,
+        pin_memory=False,
+    )
+    log_rank_0_info(
+        logger,
+        f"Built dataloader for {split} set with {len(dataset)} and {args.run_config.dataloader_threads} threads "
+        f"samples (Shuffle={split in args.learner_config.train_split}, "
+        f"Batch size={dataloader.batch_size}).",
+    )
+
+    return dataloader
 
 
 def bootleg_collate_fn(

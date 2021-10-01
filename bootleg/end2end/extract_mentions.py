@@ -424,7 +424,6 @@ def extract_mentions(
 
         # chunk file for multiprocessing
         num_lines = get_num_lines(in_filepath)
-        num_chunks = min(num_chunks, num_lines)
         num_processes = min(num_workers, int(multiprocessing.cpu_count()))
         logger.debug(f"Using {num_processes} workers...")
         chunk_size = int(np.ceil(num_lines / (num_chunks)))

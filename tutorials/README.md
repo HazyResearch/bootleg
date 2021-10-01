@@ -13,7 +13,7 @@ In this [tutorial](entity_profile_tutorial.ipynb), learn how to modify and chang
 
 ## Using Bootleg Representations
 ### Embeddings Extraction
-In this [tutorial](contextual_static_entity_embedding_tutorial.ipynb), we will introduce you to how to take a pretrained Bootleg model and generate entity representations. The next tutorial shows you how to use them in a downstream model.
+In this [tutorial](entity_embedding_tutorial.ipynb), we will introduce you to how to take a pretrained Bootleg model and generate entity representations. The next tutorial shows you how to use them in a downstream model.
 
 ### Bootleg-Enhanced TACRED
 In this [tutorial](downstream_tutorial/), we show you how to integrate Bootleg embeddings into a downstream LSTM model and SPAN-BERT model.

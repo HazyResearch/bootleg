@@ -1734,3 +1734,174 @@ class BootlegDataset(EmmentalDataset):
             f"Bootleg Dataset. Data at {self.save_dataset_name}. "
             f"Labels at {self.save_labels_name}. "
         )
+
+
+class BootlegEntityDataset(EmmentalDataset):
+    """Bootleg Dataset class for generating entity embeddings.
+
+    Args:
+        main_args: input config
+        name: internal dataset name
+        dataset: dataset file
+        tokenizer: sentence tokenizer
+        entity_symbols: entity database class
+        dataset_threads: number of threads to use
+        split: data split
+
+    Returns:
+    """
+
+    def __init__(
+        self,
+        main_args,
+        name,
+        dataset,
+        tokenizer,
+        entity_symbols,
+        dataset_threads,
+        split="test",
+    ):
+        assert split == "test", f"Split must be test split for EntityDataset"
+        log_rank_0_info(
+            logger,
+            f"Starting to build data for {split} from {dataset}",
+        )
+        global_start = time.time()
+        data_config = main_args.data_config
+        spawn_method = main_args.run_config.spawn_method
+        log_rank_0_debug(logger, f"Setting spawn method to be {spawn_method}")
+        orig_spawn = multiprocessing.get_start_method()
+        multiprocessing.set_start_method(spawn_method, force=True)
+
+        # Storage for saving the data.
+        self.X_entity_storage = [
+            ("entity_input_ids", "i8", (data_config.max_ent_len)),
+            ("entity_token_type_ids", "i8", (data_config.max_ent_len)),
+            ("entity_attention_mask", "i8", (data_config.max_ent_len)),
+            ("entity_to_mask", "i8", (data_config.max_ent_len)),
+        ]
+        self.split = split
+        self.popularity_mask = data_config.popularity_mask
+        self.context_mask_perc = data_config.context_mask_perc
+        self.tokenizer = tokenizer
+
+        # Table to map from alias_idx to entity_cand_eid used in the __get_item__
+        self.alias2cands_model = AliasEntityTable(
+            data_config=data_config, entity_symbols=entity_symbols
+        )
+        # Total number of entities used in the __get_item__
+        self.num_entities_with_pad_and_nocand = (
+            entity_symbols.num_entities_with_pad_and_nocand
+        )
+
+        # Folder for entity mmap saved files
+        save_entity_folder = data_utils.get_emb_prep_dir(data_config)
+        utils.ensure_dir(save_entity_folder)
+
+        # =======================================================================================
+        # =======================================================================================
+        # =======================================================================================
+        # ENTITY TOKENS
+        # =======================================================================================
+        # =======================================================================================
+        # =======================================================================================
+        self.save_entity_dataset_name = os.path.join(
+            save_entity_folder,
+            f"entity_data"
+            f"_type{int(data_config.entity_type_data.use_entity_types)}"
+            f"_kg{int(data_config.entity_kg_data.use_entity_kg)}"
+            f"_desc{int(data_config.use_entity_desc)}.bin",
+        )
+        log_rank_0_debug(logger, f"Seeing if {self.save_entity_dataset_name} exists")
+        if data_config.overwrite_preprocessed_data or (
+            not os.path.exists(self.save_entity_dataset_name)
+        ):
+            st_time = time.time()
+            log_rank_0_info(logger, f"Building entity data from scatch.")
+            try:
+                # Creating/saving data
+                build_and_save_entity_inputs(
+                    self.save_entity_dataset_name,
+                    self.X_entity_storage,
+                    data_config,
+                    dataset_threads,
+                    tokenizer,
+                    entity_symbols,
+                )
+                log_rank_0_debug(
+                    logger, f"Finished prepping data in {time.time() - st_time}"
+                )
+            except Exception as e:
+                tb = traceback.TracebackException.from_exception(e)
+                logger.error(e)
+                logger.error(traceback.format_exc())
+                logger.error("\n".join(tb.stack.format()))
+                os.remove(self.save_entity_dataset_name)
+                raise
+
+        X_entity_dict = self.build_data_entity_dicts(
+            self.save_entity_dataset_name, self.X_entity_storage
+        )
+        # Add the unique identified of EID (the embeddings are already in this order)
+        X_entity_dict["guids"] = torch.arange(len(X_entity_dict["entity_input_ids"]))
+        log_rank_0_info(
+            logger,
+            f"Final data initialization time for {split} is {time.time() - global_start}s",
+        )
+        # Set spawn back to original/default, which is "fork" or "spawn".
+        # This is needed for the Meta.config to be correctly passed in the collate_fn.
+        multiprocessing.set_start_method(orig_spawn, force=True)
+        super().__init__(name, X_dict=X_entity_dict, uid="guids")
+
+    @classmethod
+    def build_data_entity_dicts(cls, save_dataset_name, X_storage):
+        """Returns the X_dict for the entity data.
+
+        Args:
+            save_dataset_name: memmap file name with entity data
+            X_storage: memmap storage type
+
+        Returns: Dict of labels
+        """
+        X_dict = {
+            "entity_input_ids": [],
+            "entity_token_type_ids": [],
+            "entity_attention_mask": [],
+            "entity_to_mask": [],
+        }
+        mmap_label_file = np.memmap(save_dataset_name, dtype=X_storage, mode="r")
+        X_dict["entity_input_ids"] = torch.from_numpy(
+            mmap_label_file["entity_input_ids"]
+        )
+        X_dict["entity_token_type_ids"] = torch.from_numpy(
+            mmap_label_file["entity_token_type_ids"]
+        )
+        X_dict["entity_attention_mask"] = torch.from_numpy(
+            mmap_label_file["entity_attention_mask"]
+        )
+        X_dict["entity_to_mask"] = torch.from_numpy(mmap_label_file["entity_to_mask"])
+        return X_dict
+
+    def __getitem__(self, index):
+        r"""Get item by index.
+
+        Args:
+          index(index): The index of the item.
+        Returns:
+          Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
+        """
+        x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
+        return x_dict
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["X_dict"]
+        del state["Y_dict"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        return state
+
+    def __repr__(self):
+        return f"Bootleg Entity Dataset. Data at {self.save_entity_dataset_name}."
