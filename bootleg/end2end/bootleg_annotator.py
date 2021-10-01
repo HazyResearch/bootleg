@@ -539,6 +539,8 @@ class BootlegAnnotator(object):
                     X_dict=x_dict,
                     Y_dict=None,
                     task_to_label_dict=self.task_to_label_dict,
+                    return_loss=False,
+                    return_probs=True,
                     return_action_outputs=self.return_embs,
                 )
             del x_dict

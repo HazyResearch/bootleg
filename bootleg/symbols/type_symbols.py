@@ -41,7 +41,6 @@ class TypeSymbols:
             assert (
                 0 not in self._type_vocab.values()
             ), f"You can't have a type id that is 0. That is reserved for UNK"
-        self._type_vocab_inv = {v: i for i, v in self._type_vocab.items()}
 
         for qid in qid2typenames:
             self._qid2typenames[qid] = qid2typenames.get(qid, [])[: self.max_types]
@@ -184,9 +183,9 @@ class TypeSymbols:
         Returns:
         """
         if typename not in self._type_vocab:
-            raise ValueError(
-                f"The type {typename} is not in our vocab. We only support adding types in our vocab."
-            )
+            max_type_id = max(self._type_vocab.values()) + 1
+            self._type_vocab[typename] = max_type_id
+            self._typename2qids[typename] = set()
         typeid = self._type_vocab[typename]
         # Update qid->type mappings
         if typename not in self._qid2typenames[qid]:
@@ -245,9 +244,9 @@ class TypeSymbols:
         """
         for typename in types:
             if typename not in self._type_vocab:
-                raise ValueError(
-                    f"Tried adding type {typename}. We do not support adding new types."
-                )
+                max_type_id = max(self._type_vocab.values()) + 1
+                self._type_vocab[typename] = max_type_id
+                self._typename2qids[typename] = set()
         # Add the qid to the qid dicts so we can call the add/remove functions
         self._qid2typenames[qid] = []
         self._qid2typeid[qid] = []

@@ -40,13 +40,11 @@ class TypeSymbolsTest(unittest.TestCase):
         }
         gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2], "Q789": []}
         gold_type_vocab = {"animal": 1, "animall": 2, "dog": 3, "drop": 4}
-        gold_type_vocab_inv = {1: "animal", 2: "animall", 3: "dog", 4: "drop"}
 
         self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
         self.assertIsNone(type_symbols._typename2qids)
         self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
         self.assertDictEqual(gold_type_vocab, type_symbols._type_vocab)
-        self.assertDictEqual(gold_type_vocab_inv, type_symbols._type_vocab_inv)
 
         max_types = 4
         type_symbols = TypeSymbols(qid2typenames, max_types=max_types, edit_mode=True)
@@ -84,9 +82,6 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertIsNone(type_symbols_2._typename2qids)
         self.assertDictEqual(type_symbols_2._qid2typeid, type_symbols._qid2typeid)
         self.assertDictEqual(type_symbols_2._type_vocab, type_symbols._type_vocab)
-        self.assertDictEqual(
-            type_symbols_2._type_vocab_inv, type_symbols._type_vocab_inv
-        )
 
     def test_type_add_remove_typemap(self):
         qid2typenames = {
@@ -103,23 +98,19 @@ class TypeSymbolsTest(unittest.TestCase):
         assert type(context.exception) is AttributeError
 
         type_symbols = TypeSymbols(qid2typenames, max_types=max_types, edit_mode=True)
-        # Check the invalid type fails (this type isn't in our set of types)
-        with self.assertRaises(ValueError) as context:
-            type_symbols.add_type("Q789", "annnimal")
-        assert type(context.exception) is ValueError
-
-        # Add to a previously empty QID
-        type_symbols.add_type("Q789", "animal")
+        # Add new type
+        type_symbols.add_type("Q789", "annnimal")
         gold_qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
             "Q567": ["animal", "animall", "drop"],
-            "Q789": ["animal"],
+            "Q789": ["annnimal"],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2, 4], "Q789": [1]}
+        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2, 4], "Q789": [5]}
         gold_typename2qids = {
-            "animal": {"Q123", "Q567", "Q789"},
+            "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
+            "annnimal": {"Q789"},
             "dog": {"Q345"},
             "drop": {"Q567"},
         }
@@ -134,7 +125,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
         # Now actually remove something
-        type_symbols.remove_type("Q789", "animal")
+        type_symbols.remove_type("Q789", "annnimal")
         gold_qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -145,6 +136,7 @@ class TypeSymbolsTest(unittest.TestCase):
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
+            "annnimal": set(),
             "dog": {"Q345"},
             "drop": {"Q567"},
         }
@@ -164,6 +156,7 @@ class TypeSymbolsTest(unittest.TestCase):
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
+            "annnimal": set(),
             "dog": {"Q345", "Q567"},
             "drop": set(),
         }
@@ -182,6 +175,7 @@ class TypeSymbolsTest(unittest.TestCase):
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
+            "annnimal": set(),
             "dog": {"Q345"},
             "drop": set(),
         }
@@ -198,30 +192,27 @@ class TypeSymbolsTest(unittest.TestCase):
         }
         max_types = 3
         type_symbols = TypeSymbols(qid2typenames, max_types=max_types, edit_mode=True)
-        # Check the invalid type fails (this type isn't in our set of types)
-        with self.assertRaises(ValueError) as context:
-            type_symbols.add_entity("Q910", ["annnimal", "animal", "dog", "drop"])
-        assert type(context.exception) is ValueError
 
         # Add to a previously empty QID
-        type_symbols.add_entity("Q910", ["animall", "animal", "dog", "drop"])
+        type_symbols.add_entity("Q910", ["annnimal", "animal", "dog", "drop"])
         gold_qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
             "Q567": ["animal", "animall", "drop"],
             "Q789": [],
-            "Q910": ["animall", "animal", "dog"],  # Max types limits new types added
+            "Q910": ["annnimal", "animal", "dog"],  # Max types limits new types added
         }
         gold_qid2typeid = {
             "Q123": [1],
             "Q345": [3],
             "Q567": [1, 2, 4],
             "Q789": [],
-            "Q910": [2, 1, 3],
+            "Q910": [5, 1, 3],
         }
         gold_typename2qids = {
             "animal": {"Q123", "Q567", "Q910"},
-            "animall": {"Q567", "Q910"},
+            "animall": {"Q567"},
+            "annnimal": {"Q910"},
             "dog": {"Q345", "Q910"},
             "drop": {"Q567"},
         }
