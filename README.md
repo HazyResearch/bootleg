@@ -45,7 +45,10 @@ and any structural information about that entity, e.g., type information or know
 More details can be found [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/input_data.html)
 
 ## Inference
-Given a pretrained model, we support three types of inference: `--mode eval`, `--mode dump_preds`, and `--mode dump_embs`. `Eval` mode is the fastest option and will run the test files through the model and output aggregated quality metrics to the log. `Dump_preds` mode will write the individual predictions and corresponding probabilities to a jsonlines file. This is useful for error analysis. `Dump_embs` mode is the same as `dump_preds`, but will additionally  output contextual entity embeddings. These can then be read and processed in a downstream system.
+Given a pretrained model, we support three types of inference: `--mode eval`, `--mode dump_preds`, and `--mode dump_embs`. `Eval` mode is the fastest option and will run the test files through the model and output aggregated quality metrics to the log. `Dump_preds` mode will write the individual predictions and corresponding probabilities to a jsonlines file. This is useful for error analysis. `Dump_embs` mode is the same as `dump_preds`, but will additionally output entity embeddings. These can then be read and processed in a downstream system. See this [notebook](tutorials/end2end_ned_tutorial.ipynb) to see how with a downloaded Bootleg model.
+
+## Entity Embedding Extraction
+As we have a separate encoder for generating an entity representation, we also support the ability to dump all entities to create a single entity embedding matrix for use downstream. This is done through the ```bootleg.extract_all_entities``` script. See this [notebook](tutorials/entity_embedding_tutorial.ipynb) to see how with a downloaded Bootleg model.
 
 ## Training
 We recommend using GPUs for training Bootleg models. For large datasets, we support distributed training with Pytorch's Distributed DataParallel framework to distribute batches across multiple GPUs. Check out the [Basic Training](https://bootleg.readthedocs.io/en/latest/gettingstarted/training.html) and [Advanced Training](https://bootleg.readthedocs.io/en/latest/advanced/distributed_training.html) tutorials for more information and sample data!

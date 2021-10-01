@@ -29,6 +29,7 @@ model_config:
   temperature: 0.01
 data_config:
   data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_0329
+  train_in_candidates: false
   data_prep_dir: prep
   use_entity_desc: true
   context_mask_perc: 0.0
@@ -54,7 +55,6 @@ data_config:
   train_dataset:
     file: train.jsonl
     use_weak_label: true
-  train_in_candidates: true
   eval_slices:
     - unif_all
     - unif_NS_all
