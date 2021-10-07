@@ -3,7 +3,13 @@ import argparse
 from argparse import ArgumentParser
 from typing import Any, Dict, Optional, Tuple
 
-from emmental.utils.utils import nullable_float, nullable_int, nullable_string, str2bool, str2dict
+from emmental.utils.utils import (
+    nullable_float,
+    nullable_int,
+    nullable_string,
+    str2bool,
+    str2dict,
+)
 
 from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict
 

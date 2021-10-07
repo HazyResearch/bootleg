@@ -25,7 +25,13 @@ from bootleg.tasks import ned_task
 from bootleg.utils import data_utils, eval_utils, utils
 from bootleg.utils.model_utils import count_parameters
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
-from bootleg.utils.utils import dump_yaml_file, load_yaml_file, recurse_redict, try_rmtree, write_to_file
+from bootleg.utils.utils import (
+    dump_yaml_file,
+    load_yaml_file,
+    recurse_redict,
+    try_rmtree,
+    write_to_file,
+)
 
 logger = logging.getLogger(__name__)
 

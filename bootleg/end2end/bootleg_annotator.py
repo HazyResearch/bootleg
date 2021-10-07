@@ -15,7 +15,10 @@ from transformers import AutoTokenizer
 
 from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
-from bootleg.end2end.extract_mentions import find_aliases_in_sentence_tag, get_all_aliases
+from bootleg.end2end.extract_mentions import (
+    find_aliases_in_sentence_tag,
+    get_all_aliases,
+)
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.task_config import NED_TASK
