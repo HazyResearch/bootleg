@@ -31,7 +31,7 @@ except OSError:
     try:
         spacy_download("en_core_web_sm")
         nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-    except:
+    except OSError:
         nlp = None
 
 # We want this to pass gracefully in the case Readthedocs is trying to build.

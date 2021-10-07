@@ -322,7 +322,8 @@ class BootlegAnnotator(object):
         label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
-        """Extracts mentions and runs disambiguation. If user provides extracted_examples, we will ignore text_list
+        """Extracts mentions and runs disambiguation. If user provides
+        extracted_examples, we will ignore text_list.
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
@@ -668,8 +669,7 @@ class BootlegAnnotator(object):
         entity_attention_mask,
         entity_cand_eid,
     ):
-        """
-        Generates emmental batch
+        """Generates emmental batch.
 
         Args:
             input_ids: word token ids
@@ -681,7 +681,6 @@ class BootlegAnnotator(object):
             entity_cand_eid: entity candidate eids
 
         Returns: X_dict for emmental
-
         """
         entity_cand_eval_mask = entity_cand_eid == -1
         entity_cand_eid_noneg = torch.where(

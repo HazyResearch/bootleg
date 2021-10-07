@@ -143,7 +143,7 @@ class KGSymbols:
         return self._all_relations
 
     def get_relation_name(self, relation):
-        """Returns human readable relation from vocab
+        """Returns human readable relation from vocab.
 
         Args:
             relation: relation

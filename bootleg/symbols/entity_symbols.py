@@ -400,8 +400,7 @@ class EntitySymbols:
 
     @edit_op
     def set_title(self, qid: str, title: str):
-        """
-        Sets the title for a QID
+        """Sets the title for a QID.
 
         Args:
             qid: QID
@@ -414,8 +413,7 @@ class EntitySymbols:
 
     @edit_op
     def set_desc(self, qid: str, desc: str):
-        """
-        Sets the description for a QID
+        """Sets the description for a QID.
 
         Args:
             qid: QID

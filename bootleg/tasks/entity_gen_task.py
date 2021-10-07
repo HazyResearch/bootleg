@@ -12,7 +12,8 @@ def entity_output_func(intermediate_output_dict):
 
 
 def create_task(args, len_context_tok):
-    """Returns an EmmentalTask for a forward pass through the entity encoder only.
+    """Returns an EmmentalTask for a forward pass through the entity encoder
+    only.
 
     Args:
         args: args

@@ -124,8 +124,7 @@ def get_eval_folder(file):
 
 
 def get_char_spans(spans, text):
-    """Helper function to get character spans instead of default word
-    spans.
+    """Helper function to get character spans instead of default word spans.
 
     Args:
         spans: word spans

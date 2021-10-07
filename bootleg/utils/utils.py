@@ -103,15 +103,13 @@ def load_yaml_file(filename):
 
 
 def recurse_redict(d):
-    """
-    Casts all DottedDict values in a dictionary to be dictionaries. Useful for YAML
-    dumping.
+    """Casts all DottedDict values in a dictionary to be dictionaries. Useful
+    for YAML dumping.
 
     Args:
         d: Dict
 
     Returns: Dict with no DottedDicts
-
     """
     d = dict(d)
     for k, v in d.items():

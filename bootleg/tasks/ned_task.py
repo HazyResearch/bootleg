@@ -85,6 +85,7 @@ class DisambigLoss:
 
     def batch_cands_disambig_output(self, intermediate_output_dict):
         """Function to return the probs for a task in Emmental.
+
         Args:
             intermediate_output_dict: output dict from Emmental task flow
         Returns: NED probabilities for candidates (B x M x K)
@@ -99,6 +100,7 @@ class DisambigLoss:
 
     def batch_cands_disambig_loss(self, intermediate_output_dict, Y, active):
         """Returns the entity disambiguation loss on prediction heads.
+
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels

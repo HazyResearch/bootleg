@@ -159,8 +159,7 @@ class InputFeatures(object):
 
 
 def extract_context_windows(span, tokens, max_seq_window_len):
-    """
-    Extracts the left and right context window around a span
+    """Extracts the left and right context window around a span.
 
     Args:
         span: span (left and right values)
@@ -168,7 +167,6 @@ def extract_context_windows(span, tokens, max_seq_window_len):
         max_seq_window_len: maximum window length around a span
 
     Returns: left context, right context
-
     """
     # If more tokens to the right, shift weight there
     if span[0] < len(tokens) - span[1]:
@@ -185,8 +183,8 @@ def extract_context_windows(span, tokens, max_seq_window_len):
 
 
 def get_structural_entity_str(items, max_tok_len, sep_tok):
-    """For structural resources in items. Returns sep_tok joined list of items such
-    that the number of words is less than max tok len.
+    """For structural resources in items. Returns sep_tok joined list of items
+    such that the number of words is less than max tok len.
 
     Args:
         items: list of structural resources
@@ -195,7 +193,6 @@ def get_structural_entity_str(items, max_tok_len, sep_tok):
 
     Returns:
         result string, number of items that went beyond ``max_tok_len``
-
     """
     i = 1
     over_len = 0
@@ -217,9 +214,9 @@ def get_entity_string(
     qid2relations,
     qid2typenames,
 ):
-    """
-    For each entity, generates a string that is fed into a language model to generate an entity embedding. Returns
-    all tokens that are the title of the entity (even if in the description)
+    """For each entity, generates a string that is fed into a language model to
+    generate an entity embedding. Returns all tokens that are the title of the
+    entity (even if in the description)
 
     Args:
         qid: QID
@@ -229,7 +226,6 @@ def get_entity_string(
         qid2typenames: Dict of QID to list of types
 
     Returns: entity strings, number of types over max length, number of relations over max length
-
     """
     over_kg_len = 0
     over_type_len = 0
@@ -1641,7 +1637,10 @@ class BootlegDataset(EmmentalDataset):
         return x_dict, y_dict
 
     def _mask_input_ids(self, x_dict):
-        """Mask the entity mention with high probability, especially if rare. Further mask tokens 10% of the time"""
+        """Mask the entity mention with high probability, especially if rare.
+
+        Further mask tokens 10% of the time
+        """
         # Get core dump if you don't do this
         input_ids = torch.clone(x_dict["input_ids"])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]
@@ -1688,7 +1687,8 @@ class BootlegDataset(EmmentalDataset):
         return input_ids
 
     def _mask_entity_input_ids(self, x_dict, eid):
-        """Mask the entity to_mask index with high probability, especially if mention is rare."""
+        """Mask the entity to_mask index with high probability, especially if
+        mention is rare."""
         # Get core dump if you don't do this
         entity_input_ids = torch.clone(self.X_entity_dict["entity_input_ids"][eid])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]

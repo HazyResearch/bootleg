@@ -195,7 +195,9 @@ def bootleg_collate_fn(
         List[Tuple[Dict[str, Any], Dict[str, torch.Tensor]]], List[Dict[str, Any]]
     ]
 ) -> Union[Tuple[Dict[str, Any], Dict[str, torch.Tensor]], Dict[str, Any]]:
-    """Collate function (modified from emmental collate fn). The main
+    """Collate function (modified from emmental collate fn).
+
+    The main
     difference is our collate function merges candidates from across the batch for disambiguation.
     Args:
       batch: The batch to collate.

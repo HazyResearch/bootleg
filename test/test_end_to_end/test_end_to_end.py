@@ -36,61 +36,11 @@ class TestEnd2End(unittest.TestCase):
         if os.path.exists(dir):
             shutil.rmtree(dir, ignore_errors=True)
 
-    def test_end2end_withkg(self):
-        self.args.data_config.entity_kg_data.use_entity_kg = True
-        # For the collate and dataloaders to play nicely, the spawn must be fork (this is set in run.py)
-        torch.multiprocessing.set_start_method("fork", force=True)
-
-        scores = run_model(mode="train", config=self.args)
-
-        assert type(scores) is dict
-        assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 1.1
-
-        self.args["model_config"][
-            "model_path"
-        ] = f"{emmental.Meta.log_path}/last_model.pth"
-        emmental.Meta.config["model_config"][
-            "model_path"
-        ] = f"{emmental.Meta.log_path}/last_model.pth"
-
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
-        assert os.path.exists(result_file)
-        results = [ujson.loads(li) for li in open(result_file)]
-        assert 19 == len(results)  # 18 total sentences
-        assert os.path.exists(out_emb_file)
-
-    def test_end2end_onealias(self):
+    def test_end2end(self):
         # Just setting this for testing pipelines
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
-        assert scores["model/all/dev/loss"] < 1.1
-
-        self.args["model_config"][
-            "model_path"
-        ] = f"{emmental.Meta.log_path}/last_model.pth"
-        emmental.Meta.config["model_config"][
-            "model_path"
-        ] = f"{emmental.Meta.log_path}/last_model.pth"
-
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
-        assert os.path.exists(result_file)
-        results = [ujson.loads(li) for li in open(result_file)]
-        assert 19 == len(results)  # 18 total sentences
-        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(52)
-        )  # 38 total mentions
-        assert os.path.exists(out_emb_file)
-
-    def test_end2end_withtype_singlethread(self):
-        self.args.data_config.entity_type_data.use_entity_types = True
-        # Just setting this for testing pipelines
-        self.args.data_config.eval_accumulation_steps = 2
-        scores = run_model(mode="train", config=self.args)
-        assert type(scores) is dict
-        assert len(scores) > 0
-        # losses from two tasks contribute to this
         assert scores["model/all/dev/loss"] < 1.1
 
         self.args["model_config"][
