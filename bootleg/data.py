@@ -145,7 +145,7 @@ def get_entity_dataloaders(
 
     Returns: list of dataloaders
     """
-    task_to_label_dict = {t: CANDS_LABEL for t in tasks}
+    task_to_label_dict = {t: None for t in tasks}
     split = "test"
 
     dataset_path = os.path.join(
