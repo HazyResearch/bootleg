@@ -23,7 +23,7 @@ setup(
         "scikit_learn~=0.24.1",
         "scipy~=1.6.1",
         "sentencepiece==0.1.*",
-        "spacy==3.0.*",
+        "spacy>=3.0.1,<3.0.5",
         "tagme==0.1.3",
         "torch>=1.7.0,<1.10.0",
         "tqdm>=4.27",
