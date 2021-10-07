@@ -37,7 +37,7 @@ def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0, zero_delta=1e-45):
 
     Returns: masked softmax tensor
     """
-    assert temp > 0, f"You can't have a temperature of 0"
+    assert temp > 0, "You can't have a temperature of 0"
     # pred is batch x M x K
     # https://github.com/allenai/allennlp/blob/b6cc9d39651273e8ec2a7e334908ffa9de5c2026/allennlp/nn/util.py#L272-L303
     pred = pred / temp
@@ -557,8 +557,8 @@ def disambig_dump_preds(
 
     # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
     # indices for overflowing sentences)
-    unmerged_entity_emb_file = os.path.join(save_folder, f"entity_embs.pt")
-    merged_entity_emb_file = os.path.join(save_folder, f"entity_embs_unmerged.pt")
+    unmerged_entity_emb_file = os.path.join(save_folder, "entity_embs.pt")
+    merged_entity_emb_file = os.path.join(save_folder, "entity_embs_unmerged.pt")
     emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
     if dump_embs:
@@ -648,14 +648,14 @@ def disambig_dump_preds(
         gold_cand_K_idx_train = disambig_res_dict["outputs"][
             "_input__for_dump_gold_cand_K_idx_train"
         ][i]
-        output_embeddings = disambig_res_dict["outputs"][f"entity_encoder_0"][i]
+        output_embeddings = disambig_res_dict["outputs"]["entity_encoder_0"][i]
         mmap_file[i]["K"] = K
         mmap_file[i]["hidden_size"] = config.model_config.hidden_size
         mmap_file[i]["sent_idx"] = sent_idx
         mmap_file[i]["subsent_idx"] = subsent_idx
         mmap_file[i]["alias_list_pos"] = alias_orig_list_pos
         # This will give all aliases seen by the model during training, independent of if it's gold or not
-        mmap_file[i][f"final_loss_true"] = gold_cand_K_idx_train
+        mmap_file[i]["final_loss_true"] = gold_cand_K_idx_train
 
         # get max for each alias, probs is K
         max_probs = probs.max(axis=0)
@@ -1074,7 +1074,7 @@ def write_data_labels(
             in_file_name.replace(create_ex_indir, create_ex_outdir)
             for in_file_name in input_files
         ]
-        log_rank_0_debug(logger, f"Done chunking files. Starting pool")
+        log_rank_0_debug(logger, "Done chunking files. Starting pool")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -1099,7 +1099,7 @@ def write_data_labels(
             total += 1
 
         # Merge output files to final file
-        log_rank_0_debug(logger, f"Merging output files")
+        log_rank_0_debug(logger, "Merging output files")
         with open(out_file, "wb") as outfile:
             for filename in glob.glob(os.path.join(create_ex_outdir, "*")):
                 if filename == out_file:

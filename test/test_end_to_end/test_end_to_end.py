@@ -2,7 +2,6 @@ import os
 import shutil
 import unittest
 
-import torch
 import ujson
 
 import emmental

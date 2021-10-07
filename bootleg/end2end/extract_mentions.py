@@ -26,7 +26,7 @@ try:
     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 except OSError:
     logger.warning(
-        f"Spacy models en_core_web_sm not found.  Downloading and installing."
+        "Spacy models en_core_web_sm not found.  Downloading and installing."
     )
     try:
         spacy_download("en_core_web_sm")
@@ -465,7 +465,7 @@ def extract_mentions(
 
     # single process
     else:
-        logger.debug(f"Using 1 worker...")
+        logger.debug("Using 1 worker...")
         with jsonlines.open(in_filepath, "r") as in_file, jsonlines.open(
             out_filepath, "w"
         ) as out_file:

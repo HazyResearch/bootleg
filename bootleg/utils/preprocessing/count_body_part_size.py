@@ -115,7 +115,7 @@ def main():
 
     a2q_f = data_dir / "entity_db" / "entity_mappings" / "alias2qids.json"
 
-    print(f"Getting slice counts from test and dev")
+    print("Getting slice counts from test and dev")
     for prefix in ["test", "dev"]:
         subfolder = data_dir / prefix
         input_files = list(subfolder.glob("*.jsonl"))

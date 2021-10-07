@@ -218,7 +218,7 @@ def edit_op(func):
     @wraps(func)
     def wrapper_check_edit_mode(obj, *args, **kwargs):
         if obj.edit_mode is False:
-            raise AttributeError(f"You must load object in edit_mode=True")
+            raise AttributeError("You must load object in edit_mode=True")
         return func(obj, *args, **kwargs)
 
     return wrapper_check_edit_mode

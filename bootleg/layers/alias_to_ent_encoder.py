@@ -48,11 +48,11 @@ class AliasEntityTable(nn.Module):
         assert torch.equal(
             self.alias2entity_table[-2],
             torch.ones_like(self.alias2entity_table[-1]) * -1,
-        ), f"The second to last row of the alias table isn't -1, something wasn't loaded right."
+        ), "The second to last row of the alias table isn't -1, something wasn't loaded right."
         assert torch.equal(
             self.alias2entity_table[-1],
             torch.ones_like(self.alias2entity_table[-1]) * -1,
-        ), f"The last row of the alias table isn't -1, something wasn't loaded right."
+        ), "The last row of the alias table isn't -1, something wasn't loaded right."
 
     @classmethod
     def prep(
@@ -105,7 +105,7 @@ class AliasEntityTable(nn.Module):
             )
         else:
             start = time.time()
-            log_rank_0_debug(logger, f"Building alias table")
+            log_rank_0_debug(logger, "Building alias table")
             utils.ensure_dir(prep_dir)
             alias2entity_table, alias2entityprior_table = cls.build_alias_table(
                 data_config, entity_symbols

@@ -324,7 +324,7 @@ def create_examples(
     qidcnt_file = os.path.join(
         data_config.entity_dir, data_config.entity_map_dir, data_config.qid_cnt_map
     )
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     constants_dict = {
         "is_bert": is_bert,
@@ -368,7 +368,7 @@ def create_examples(
         assert (
             total_input == total_input_from_chunks
         ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-        log_rank_0_debug(logger, f"Done chunking files. Starting pool.")
+        log_rank_0_debug(logger, "Done chunking files. Starting pool.")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -757,7 +757,7 @@ def convert_examples_to_features_and_save_single(
         if not entitysymbols.alias_exists(alias):
             # if we do not have this alias in our set, we give it an index of -2, meaning we will
             # always get it wrong in eval
-            assert split in ["test", "dev",], (
+            assert split in ["test", "dev"], (
                 f"Expected split of 'test' or 'dev'. If you are training, "
                 f"the alias {alias} must be in our entity dump"
             )
@@ -781,7 +781,7 @@ def convert_examples_to_features_and_save_single(
                 # if we are not using a NC (no candidate) but are in eval mode, we let the gold
                 # candidate not be in the candidate set we give in a true index of -2,
                 # meaning our model will always get this example incorrect
-                assert split in ["test", "dev",], (
+                assert split in ["test", "dev"], (
                     f"Expected split of 'test' or 'dev' in sent {example.sent_idx}. If you are training, "
                     f"the QID {qid} must be in the candidate list for data_args.train_in_candidates to be True"
                 )
@@ -1459,7 +1459,7 @@ class BootlegDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(
@@ -1486,7 +1486,7 @@ class BootlegDataset(EmmentalDataset):
         )
         self.X_entity_dict = X_entity_dict
 
-        log_rank_0_debug(logger, f"Removing temporary output files")
+        log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
         log_rank_0_info(
             logger,
@@ -1761,7 +1761,7 @@ class BootlegEntityDataset(EmmentalDataset):
         dataset_threads,
         split="test",
     ):
-        assert split == "test", f"Split must be test split for EntityDataset"
+        assert split == "test", "Split must be test split for EntityDataset"
         log_rank_0_info(
             logger,
             f"Starting to build data for {split} from {dataset}",
@@ -1817,7 +1817,7 @@ class BootlegEntityDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(

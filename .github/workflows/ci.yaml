@@ -2,9 +2,13 @@ name: CI
 
 on:
     push:
-        branches: [ emmental_master, master ]
+        branches:
+          - emmental_master
+          - master
     pull_request:
-        branches: [ emmental_master, master ]
+        branches:
+          - emmental_master
+          - master
 
     # Allows you to run this workflow manually from the Actions tab
     workflow_dispatch:

@@ -169,10 +169,9 @@ def read_in_types(data_config, entitysymbols):
             f"Inverse vocab from {vocab_file} not" f"same length as vocab"
         )
     all_type_ids = set(vocab.values())
-    assert 0 not in all_type_ids, (
-        f"We assume type indices start at 1. 0 is reserved for UNK type. "
-        f"You have index 0."
-    )
+    assert (
+        0 not in all_type_ids
+    ), "We assume type indices start at 1. 0 is reserved for UNK type. You have index 0."
     with open(type_file) as in_f:
         # take the first type; UNK type is 0
         qid2typenames = {}
