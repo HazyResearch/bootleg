@@ -8,7 +8,7 @@ test: dev check docs
 	pytest tests
 
 format:
-	isort bootleg/ tests/
+	isort --atomic bootleg/ tests/
 	black bootleg/ tests/
 	# docformatter --in-place --recursive bootleg tests
 

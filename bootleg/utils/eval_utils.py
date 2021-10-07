@@ -7,20 +7,20 @@ import shutil
 import time
 from collections import defaultdict
 
+import emmental
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
 import ujson
+from emmental.utils.utils import array_to_numpy, prob_to_pred
 from tqdm import tqdm
 
-import emmental
 from bootleg import log_rank_0_debug
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
 from bootleg.utils.utils import strip_nan, try_rmtree
-from emmental.utils.utils import array_to_numpy, prob_to_pred
 
 logger = logging.getLogger(__name__)
 

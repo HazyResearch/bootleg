@@ -5,19 +5,17 @@ import tarfile
 import urllib
 from pathlib import Path
 
+import emmental
 import numpy as np
 import torch
 import ujson
+from emmental.model import EmmentalModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
-from bootleg.end2end.extract_mentions import (
-    find_aliases_in_sentence_tag,
-    get_all_aliases,
-)
+from bootleg.end2end.extract_mentions import find_aliases_in_sentence_tag, get_all_aliases
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.task_config import NED_TASK
@@ -28,7 +26,6 @@ from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
