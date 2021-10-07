@@ -95,7 +95,7 @@ def merge_data(
         os.path.dirname(file_pairs[0]), "_bootleg_temp_outdir"
     )
     utils.ensure_dir(create_ex_outdir)
-    print(f"Counting lines")
+    print("Counting lines")
     total_input = sum(1 for _ in open(file_pairs[0]))
     total_input_cands = sum(1 for _ in open(file_pairs[1]))
     assert (
@@ -161,7 +161,7 @@ def merge_data(
         f"Overall Recall for {file_pairs[0]}: {(total_seen - total_dropped) / total_seen} for seeing {total_seen}"
     )
     # Merge output files to final file
-    print(f"Merging output files")
+    print("Merging output files")
     with open(file_pairs[2], "wb") as outfile:
         for filename in glob.glob(os.path.join(create_ex_outdir, "*")):
             if filename == file_pairs[2]:
@@ -329,7 +329,7 @@ def main():
             final_cand_map[al] = new_alias2qids[al]
             max_cands = max(max_cands, len(final_cand_map[al]))
 
-    print(f"Buidling new entity symbols")
+    print("Buidling new entity symbols")
     entity_dump = EntitySymbols.load_from_cache(load_dir=args.entity_dump)
     entity_dump_new = EntitySymbols(
         max_candidates=max_cands,

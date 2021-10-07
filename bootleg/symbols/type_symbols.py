@@ -22,7 +22,7 @@ class TypeSymbols:
         verbose: Optional[bool] = False,
     ):
         if max_types <= 0:
-            raise ValueError(f"max_types must be greater than 0")
+            raise ValueError("max_types must be greater than 0")
         self.max_types = max_types
         self.edit_mode = edit_mode
         self.verbose = verbose
@@ -40,7 +40,7 @@ class TypeSymbols:
             self._type_vocab: Dict[str, int] = type_vocab
             assert (
                 0 not in self._type_vocab.values()
-            ), f"You can't have a type id that is 0. That is reserved for UNK"
+            ), "You can't have a type id that is 0. That is reserved for UNK"
 
         for qid in qid2typenames:
             self._qid2typenames[qid] = qid2typenames.get(qid, [])[: self.max_types]
@@ -54,9 +54,7 @@ class TypeSymbols:
             self._qid2typeid: Dict[str, List[int]] = qid2typeid
 
         for typeids in self._qid2typeid.values():
-            assert (
-                0 not in typeids
-            ), f"Typeids can't be 0. This is reserved for UNK type"
+            assert 0 not in typeids, "Typeids can't be 0. This is reserved for UNK type"
 
         self._typename2qids = None
         if edit_mode:
@@ -71,6 +69,10 @@ class TypeSymbols:
                     if typname not in self._typename2qids:
                         self._typename2qids[typname] = set()
                     self._typename2qids[typname].add(qid)
+            # In case extra types in vocab without qids
+            for typname in self._type_vocab:
+                if typname not in self._typename2qids:
+                    self._typename2qids[typname] = set()
 
     def save(self, save_dir, prefix=""):
         """Dumps the type symbols.

@@ -110,8 +110,8 @@ class EntityProfile:
         )
         if no_type:
             print(
-                f"Not loading type information. We will act as if there is no types associated with any entity "
-                f"and will not modify the types in any way, even if calling `add`."
+                "Not loading type information. We will act as if there is no types associated with any entity "
+                "and will not modify the types in any way, even if calling `add`."
             )
         type_sys_dict = {}
         for fold in type_subfolder.iterdir():
@@ -128,11 +128,11 @@ class EntityProfile:
                     verbose=verbose,
                 )
         if verbose:
-            print(f"Loading KG Symbols")
+            print("Loading KG Symbols")
         if no_kg:
             print(
-                f"Not loading KG information. We will act as if there is no KG connections between entities. "
-                f"We will not modify the KG information in any way, even if calling `add`."
+                "Not loading KG information. We will act as if there is no KG connections between entities. "
+                "We will not modify the KG information in any way, even if calling `add`."
             )
         kg_symbols = None
         if not no_kg:
@@ -260,7 +260,7 @@ class EntityProfile:
                 for rel_pair in ent.relations:
                     if "relation" not in rel_pair or "object" not in rel_pair:
                         raise ValueError(
-                            f"For each value in relations, it must be a JSON with keys relation and object"
+                            "For each value in relations, it must be a JSON with keys relation and object"
                         )
                     if ent.entity_id not in qid2relations:
                         qid2relations[ent.entity_id] = {}
@@ -562,8 +562,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
-                f"you are replacing the entity information in bulk."
+                "The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                "you are replacing the entity information in bulk."
             )
         try:
             ent = EntityObj(
@@ -594,7 +594,7 @@ class EntityProfile:
         for rel_pair in ent.relations:
             if "relation" not in rel_pair or "object" not in rel_pair:
                 raise ValueError(
-                    f"For each value in relations, it must be a JSON with keys relation and object"
+                    "For each value in relations, it must be a JSON with keys relation and object"
                 )
             if (
                 self._kg_symbols is not None
@@ -659,8 +659,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
-                f"you are replacing the entity information in bulk."
+                "The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                "you are replacing the entity information in bulk."
             )
         if not self._entity_symbols.qid_exists(entity_obj["entity_id"]):
             raise ValueError(f"The entity {entity_obj['entity_id']} is not in our dump")
@@ -727,7 +727,7 @@ class EntityProfile:
                 print(f"Pruning {type_sys} data")
             self._type_systems[type_sys].prune_to_entities(entities_to_keep)
         if self.verbose:
-            print(f"Pruning kg data")
+            print("Pruning kg data")
         if self._kg_symbols is not None:
             self._kg_symbols.prune_to_entities(entities_to_keep)
 

@@ -247,7 +247,7 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
         assert os.path.splitext(config)[1] in [
             ".json",
             ".yaml",
-        ], f"We only accept json or yaml ending for configs"
+        ], "We only accept json or yaml ending for configs"
         if os.path.splitext(config)[1] == ".json":
             params = load_commented_json_file(config)
         else:
@@ -255,7 +255,7 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     else:
         assert (
             type(config) is dict
-        ), f"We only support loading configs that are paths to json/yaml files or preloaded configs."
+        ), "We only support loading configs that are paths to json/yaml files or preloaded configs."
         params = config
     all_keys = list(recursive_keys(parser_hierarchy))
     new_params = flatten_nested_args_for_parser(params, [], groups=all_keys, prefix="")

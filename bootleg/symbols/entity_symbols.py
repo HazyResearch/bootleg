@@ -69,13 +69,13 @@ class EntitySymbols:
         self._id2alias: Dict[int, str] = {id: al for al, id in self._alias2id.items()}
         self._eid2qid: Dict[int, str] = {eid: qid for qid, eid in self._qid2eid.items()}
         assert len(self._qid2eid) == len(self._eid2qid), (
-            f"The qid2eid mapping is not invertable. "
-            f"This means there is a duplicate id value."
+            "The qid2eid mapping is not invertable. "
+            "This means there is a duplicate id value."
         )
-        assert -1 not in self._eid2qid, f"-1 can't be an eid"
+        assert -1 not in self._eid2qid, "-1 can't be an eid"
         assert (
             0 not in self._eid2qid
-        ), f"0 can't be an eid. It's reserved for null candidate"
+        ), "0 can't be an eid. It's reserved for null candidate"
         # this assumes that eid of 0 is NO_CAND and eid of -1 is NULL entity
         self.num_entities = len(self._qid2eid)
         self.num_entities_with_pad_and_nocand = self.num_entities + 2
@@ -400,8 +400,7 @@ class EntitySymbols:
 
     @edit_op
     def set_title(self, qid: str, title: str):
-        """
-        Sets the title for a QID
+        """Sets the title for a QID.
 
         Args:
             qid: QID
@@ -414,8 +413,7 @@ class EntitySymbols:
 
     @edit_op
     def set_desc(self, qid: str, desc: str):
-        """
-        Sets the description for a QID
+        """Sets the description for a QID.
 
         Args:
             qid: QID

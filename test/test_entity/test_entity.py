@@ -334,7 +334,7 @@ class KGSymbolsTest(unittest.TestCase):
             tuple(["Q567", "Q123"]),
         ]
         qid2qid_adj = []
-        with open(os.path.join(self.save_dir, f"testkg_adj.txt")) as in_f:
+        with open(os.path.join(self.save_dir, "testkg_adj.txt")) as in_f:
             for line in in_f:
                 qid2qid_adj.append(tuple(line.split()))
         self.assertListEqual(gold_qid2qid_adj, qid2qid_adj)

@@ -159,8 +159,7 @@ class InputFeatures(object):
 
 
 def extract_context_windows(span, tokens, max_seq_window_len):
-    """
-    Extracts the left and right context window around a span
+    """Extracts the left and right context window around a span.
 
     Args:
         span: span (left and right values)
@@ -168,7 +167,6 @@ def extract_context_windows(span, tokens, max_seq_window_len):
         max_seq_window_len: maximum window length around a span
 
     Returns: left context, right context
-
     """
     # If more tokens to the right, shift weight there
     if span[0] < len(tokens) - span[1]:
@@ -185,8 +183,8 @@ def extract_context_windows(span, tokens, max_seq_window_len):
 
 
 def get_structural_entity_str(items, max_tok_len, sep_tok):
-    """For structural resources in items. Returns sep_tok joined list of items such
-    that the number of words is less than max tok len.
+    """For structural resources in items. Returns sep_tok joined list of items
+    such that the number of words is less than max tok len.
 
     Args:
         items: list of structural resources
@@ -195,7 +193,6 @@ def get_structural_entity_str(items, max_tok_len, sep_tok):
 
     Returns:
         result string, number of items that went beyond ``max_tok_len``
-
     """
     i = 1
     over_len = 0
@@ -217,9 +214,9 @@ def get_entity_string(
     qid2relations,
     qid2typenames,
 ):
-    """
-    For each entity, generates a string that is fed into a language model to generate an entity embedding. Returns
-    all tokens that are the title of the entity (even if in the description)
+    """For each entity, generates a string that is fed into a language model to
+    generate an entity embedding. Returns all tokens that are the title of the
+    entity (even if in the description)
 
     Args:
         qid: QID
@@ -229,7 +226,6 @@ def get_entity_string(
         qid2typenames: Dict of QID to list of types
 
     Returns: entity strings, number of types over max length, number of relations over max length
-
     """
     over_kg_len = 0
     over_type_len = 0
@@ -328,7 +324,7 @@ def create_examples(
     qidcnt_file = os.path.join(
         data_config.entity_dir, data_config.entity_map_dir, data_config.qid_cnt_map
     )
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     constants_dict = {
         "is_bert": is_bert,
@@ -372,7 +368,7 @@ def create_examples(
         assert (
             total_input == total_input_from_chunks
         ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-        log_rank_0_debug(logger, f"Done chunking files. Starting pool.")
+        log_rank_0_debug(logger, "Done chunking files. Starting pool.")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -761,7 +757,7 @@ def convert_examples_to_features_and_save_single(
         if not entitysymbols.alias_exists(alias):
             # if we do not have this alias in our set, we give it an index of -2, meaning we will
             # always get it wrong in eval
-            assert split in ["test", "dev",], (
+            assert split in ["test", "dev"], (
                 f"Expected split of 'test' or 'dev'. If you are training, "
                 f"the alias {alias} must be in our entity dump"
             )
@@ -785,7 +781,7 @@ def convert_examples_to_features_and_save_single(
                 # if we are not using a NC (no candidate) but are in eval mode, we let the gold
                 # candidate not be in the candidate set we give in a true index of -2,
                 # meaning our model will always get this example incorrect
-                assert split in ["test", "dev",], (
+                assert split in ["test", "dev"], (
                     f"Expected split of 'test' or 'dev' in sent {example.sent_idx}. If you are training, "
                     f"the QID {qid} must be in the candidate list for data_args.train_in_candidates to be True"
                 )
@@ -1463,7 +1459,7 @@ class BootlegDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(
@@ -1490,7 +1486,7 @@ class BootlegDataset(EmmentalDataset):
         )
         self.X_entity_dict = X_entity_dict
 
-        log_rank_0_debug(logger, f"Removing temporary output files")
+        log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
         log_rank_0_info(
             logger,
@@ -1641,7 +1637,10 @@ class BootlegDataset(EmmentalDataset):
         return x_dict, y_dict
 
     def _mask_input_ids(self, x_dict):
-        """Mask the entity mention with high probability, especially if rare. Further mask tokens 10% of the time"""
+        """Mask the entity mention with high probability, especially if rare.
+
+        Further mask tokens 10% of the time
+        """
         # Get core dump if you don't do this
         input_ids = torch.clone(x_dict["input_ids"])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]
@@ -1688,7 +1687,8 @@ class BootlegDataset(EmmentalDataset):
         return input_ids
 
     def _mask_entity_input_ids(self, x_dict, eid):
-        """Mask the entity to_mask index with high probability, especially if mention is rare."""
+        """Mask the entity to_mask index with high probability, especially if
+        mention is rare."""
         # Get core dump if you don't do this
         entity_input_ids = torch.clone(self.X_entity_dict["entity_input_ids"][eid])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]
@@ -1761,7 +1761,7 @@ class BootlegEntityDataset(EmmentalDataset):
         dataset_threads,
         split="test",
     ):
-        assert split == "test", f"Split must be test split for EntityDataset"
+        assert split == "test", "Split must be test split for EntityDataset"
         log_rank_0_info(
             logger,
             f"Starting to build data for {split} from {dataset}",
@@ -1817,7 +1817,7 @@ class BootlegEntityDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(

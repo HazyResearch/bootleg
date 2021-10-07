@@ -72,7 +72,7 @@ def parse_cmdline_args():
     # 'unknown' are what we pass on to our override any args from the second phase of arg parsing from the json file
     cli_args, unknown = cli_parser.parse_known_args()
     if len(cli_args.config_script) == 0:
-        raise ValueError(f"You must pass a config script via --config.")
+        raise ValueError("You must pass a config script via --config.")
     config = parse_boot_and_emm_args(cli_args.config_script, unknown)
 
     #  Modify the local rank param from the cli args
@@ -200,7 +200,7 @@ def run_model(mode, config, run_config_path=None):
     setup(config, run_config_path)
 
     # Load entity symbols
-    log_rank_0_info(logger, f"Loading entity symbols...")
+    log_rank_0_info(logger, "Loading entity symbols...")
     entity_symbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
@@ -223,7 +223,7 @@ def run_model(mode, config, run_config_path=None):
         if mode in ["dump_preds", "dump_embs"]:
             if config.data_config[f"{TEST_SPLIT}_dataset"].use_weak_label is False:
                 raise ValueError(
-                    f"When calling dump_preds or dump_embs, we require use_weak_label to be True."
+                    "When calling dump_preds or dump_embs, we require use_weak_label to be True."
                 )
 
     # Batch cands is for training and eval_batch_cands
@@ -249,7 +249,7 @@ def run_model(mode, config, run_config_path=None):
     configure_optimizer()
 
     # Create models and add tasks
-    log_rank_0_info(logger, f"Starting Bootleg Model")
+    log_rank_0_info(logger, "Starting Bootleg Model")
     model_name = "Bootleg"
     model = EmmentalModel(name=model_name)
 
@@ -321,7 +321,7 @@ def run_model(mode, config, run_config_path=None):
     dump_embs = False if mode != "dump_embs" else True
     assert (
         len(dataloaders) == 1
-    ), f"We should only have length 1 dataloaders for dump_embs and dump_preds!"
+    ), "We should only have length 1 dataloaders for dump_embs and dump_preds!"
     final_result_file, final_out_emb_file = None, None
     if config.learner_config.local_rank in [0, -1]:
         # Setup files/folders
@@ -333,7 +333,7 @@ def run_model(mode, config, run_config_path=None):
         sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
             os.path.join(config.data_config.data_dir, filename)
         )
-        log_rank_0_debug(logger, f"Done collecting sentence to mention map")
+        log_rank_0_debug(logger, "Done collecting sentence to mention map")
         eval_folder = eval_utils.get_eval_folder(filename)
         subeval_folder = os.path.join(eval_folder, "batch_results")
         utils.ensure_dir(subeval_folder)
@@ -407,7 +407,7 @@ def run_model(mode, config, run_config_path=None):
         )
 
         log_rank_0_info(
-            logger, f"Finished dumping. Merging results across accumulation steps."
+            logger, "Finished dumping. Merging results across accumulation steps."
         )
         # Final result files for labels and embeddings
         final_result_file = os.path.join(

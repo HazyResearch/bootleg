@@ -162,7 +162,7 @@ def create_examples(
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
 
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     if num_processes == 1:
         out_file_name = os.path.join(create_ex_outdir, os.path.basename(dataset))
@@ -204,7 +204,7 @@ def create_examples(
         assert (
             total_input == total_input_from_chunks
         ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-        log_rank_0_debug(logger, f"Done chunking files")
+        log_rank_0_debug(logger, "Done chunking files")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -331,7 +331,7 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
                 ), f"If {FINAL_LOSS} isn't in slice, it must be that all anchors are False. This is not true"
                 assert (
                     split != "train" or not use_weak_label
-                ), f"As all anchors are false, this must happen if you are evaling or training and using weak labels"
+                ), "As all anchors are false, this must happen if you are evaling or training and using weak labels"
             # TODO: optimizer here
             # for i in range(0, num_alias2pred, 1):
             #     subset_slices = {}
@@ -395,7 +395,7 @@ def convert_examples_to_features_and_save(
         logger, f"Starting to build and save features with {num_processes} threads"
     )
 
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = utils.load_json_file(meta_file)["num_mentions"]
     max_alias2pred = utils.load_json_file(meta_file)["max_alias2pred"]
     files_and_counts = utils.load_json_file(meta_file)["files_and_counts"]
@@ -697,7 +697,7 @@ class BootlegSliceDataset:
         )
         assert len(self.data) > 0
         assert len(self.sent_to_row_id_dict) > 0
-        log_rank_0_debug(logger, f"Removing temporary output files")
+        log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
         # Set spawn back to original/default, which is "fork" or "spawn". This is needed for the Meta.config to
         # be correctly passed in the collate_fn.

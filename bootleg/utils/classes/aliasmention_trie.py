@@ -79,20 +79,20 @@ class AliasCandRecordTrie:
                 filename=os.path.join(save_dir, "max_value.json"),
                 contents=self._max_value,
             )
-            self._stoi.save(os.path.join(save_dir, f"vocabulary_trie.marisa"))
-            self._record_trie.save(os.path.join(save_dir, f"record_trie.marisa"))
+            self._stoi.save(os.path.join(save_dir, "vocabulary_trie.marisa"))
+            self._record_trie.save(os.path.join(save_dir, "record_trie.marisa"))
 
     def load(self, load_dir):
         self._max_value = load_json_file(
             filename=os.path.join(load_dir, "max_value.json")
         )
         self._stoi = marisa_trie.Trie().mmap(
-            os.path.join(load_dir, f"vocabulary_trie.marisa")
+            os.path.join(load_dir, "vocabulary_trie.marisa")
         )
         self._itos = lambda x: self._stoi.restore_key(x)
         self._record_trie = marisa_trie.RecordTrie(
             self._get_fmt_string(self._max_value)
-        ).mmap(os.path.join(load_dir, f"record_trie.marisa"))
+        ).mmap(os.path.join(load_dir, "record_trie.marisa"))
 
     def build_trie(self, input_dict: Dict[str, Any], max_value: int):
         all_values = []

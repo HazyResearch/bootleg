@@ -20,7 +20,7 @@ from bootleg.end2end.extract_mentions import (
 )
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import CANDS_LABEL, NED_TASK
+from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
 from bootleg.utils.data_utils import read_in_relations, read_in_types
@@ -110,7 +110,7 @@ def create_sources(model_path, data_path, model_name):
             filename=str(model_path / f"{model_name}.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
-        print(f"Downloaded. Decompressing...")
+        print("Downloaded. Decompressing...")
         tar = tarfile.open(str(model_path / f"{model_name}.tar.gz"), "r:gz")
         tar.extractall(model_path)
         tar.close()
@@ -122,7 +122,7 @@ def create_sources(model_path, data_path, model_name):
             filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
-        print(f"Downloaded. Decompressing...")
+        print("Downloaded. Decompressing...")
         tar = tarfile.open(str(data_path / "entity_db.tar.gz"), "r:gz")
         tar.extractall(data_path)
         tar.close()
@@ -256,8 +256,8 @@ class BootlegAnnotator(object):
         )
         data_utils.add_special_tokens(self.tokenizer)
 
-        # Create tasks - CANDS_LABEL as we are not doing batch cands in annotator
-        self.task_to_label_dict = {NED_TASK: CANDS_LABEL}
+        # Create tasks
+        self.task_to_label_dict = {NED_TASK: None}
 
         # Create tasks
         self.model = EmmentalModel(name="Bootleg")
@@ -272,13 +272,13 @@ class BootlegAnnotator(object):
         # Load the best model from the pretrained model
         assert (
             self.config["model_config"]["model_path"] is not None
-        ), f"Must have a model to load in the model_path for the BootlegAnnotator"
+        ), "Must have a model to load in the model_path for the BootlegAnnotator"
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
         if cand_map is None:
             alias_map = self.entity_db.get_alias2qids()
         else:
-            logger.debug(f"Loading candidate map")
+            logger.debug("Loading candidate map")
             alias_map = ujson.load(open(cand_map))
 
         self.all_aliases_trie = get_all_aliases(alias_map, verbose)
@@ -322,7 +322,8 @@ class BootlegAnnotator(object):
         label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
-        """Extracts mentions and runs disambiguation. If user provides extracted_examples, we will ignore text_list
+        """Extracts mentions and runs disambiguation. If user provides
+        extracted_examples, we will ignore text_list.
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
@@ -347,7 +348,7 @@ class BootlegAnnotator(object):
             do_extract_mentions = False
             assert (
                 type(extracted_examples) is list
-            ), f"Must provide a list of Dics for extracted_examples"
+            ), "Must provide a list of Dics for extracted_examples"
             check_ex = extracted_examples[0]
             assert (
                 len(
@@ -363,13 +364,12 @@ class BootlegAnnotator(object):
         else:
             assert (
                 text_list is not None
-            ), f"If you do not provide extracted_examples you must provide text_list"
+            ), "If you do not provide extracted_examples you must provide text_list"
 
         if text_list is None:
-            assert extracted_examples is not None, (
-                f"If you do not provide text_list "
-                f"you must provide extracted_exampels"
-            )
+            assert (
+                extracted_examples is not None
+            ), "If you do not provide text_list you must provide extracted_exampels"
         else:
             if type(text_list) is str:
                 text_list = [text_list]
@@ -378,7 +378,7 @@ class BootlegAnnotator(object):
                     type(text_list) is list
                     and len(text_list) > 0
                     and type(text_list[0]) is str
-                ), f"We only accept inputs of strings and lists of strings"
+                ), "We only accept inputs of strings and lists of strings"
 
         # Get number of examples
         if extracted_examples is not None:
@@ -546,7 +546,7 @@ class BootlegAnnotator(object):
             del x_dict
             if self.return_embs:
                 (uid_bdict, _, prob_bdict, _, out_bdict) = res
-                output_embs = out_bdict[NED_TASK][f"entity_encoder_0"]
+                output_embs = out_bdict[NED_TASK]["entity_encoder_0"]
             else:
                 output_embs = None
                 (uid_bdict, _, prob_bdict, _) = res
@@ -668,8 +668,7 @@ class BootlegAnnotator(object):
         entity_attention_mask,
         entity_cand_eid,
     ):
-        """
-        Generates emmental batch
+        """Generates emmental batch.
 
         Args:
             input_ids: word token ids
@@ -681,7 +680,6 @@ class BootlegAnnotator(object):
             entity_cand_eid: entity candidate eids
 
         Returns: X_dict for emmental
-
         """
         entity_cand_eval_mask = entity_cand_eid == -1
         entity_cand_eid_noneg = torch.where(
