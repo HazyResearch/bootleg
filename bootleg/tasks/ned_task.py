@@ -1,5 +1,7 @@
 import torch
 import torch.nn.functional as F
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
@@ -7,8 +9,6 @@ from bootleg.layers.bert_encoder import Encoder
 from bootleg.scorer import BootlegSlicedScorer
 from bootleg.task_config import NED_TASK
 from bootleg.utils import eval_utils
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 
 class DisambigLoss:

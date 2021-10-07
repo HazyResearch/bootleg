@@ -8,12 +8,14 @@ import subprocess
 import sys
 from copy import copy
 
+import emmental
 import numpy as np
 import torch
+from emmental.learner import EmmentalLearner
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.data import get_dataloaders, get_slicedatasets
 from bootleg.symbols.constants import DEV_SPLIT, TEST_SPLIT, TRAIN_SPLIT
@@ -30,8 +32,6 @@ from bootleg.utils.utils import (
     try_rmtree,
     write_to_file,
 )
-from emmental.learner import EmmentalLearner
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 

@@ -79,12 +79,14 @@ class DataLoader(unittest.TestCase):
     def setUp(self):
         # tests that the sampling is done correctly on indices
         # load data from directory
-        self.args = parser_utils.parse_boot_and_emm_args("test/run_args/test_data.json")
+        self.args = parser_utils.parse_boot_and_emm_args(
+            "tests/run_args/test_data.json"
+        )
         self.tokenizer = AutoTokenizer.from_pretrained(
             "bert-base-cased",
             do_lower_case=False,
             use_fast=True,
-            cache_dir="test/data/emb_data/pretrained_bert_models",
+            cache_dir="tests/data/emb_data/pretrained_bert_models",
         )
         self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.is_bert = True
@@ -94,7 +96,7 @@ class DataLoader(unittest.TestCase):
             ),
             alias_cand_map_file=self.args.data_config.alias_cand_map,
         )
-        self.temp_file_name = "test/data/data_loader/test_data.jsonl"
+        self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
         self.guid_dtype = lambda max_aliases: np.dtype(
             [
                 ("sent_idx", "i8", 1),

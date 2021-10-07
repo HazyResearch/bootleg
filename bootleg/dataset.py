@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 import torch
 import ujson
+from emmental.data import EmmentalDataset
 from tqdm import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
@@ -20,7 +21,6 @@ from bootleg.symbols.constants import ANCHOR_KEY, PAD_ID, STOP_WORDS
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import data_utils, utils
 from bootleg.utils.data_utils import read_in_relations, read_in_types
-from emmental.data import EmmentalDataset
 
 warnings.filterwarnings(
     "ignore",

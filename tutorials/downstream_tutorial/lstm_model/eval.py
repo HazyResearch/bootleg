@@ -6,18 +6,14 @@ import argparse
 import csv
 import datetime
 import json
-import os
 import pickle
 import random
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from data.loader import DataLoader
 from model.rnn import RelationModel
 from utils import constant, helper, scorer, torch_utils
 from utils.vocab import Vocab
-
-from data.loader import DataLoader
 
 now = datetime.datetime.now()
 timestamp = now.strftime("%m%d%Y-%H%M%S")

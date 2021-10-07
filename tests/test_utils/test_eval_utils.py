@@ -411,7 +411,7 @@ class EvalUtils(unittest.TestCase):
         data_file = tempfile.NamedTemporaryFile()
         cache_folder = tempfile.TemporaryDirectory()
 
-        entity_dir = "test/entity_db"
+        entity_dir = "tests/entity_db"
         entity_map_dir = "entity_mappings"
 
         entity_symbols = EntitySymbolsSubclass()

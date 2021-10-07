@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from numpy import ndarray
-
 from task_config import ID_TO_LABEL
 
 

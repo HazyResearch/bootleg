@@ -1,8 +1,7 @@
 import os
 
-from torch import nn
-
 from pytorch_pretrained_bert.modeling import BertModel
+from torch import nn
 
 
 class BertModule(nn.Module):

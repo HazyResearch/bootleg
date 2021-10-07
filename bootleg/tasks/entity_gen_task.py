@@ -1,10 +1,10 @@
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
 from bootleg.layers.bert_encoder import Encoder
 from bootleg.task_config import NED_TASK
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 
 def entity_output_func(intermediate_output_dict):

@@ -7,12 +7,13 @@ import subprocess
 import sys
 from copy import copy
 
+import emmental
 import numpy as np
 import torch
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_info
 from bootleg.data import get_entity_dataloaders
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -26,7 +27,6 @@ from bootleg.utils.utils import (
     recurse_redict,
     write_to_file,
 )
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 

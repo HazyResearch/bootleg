@@ -43,14 +43,16 @@ class DataSlice(unittest.TestCase):
     def setUp(self):
         # tests that the sampling is done correctly on indices
         # load data from directory
-        self.args = parser_utils.parse_boot_and_emm_args("test/run_args/test_data.json")
+        self.args = parser_utils.parse_boot_and_emm_args(
+            "tests/run_args/test_data.json"
+        )
         self.entity_symbols = EntitySymbols.load_from_cache(
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
             alias_cand_map_file=self.args.data_config.alias_cand_map,
         )
-        self.temp_file_name = "test/data/data_loader/test_slice_data.jsonl"
+        self.temp_file_name = "tests/data/data_loader/test_slice_data.jsonl"
 
     def tearDown(self) -> None:
         dir = os.path.join(

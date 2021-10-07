@@ -3,9 +3,9 @@ import logging
 
 import torch
 import torch.nn.functional as F
+from emmental import Meta
 
 from bootleg import log_rank_0_debug
-from emmental import Meta
 
 logger = logging.getLogger(__name__)
 
