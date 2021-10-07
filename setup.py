@@ -8,7 +8,6 @@ setup(
     url="https://github.com/HazyResearch/bootleg",
     install_requires=[
         "argh==0.26.2",
-        "click>=7.1.1,<7.2.0",
         "emmental==0.0.9",
         "jsonlines==2.0.0",
         "marisa_trie_m==0.7.6",
