@@ -3,9 +3,8 @@ from collections import Counter
 
 import numpy as np
 import torch
-from task_config import LABEL_TO_ID
-
 from emmental.data import EmmentalDataset
+from task_config import LABEL_TO_ID
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ class InputFeatures(object):
 
 
 def convert_token(token):
-    """ Convert PTB tokens to normal tokens """
+    """Convert PTB tokens to normal tokens"""
     if token.lower() == "-lrb-":
         return "("
     elif token.lower() == "-rrb-":

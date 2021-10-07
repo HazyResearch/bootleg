@@ -7,7 +7,7 @@ import random
 
 import numpy as np
 import torch
-from utils import constant, helper, vocab
+from utils import constant
 
 
 class DataLoader(object):
@@ -50,7 +50,7 @@ class DataLoader(object):
         print("{} batches created for {}".format(len(data), filename))
 
     def preprocess(self, data, vocab, ent_vocab, opt):
-        """ Preprocess the data and convert to ids. """
+        """Preprocess the data and convert to ids."""
         processed = []
         for d in data:
             tokens = d["token"]
@@ -75,9 +75,9 @@ class DataLoader(object):
             pos = map_to_ids(d["stanford_pos"], constant.POS_TO_ID)
             ner = map_to_ids(d["stanford_ner"], constant.NER_TO_ID)
             deprel = map_to_ids(d["stanford_deprel"], constant.DEPREL_TO_ID)
-            l = len(tokens)
-            subj_positions = get_positions(d["subj_start"], d["subj_end"], l)
-            obj_positions = get_positions(d["obj_start"], d["obj_end"], l)
+            token_len = len(tokens)
+            subj_positions = get_positions(d["subj_start"], d["subj_end"], token_len)
+            obj_positions = get_positions(d["obj_start"], d["obj_end"], token_len)
             relation = constant.LABEL_TO_ID[d["relation"]]
             processed += [
                 (
@@ -95,7 +95,7 @@ class DataLoader(object):
         return processed
 
     def gold(self):
-        """ Return gold labels as a list. """
+        """Return gold labels as a list."""
         return self.labels
 
     def __len__(self):
@@ -103,7 +103,7 @@ class DataLoader(object):
         return len(self.data)
 
     def __getitem__(self, key):
-        """ Get a batch with index. """
+        """Get a batch with index."""
         if not isinstance(key, int):
             raise TypeError
         if key < 0 or key >= len(self.data):
@@ -163,7 +163,7 @@ def map_to_ids(tokens, vocab):
 
 
 def get_positions(start_idx, end_idx, length):
-    """ Get subj/obj position sequence. """
+    """Get subj/obj position sequence."""
     return (
         list(range(-start_idx, 0))
         + [0] * (end_idx - start_idx + 1)
@@ -172,7 +172,7 @@ def get_positions(start_idx, end_idx, length):
 
 
 def get_long_tensor(tokens_list, batch_size):
-    """ Convert list of list of tokens to a padded LongTensor. """
+    """Convert list of list of tokens to a padded LongTensor."""
     token_len = max(len(x) for x in tokens_list)
     tokens = torch.LongTensor(batch_size, token_len).fill_(constant.PAD_ID)
     for i, s in enumerate(tokens_list):
@@ -181,14 +181,14 @@ def get_long_tensor(tokens_list, batch_size):
 
 
 def sort_all(batch, lens):
-    """ Sort all fields by descending order of lens, and return the original indices. """
+    """Sort all fields by descending order of lens, and return the original indices."""
     unsorted_all = [lens] + [range(len(lens))] + list(batch)
     sorted_all = [list(t) for t in zip(*sorted(zip(*unsorted_all), reverse=True))]
     return sorted_all[2:], sorted_all[1]
 
 
 def word_dropout(tokens, dropout):
-    """ Randomly dropout tokens (IDs) and replace them with <UNK> tokens. """
+    """Randomly dropout tokens (IDs) and replace them with <UNK> tokens."""
     return [
         constant.UNK_ID if x != constant.UNK_ID and np.random.random() < dropout else x
         for x in tokens

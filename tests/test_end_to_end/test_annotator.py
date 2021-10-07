@@ -2,9 +2,9 @@ import os
 import shutil
 import unittest
 
+import emmental
 import torch
 
-import emmental
 from bootleg.end2end.bootleg_annotator import BootlegAnnotator
 from bootleg.run import run_model
 from bootleg.utils import utils
@@ -14,10 +14,10 @@ from bootleg.utils.parser import parser_utils
 class TestEnd2End(unittest.TestCase):
     def setUp(self) -> None:
         self.args = parser_utils.parse_boot_and_emm_args(
-            "test/run_args/test_end2end.json"
+            "tests/run_args/test_end2end.json"
         )
         # This _MUST_ get passed the args so it gets a random seed set
-        emmental.init(log_dir="test/temp_log", config=self.args)
+        emmental.init(log_dir="tests/temp_log", config=self.args)
         if not os.path.exists(emmental.Meta.log_path):
             os.makedirs(emmental.Meta.log_path)
 
@@ -32,7 +32,7 @@ class TestEnd2End(unittest.TestCase):
         )
         if utils.exists_dir(dir):
             shutil.rmtree(dir, ignore_errors=True)
-        dir = os.path.join("test/temp_log")
+        dir = os.path.join("tests/temp_log")
         if os.path.exists(dir):
             shutil.rmtree(dir, ignore_errors=True)
 

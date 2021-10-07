@@ -20,10 +20,10 @@
         "hidden_size": 32,
     },
     "data_config": {
-        "entity_dir": "test/data/entity_loader/entity_data",
+        "entity_dir": "tests/data/entity_loader/entity_data",
         "train_in_candidates": true,
         "max_seq_len": 32,
-        "data_dir": "test/data/data_loader",
+        "data_dir": "tests/data/data_loader",
         "overwrite_preprocessed_data": true,
         "use_entity_desc": false,
         "entity_type_data": {
@@ -42,7 +42,7 @@
         {
             "context_layers": 1,
             "entity_layers": 1,
-            "cache_dir": "test/data/emb_data/pretrained_bert_models"
+            "cache_dir": "tests/data/emb_data/pretrained_bert_models"
         },
         "train_dataset": {
             "file": "end2end_train.jsonl"

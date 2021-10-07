@@ -16,6 +16,8 @@
 # limitations under the License.
 """PyTorch BERT model."""
 
+# flake8: noqa
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
@@ -230,7 +232,7 @@ class BertConfig(object):
         return json.dumps(self.to_dict(), indent=2, sort_keys=True) + "\n"
 
     def to_json_file(self, json_file_path):
-        """ Save this instance to a json file."""
+        """Save this instance to a json file."""
         with open(json_file_path, "w", encoding="utf-8") as writer:
             writer.write(self.to_json_string())
 

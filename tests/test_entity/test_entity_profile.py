@@ -3,12 +3,12 @@ import shutil
 import unittest
 from pathlib import Path
 
+import emmental
 import numpy as np
 import torch
 import ujson
 from pydantic import ValidationError
 
-import emmental
 from bootleg.run import run_model
 from bootleg.symbols.entity_profile import EntityProfile
 from bootleg.utils.parser import parser_utils
@@ -16,7 +16,7 @@ from bootleg.utils.parser import parser_utils
 
 class EntityProfileTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.dir = Path("test/data/entity_profile_test")
+        self.dir = Path("tests/data/entity_profile_test")
         self.save_dir = Path(self.dir / "entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
         self.save_dir2 = Path(self.dir / "entity_db_save2")

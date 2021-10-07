@@ -18,13 +18,13 @@ class DataEntityLoader(unittest.TestCase):
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args(
-            "test/run_args/test_entity_data.json"
+            "tests/run_args/test_entity_data.json"
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             "bert-base-cased",
             do_lower_case=False,
             use_fast=True,
-            cache_dir="test/data/emb_data/pretrained_bert_models",
+            cache_dir="tests/data/emb_data/pretrained_bert_models",
         )
         self.tokenizer.add_special_tokens(SPECIAL_TOKENS)
         self.is_bert = True
@@ -35,8 +35,8 @@ class DataEntityLoader(unittest.TestCase):
             alias_cand_map_file=self.args.data_config.alias_cand_map,
             alias_idx_file=self.args.data_config.alias_idx_map,
         )
-        self.entity_temp_dir = "test/data/entity_loader/entity_data_test"
-        self.temp_file_name = "test/data/data_loader/test_data.jsonl"
+        self.entity_temp_dir = "tests/data/entity_loader/entity_data_test"
+        self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
 
     def tearDown(self) -> None:
         dir = os.path.join(
@@ -113,7 +113,7 @@ class DataEntityLoader(unittest.TestCase):
         }
         """
         temp_type_data = {"Q1": [1, 2], "Q2": [3], "Q3": [], "Q4": [2], "Q5": [2]}
-        file = "test/data/emb_data/temp_type_mapping.json"
+        file = "tests/data/emb_data/temp_type_mapping.json"
         with open(file, "w") as out_f:
             ujson.dump(temp_type_data, out_f)
 
@@ -332,14 +332,14 @@ class DataEntityLoader(unittest.TestCase):
         self.args.data_config.use_entity_desc = True
         # For this test, we make a new entity_mappings directory to prevent multiprocessing tests from pytest to
         # also read in the qid2desc file
-        shutil.copytree("test/data/entity_loader/entity_data", self.entity_temp_dir)
+        shutil.copytree("tests/data/entity_loader/entity_data", self.entity_temp_dir)
         self.args.data_config.entity_dir = self.entity_temp_dir
         qid2desc = {
             "Q1": "testing desc",
             "Q3": "words",
         }
         out_file = (
-            "test/data/entity_loader/entity_data_test/entity_mappings/qid2desc.json"
+            "tests/data/entity_loader/entity_data_test/entity_mappings/qid2desc.json"
         )
         with open(out_file, "w") as out_f:
             ujson.dump(qid2desc, out_f)

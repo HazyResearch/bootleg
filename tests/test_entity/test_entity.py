@@ -15,7 +15,7 @@ from bootleg.utils.classes.dotted_dict import DottedDict
 
 class TypeSymbolsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.save_dir = Path("test/data/entity_loader/entity_db_save")
+        self.save_dir = Path("tests/data/entity_loader/entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
 
     def tearDown(self) -> None:
@@ -283,7 +283,7 @@ class TypeSymbolsTest(unittest.TestCase):
 
 class KGSymbolsTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.save_dir = Path("test/data/entity_loader/entity_db_save")
+        self.save_dir = Path("tests/data/entity_loader/entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
 
     def tearDown(self) -> None:
@@ -591,7 +591,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertIsNone(entity_symbols._qid2aliases)
 
         # Test load from dump
-        temp_save_dir = "test/data/entity_loader_test"
+        temp_save_dir = "tests/data/entity_loader_test"
         entity_symbols.save(temp_save_dir)
         entity_symbols = EntitySymbols.load_from_cache(temp_save_dir)
 
@@ -1222,18 +1222,18 @@ class EntitySymbolTest(unittest.TestCase):
 
 class AliasTableTest(unittest.TestCase):
     def setUp(self):
-        entity_dump_dir = "test/data/entity_loader/entity_data/entity_mappings"
+        entity_dump_dir = "tests/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols.load_from_cache(
             entity_dump_dir, alias_cand_map_file="alias2qids.json"
         )
         self.config = {
             "data_config": {
                 "train_in_candidates": False,
-                "entity_dir": "test/data/entity_loader/entity_data",
+                "entity_dir": "tests/data/entity_loader/entity_data",
                 "entity_prep_dir": "prep",
                 "alias_cand_map": "alias2qids.json",
                 "max_aliases": 3,
-                "data_dir": "test/data/entity_loader",
+                "data_dir": "tests/data/entity_loader",
                 "overwrite_preprocessed_data": True,
             },
             "run_config": {"distributed": False},

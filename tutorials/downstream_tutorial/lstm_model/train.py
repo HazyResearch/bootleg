@@ -11,13 +11,10 @@ from shutil import copyfile
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from data.loader import DataLoader
 from model.rnn import RelationModel
 from utils import constant, helper, scorer
 from utils.vocab import Vocab
-
-from data.loader import DataLoader
 
 parser = argparse.ArgumentParser()
 

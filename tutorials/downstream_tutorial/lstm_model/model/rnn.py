@@ -1,8 +1,6 @@
 """
 A rnn model for relation extraction, written in pytorch.
 """
-import math
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -15,7 +13,7 @@ num_features = 8
 
 
 class RelationModel(object):
-    """ A wrapper class for the training and evaluation of models. """
+    """A wrapper class for the training and evaluation of models."""
 
     def __init__(self, opt, emb_matrix=None, ent_emb_matrix=None):
         self.opt = opt
@@ -30,7 +28,7 @@ class RelationModel(object):
         )
 
     def update(self, batch):
-        """ Run a step of forward and backward model update. """
+        """Run a step of forward and backward model update."""
         if self.opt["cuda"]:
             inputs = [b.cuda() for b in batch[:num_features]]
             labels = batch[num_features].cuda()
@@ -54,7 +52,7 @@ class RelationModel(object):
         return loss_val
 
     def predict(self, batch, unsort=True):
-        """ Run forward prediction. If unsort is True, recover the original order of the batch. """
+        """Run forward prediction. If unsort is True, recover the original order of the batch."""
         if self.opt["cuda"]:
             inputs = [b.cuda() for b in batch[:num_features]]
             labels = batch[num_features].cuda()
@@ -98,7 +96,7 @@ class RelationModel(object):
 
 
 class PositionAwareRNN(nn.Module):
-    """ A sequence model for relation extraction. """
+    """A sequence model for relation extraction."""
 
     def __init__(self, opt, emb_matrix=None, ent_emb_matrix=None):
         super(PositionAwareRNN, self).__init__()
@@ -221,7 +219,6 @@ class PositionAwareRNN(nn.Module):
         if self.opt["ner_dim"] > 0:
             inputs += [self.ner_emb(ner)]
         inputs = self.drop(torch.cat(inputs, dim=2))  # add dropout to input
-        input_size = inputs.size(2)
 
         # rnn
         h0, c0 = self.zero_state(batch_size)
