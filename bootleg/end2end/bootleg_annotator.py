@@ -20,7 +20,7 @@ from bootleg.end2end.extract_mentions import (
 )
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import CANDS_LABEL, NED_TASK
+from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
 from bootleg.utils.data_utils import read_in_relations, read_in_types
@@ -256,8 +256,8 @@ class BootlegAnnotator(object):
         )
         data_utils.add_special_tokens(self.tokenizer)
 
-        # Create tasks - CANDS_LABEL as we are not doing batch cands in annotator
-        self.task_to_label_dict = {NED_TASK: CANDS_LABEL}
+        # Create tasks
+        self.task_to_label_dict = {NED_TASK: None}
 
         # Create tasks
         self.model = EmmentalModel(name="Bootleg")
