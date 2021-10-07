@@ -1,3 +1,4 @@
+"""Test data."""
 import os
 import shutil
 import unittest
@@ -15,6 +16,7 @@ from bootleg.utils.parser import parser_utils
 
 
 def adjust_sentence(sentence, max_len, max_window_len, span, tokenizer):
+    """Tokenize and adjust sentence for max length."""
     tokens = sentence.split()
     prev_context, next_context = extract_context_windows(span, tokens, max_window_len)
     context_tokens = (
@@ -41,6 +43,7 @@ def adjust_sentence(sentence, max_len, max_window_len, span, tokenizer):
 
 
 def get_uniq_ids(sent_i, num_aliases, guid_dtype, max_aliases=1):
+    """Get unique ids."""
     res = []
     for i in range(num_aliases):
         res.append(np.array((sent_i, i, [i]), dtype=guid_dtype(max_aliases)))
@@ -48,6 +51,7 @@ def get_uniq_ids(sent_i, num_aliases, guid_dtype, max_aliases=1):
 
 
 def assert_data_dicts_equal(dict_l, dict_r):
+    """Assert data dicts are equals."""
     for k in dict_l:
         assert k in dict_r, f"Key is {k}"
         if type(dict_l[k]) is torch.Tensor:
@@ -76,7 +80,10 @@ def assert_data_dicts_equal(dict_l, dict_r):
 
 
 class DataLoader(unittest.TestCase):
+    """Data test."""
+
     def setUp(self):
+        """Set up."""
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args(
@@ -106,6 +113,7 @@ class DataLoader(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -128,6 +136,7 @@ class DataLoader(unittest.TestCase):
         use_weak,
         input_data,
     ):
+        """Prep data dicts."""
         X_dict, Y_dict = defaultdict(list), defaultdict(list)
         for i, inp in enumerate(input_data):
             guids = get_uniq_ids(i, len(inp["aliases"]), self.guid_dtype)
@@ -189,7 +198,10 @@ class DataLoader(unittest.TestCase):
         return X_dict, Y_dict
 
     def test_simple_dataset(self):
-        """ENTITY SYMBOLS
+        """
+        Test simple dataset.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -242,7 +254,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_in_candidate_flag(self):
-        """ENTITY SYMBOLS
+        """
+        Test in candidates.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -367,7 +382,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_nonmatch_alias(self):
-        """ENTITY SYMBOLS
+        """
+        Test aliases not in dict.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -452,7 +470,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_long_sentences(self):
-        """ENTITY SYMBOLS
+        """
+        Test long sentences.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -551,7 +572,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_long_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test large number aliases.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -604,7 +628,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_non_gold_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test non-gold aliases.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -796,7 +823,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_non_gold_no_weak_label_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test non gold aliases without weak labels.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -1049,7 +1079,10 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
     def test_multiple_sentences(self):
-        """ENTITY SYMBOLS
+        """
+        Test multiple sentences at once with multiprocessing.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],

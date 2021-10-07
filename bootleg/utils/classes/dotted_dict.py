@@ -1,3 +1,4 @@
+"""Dotted dict class."""
 import keyword
 import re
 import string
@@ -6,10 +7,14 @@ import ujson
 
 
 class DottedDict(dict):
-    """Override for the dict object to allow referencing of keys as attributes,
-    i.e. dict.key."""
+    """
+    Dotted dictionary.
+
+    Override for the dict object to allow referencing of keys as attributes, i.e. dict.key.
+    """
 
     def __init__(self, *args, **kwargs):
+        """Dotted dict initializer."""
         for arg in args:
             if isinstance(arg, dict):
                 self._parse_input_(arg)
@@ -24,13 +29,16 @@ class DottedDict(dict):
             self._parse_input_(kwargs)
 
     def __delattr__(self, item):
+        """Delete attr."""
         self.__delitem__(item)
 
     def __delitem__(self, key):
+        """Delete item."""
         super(DottedDict, self).__delitem__(key)
         del self.__dict__[key]
 
     def __getattr__(self, attr):
+        """Get attr."""
         try:
             return self.__dict__[attr]
         # Do this to match python default behavior
@@ -38,6 +46,7 @@ class DottedDict(dict):
             raise AttributeError(attr)
 
     def __getitem__(self, key):
+        """Get item."""
         return self.__dict__[key]
 
     def __repr__(self):
@@ -47,10 +56,12 @@ class DottedDict(dict):
         )
 
     def __setattr__(self, key, value):
+        """Set attr."""
         # No need to run _is_valid_identifier since a syntax error is raised if invalid attr name
         self.__setitem__(key, value)
 
     def __setitem__(self, key, value):
+        """Set item."""
         try:
             self._is_valid_identifier_(key)
         except ValueError:
@@ -62,11 +73,9 @@ class DottedDict(dict):
         self.__dict__.update({key: value})
 
     def _is_valid_identifier_(self, identifier):
-        """Test the key name for valid identifier status as considered by the
-        python lexer.
+        """Test the key name for valid identifier status as considered by the python lexer.
 
-        Also
-        check that the key name is not a python keyword.
+        Also check that the key name is not a python keyword.
         https://stackoverflow.com/questions/12700893/how-to-check-if-a-string-is-a-valid-python-identifier-including-keyword-check
         """
         if re.match("[a-zA-Z_][a-zA-Z0-9_]*$", str(identifier)):
@@ -75,8 +84,7 @@ class DottedDict(dict):
         raise ValueError('Key "{0}" is not a valid identifier.'.format(identifier))
 
     def _make_safe_(self, key):
-        """Replace the space characters on the key with _ to make valid
-        attrs."""
+        """Replace the space characters on the key with _ to make valid attrs."""
         key = str(key)
         allowed = string.ascii_letters + string.digits + "_" + "/"
         # Replace spaces with _
@@ -136,12 +144,14 @@ class DottedDict(dict):
 
 
 class PreserveKeysDottedDict(dict):
-    """Overrides auto correction of key names to safe attr names.
+    """
+    Override auto correction of key names to safe attr names.
 
     Can result in errors when using attr name resolution.
     """
 
     def __init__(self, *args, **kwargs):
+        """Preserve keys DottedDict initializer."""
         for arg in args:
             if isinstance(arg, dict):
                 self._parse_input_(arg)
@@ -156,13 +166,16 @@ class PreserveKeysDottedDict(dict):
             self._parse_input_(kwargs)
 
     def __delattr__(self, item):
+        """Delete attr."""
         self.__delitem__(item)
 
     def __delitem__(self, key):
+        """Delete item."""
         super(PreserveKeysDottedDict, self).__delitem__(key)
         del self.__dict__[key]
 
     def __getattr__(self, attr):
+        """Get attr."""
         try:
             return self.__dict__[attr]
         # Do this to match python default behavior
@@ -170,6 +183,7 @@ class PreserveKeysDottedDict(dict):
             raise AttributeError(attr)
 
     def __getitem__(self, key):
+        """Get item."""
         return self.__dict__[key]
 
     def __repr__(self):
@@ -179,9 +193,11 @@ class PreserveKeysDottedDict(dict):
         )
 
     def __setattr__(self, key, value):
+        """Set attr."""
         self.__setitem__(key, value)
 
     def __setitem__(self, key, value):
+        """Set item."""
         super(PreserveKeysDottedDict, self).__setitem__(key, value)
         self.__dict__.update({key: value})
 
@@ -223,7 +239,8 @@ class PreserveKeysDottedDict(dict):
         return out
 
 
-def createBoolDottedDict(d_dict):
+def create_bool_dotted_dict(d_dict):
+    """Create boolean Dotted Dict."""
     if (type(d_dict) is DottedDict) or (type(d_dict) is dict):
         d_dict = DottedDict(d_dict)
     if type(d_dict) is str and is_json(d_dict):
@@ -239,15 +256,15 @@ def createBoolDottedDict(d_dict):
                 or (type(d_dict[k]) is dict)
                 or (type(d_dict[k]) is str and is_json(d_dict[k]))
             ):
-                d_dict[k] = createBoolDottedDict(d_dict[k])
+                d_dict[k] = create_bool_dotted_dict(d_dict[k])
             elif type(d_dict[k]) is list:
                 for i in range(len(d_dict[k])):
-                    d_dict[k][i] = createBoolDottedDict(d_dict[k][i])
+                    d_dict[k][i] = create_bool_dotted_dict(d_dict[k][i])
     return d_dict
 
 
 def is_number(s):
-    """Returns True is string is a number."""
+    """Return True is string is a number."""
     try:
         float(s)
         return True
@@ -256,6 +273,7 @@ def is_number(s):
 
 
 def is_json(value):
+    """Return true if is json."""
     # ujson is weird in that a string of a number is a dictionary; we don't want this
     if is_number(value):
         return False

@@ -1,3 +1,5 @@
+"""Get entity dump."""
+
 import argparse
 import os
 
@@ -5,10 +7,9 @@ import ujson
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 
-# generates entity mappings for the entity directory
-
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--qid2title", type=str, required=True, help="Path for qid2title file"
@@ -42,6 +43,7 @@ def parse_args():
 
 
 def main():
+    """Run."""
     args = parse_args()
 
     # compute the max alias len in alias2qids

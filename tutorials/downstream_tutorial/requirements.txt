@@ -1,5 +1,0 @@
-black>=18.9b0
-flake8>=3.8.0
-isort>=5.0.0
-pre-commit
-emmental==0.0.7

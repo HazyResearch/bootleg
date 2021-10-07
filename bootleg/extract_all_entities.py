@@ -32,7 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 def parse_cmdline_args():
-    """Takes an input config file and parses it into the correct subdictionary
+    """
+    Parse command line.
+
+    Takes an input config file and parses it into the correct subdictionary
     groups for the model.
 
     Returns:
@@ -71,12 +74,11 @@ def parse_cmdline_args():
 
 def setup(config, run_config_path=None):
     """
-    Setup distributed backend and save configuration files.
+    Set distributed backend and save configuration files.
+
     Args:
         config: config
         run_config_path: path for original run config
-
-    Returns:
     """
     # torch.multiprocessing.set_sharing_strategy("file_system")
     # spawn method must be fork to work with Meta.config
@@ -133,15 +135,12 @@ def setup(config, run_config_path=None):
 
 def run_model(config, run_config_path=None):
     """
-    Main run method for Emmental Bootleg model.
+    Run Emmental Bootleg model.
+
     Args:
         config: parsed model config
         run_config_path: original config path (for saving)
-
-    Returns:
-
     """
-
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 

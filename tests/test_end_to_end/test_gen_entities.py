@@ -1,3 +1,4 @@
+"""Test generate entities."""
 import os
 import shutil
 import unittest
@@ -13,7 +14,10 @@ from bootleg.utils.parser import parser_utils
 
 
 class TestGenEntities(unittest.TestCase):
+    """Test generate entites."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.args = parser_utils.parse_boot_and_emm_args(
             "tests/run_args/test_end2end.json"
         )
@@ -23,6 +27,7 @@ class TestGenEntities(unittest.TestCase):
             os.makedirs(emmental.Meta.log_path)
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -38,6 +43,7 @@ class TestGenEntities(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_end2end(self):
+        """Test end to end."""
         # For the collate and dataloaders to play nicely, the spawn must be fork (this is set in run.py)
         torch.multiprocessing.set_start_method("fork", force=True)
 

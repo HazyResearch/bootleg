@@ -1,3 +1,4 @@
+"""NED task definitions."""
 import torch
 import torch.nn.functional as F
 from emmental.scorer import Scorer
@@ -12,12 +13,15 @@ from bootleg.utils import eval_utils
 
 
 class DisambigLoss:
+    """Disambiguation loss."""
+
     def __init__(self, normalize, temperature):
+        """Disambiguation loss initializer."""
         self.normalize = normalize
         self.temperature = temperature
 
     def disambig_output(self, intermediate_output_dict):
-        """Function to return the probs for a task in Emmental.
+        """Return the probs for a task in Emmental.
 
         Args:
             intermediate_output_dict: output dict from Emmental task flow
@@ -40,7 +44,7 @@ class DisambigLoss:
         return ret.exp()
 
     def disambig_loss(self, intermediate_output_dict, Y, active):
-        """Returns the entity disambiguation loss on prediction heads.
+        """Return the entity disambiguation loss on prediction heads.
 
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
@@ -84,7 +88,7 @@ class DisambigLoss:
         return loss
 
     def batch_cands_disambig_output(self, intermediate_output_dict):
-        """Function to return the probs for a task in Emmental.
+        """Return the probs for a task in Emmental.
 
         Args:
             intermediate_output_dict: output dict from Emmental task flow
@@ -99,7 +103,7 @@ class DisambigLoss:
         return F.softmax(score, dim=-1)
 
     def batch_cands_disambig_loss(self, intermediate_output_dict, Y, active):
-        """Returns the entity disambiguation loss on prediction heads.
+        """Return the entity disambiguation loss on prediction heads.
 
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
@@ -130,7 +134,7 @@ class DisambigLoss:
 
 
 def create_task(args, use_batch_cands, len_context_tok, slice_datasets=None):
-    """Returns an EmmentalTask for named entity disambiguation (NED).
+    """Return an EmmentalTask for named entity disambiguation (NED).
 
     Args:
         args: args

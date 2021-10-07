@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 
 
 def parse_cmdline_args():
-    """Takes an input config file and parses it into the correct subdictionary
-    groups for the model.
+    """
+    Take an input config file and parse it into the correct subdictionary groups for the model.
 
     Returns:
         model run mode of train, eval, or dumping
@@ -83,12 +83,11 @@ def parse_cmdline_args():
 
 def setup(config, run_config_path=None):
     """
-    Setup distributed backend and save configuration files.
+    Set distributed backend and save configuration files.
+
     Args:
         config: config
         run_config_path: path for original run config
-
-    Returns:
     """
     # torch.multiprocessing.set_sharing_strategy("file_system")
     # spawn method must be fork to work with Meta.config
@@ -144,14 +143,11 @@ def setup(config, run_config_path=None):
 
 
 def configure_optimizer():
-    """Configures the optimizer for Bootleg. By default, we use
-    SparseDenseAdam. We always change the parameter group for layer norms
-    following standard BERT finetuning methods.
+    """
+    Configure the optimizer for Bootleg.
 
     Args:
         config: config
-
-    Returns:
     """
     # Specify parameter group for Adam BERT
     def grouped_parameters(model):
@@ -186,16 +182,13 @@ def configure_optimizer():
 # TODO: optimize slices so we split them based on max aliases (save A LOT of memory)
 def run_model(mode, config, run_config_path=None):
     """
-    Main run method for Emmental Bootleg models.
+    Run Emmental Bootleg models.
+
     Args:
         mode: run mode (train, eval, dump_preds, dump_embs)
         config: parsed model config
         run_config_path: original config path (for saving)
-
-    Returns:
-
     """
-
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 

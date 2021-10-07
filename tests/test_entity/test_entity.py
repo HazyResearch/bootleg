@@ -1,3 +1,4 @@
+"""Test entity."""
 import os
 import shutil
 import unittest
@@ -14,15 +15,20 @@ from bootleg.utils.classes.dotted_dict import DottedDict
 
 
 class TypeSymbolsTest(unittest.TestCase):
+    """Test type symbols."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.save_dir = Path("tests/data/entity_loader/entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
 
     def tearDown(self) -> None:
+        """Tear down."""
         if os.path.exists(self.save_dir):
             shutil.rmtree(self.save_dir)
 
     def test_type_init(self):
+        """Test type init."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -65,6 +71,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
 
     def test_type_load_and_save(self):
+        """Test type load and save."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -84,6 +91,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(type_symbols_2._type_vocab, type_symbols._type_vocab)
 
     def test_type_add_remove_typemap(self):
+        """Test type add remove typemap."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -184,6 +192,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_add_entity(self):
+        """Test add entity."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -221,6 +230,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_reidentify_entity(self):
+        """Test reidentiy entity."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -253,6 +263,7 @@ class TypeSymbolsTest(unittest.TestCase):
         self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_prune_to_entities(self):
+        """Test prune to entities."""
         qid2typenames = {
             "Q123": ["animal"],
             "Q345": ["dog"],
@@ -282,15 +293,20 @@ class TypeSymbolsTest(unittest.TestCase):
 
 
 class KGSymbolsTest(unittest.TestCase):
+    """Kg symbols test."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.save_dir = Path("tests/data/entity_loader/entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
 
     def tearDown(self) -> None:
+        """Tear down."""
         if os.path.exists(self.save_dir):
             shutil.rmtree(self.save_dir)
 
     def test_kg_init(self):
+        """Test kg init."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
@@ -312,6 +328,7 @@ class KGSymbolsTest(unittest.TestCase):
         self.assertSetEqual(gold_allrelations, kg_symbols._all_relations)
 
     def test_kg_load_and_save(self):
+        """Test kg load and save."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
@@ -340,6 +357,7 @@ class KGSymbolsTest(unittest.TestCase):
         self.assertListEqual(gold_qid2qid_adj, qid2qid_adj)
 
     def test_relation_add_remove_kgmapping(self):
+        """Test relation add remoce kg mapping."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
@@ -435,6 +453,7 @@ class KGSymbolsTest(unittest.TestCase):
         self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
 
     def test_add_entity(self):
+        """Test add entity."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
@@ -472,6 +491,7 @@ class KGSymbolsTest(unittest.TestCase):
         self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
 
     def test_reidentify_entities(self):
+        """Test reidentify entities."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"], "sib": ["Q567"]},
             "Q345": {"sibling": ["Q123"]},
@@ -518,6 +538,7 @@ class KGSymbolsTest(unittest.TestCase):
         self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
 
     def test_prune_to_entities(self):
+        """Test prune to entities."""
         qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q567"]},
@@ -542,7 +563,10 @@ class KGSymbolsTest(unittest.TestCase):
 
 
 class EntitySymbolTest(unittest.TestCase):
+    """Entity symbol test class."""
+
     def test_create_entities(self):
+        """Test create entities."""
         truealias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
@@ -625,6 +649,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
 
     def test_getters(self):
+        """Test getters."""
         truealias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
@@ -675,6 +700,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.alias_exists("alias5"), False)
 
     def test_add_remove_mention(self):
+        """Test add remove mention."""
         alias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2], ["Q3", 1]],
@@ -944,6 +970,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
     def test_add_entity(self):
+        """Test add entity."""
         alias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2], ["Q3", 1]],
@@ -1083,6 +1110,7 @@ class EntitySymbolTest(unittest.TestCase):
         )
 
     def test_reidentify_entity(self):
+        """Test reidentify entities."""
         alias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2], ["Q3", 1]],
@@ -1148,6 +1176,7 @@ class EntitySymbolTest(unittest.TestCase):
         )
 
     def test_prune_to_entities(self):
+        """Test prune to entities."""
         alias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2], ["Q3", 1]],
@@ -1221,7 +1250,10 @@ class EntitySymbolTest(unittest.TestCase):
 
 
 class AliasTableTest(unittest.TestCase):
+    """Alias table test."""
+
     def setUp(self):
+        """Set up."""
         entity_dump_dir = "tests/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols.load_from_cache(
             entity_dump_dir, alias_cand_map_file="alias2qids.json"
@@ -1240,6 +1272,7 @@ class AliasTableTest(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.config["data_config"]["entity_dir"],
             self.config["data_config"]["entity_prep_dir"],
@@ -1248,6 +1281,7 @@ class AliasTableTest(unittest.TestCase):
             shutil.rmtree(dir)
 
     def test_setup_notincand(self):
+        """Test setup not in canddiate."""
         self.alias_entity_table = AliasEntityTable(
             DottedDict(self.config["data_config"]), self.entity_symbols
         )
@@ -1280,6 +1314,7 @@ class AliasTableTest(unittest.TestCase):
         )
 
     def test_setup_incand(self):
+        """Test setup in candidate."""
         self.config["data_config"]["train_in_candidates"] = True
         self.alias_entity_table = AliasEntityTable(
             DottedDict(self.config["data_config"]), self.entity_symbols
@@ -1314,6 +1349,7 @@ class AliasTableTest(unittest.TestCase):
         )
 
     def test_forward(self):
+        """Test forward."""
         self.alias_entity_table = AliasEntityTable(
             DottedDict(self.config["data_config"]), self.entity_symbols
         )

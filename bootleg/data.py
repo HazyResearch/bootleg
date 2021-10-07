@@ -1,3 +1,4 @@
+"""Bootleg data creation."""
 import copy
 import logging
 import os
@@ -53,7 +54,7 @@ def get_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -136,7 +137,7 @@ def get_entity_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the entity dataloaders.
 
     Args:
         args: main args

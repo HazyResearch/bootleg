@@ -1,4 +1,7 @@
-"""Helper file for computing various statistics over our data such as mention
+"""
+Compute statistics over data.
+
+Helper file for computing various statistics over our data such as mention
 frequency, mention text frequency in the data (even if not labeled as an
 anchor), ...
 
@@ -26,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_dir", type=str, default="data/", help="Data dir for training data"
@@ -60,6 +64,7 @@ def parse_args():
 
 
 def compute_histograms(save_dir, entity_symbols):
+    """Compute histogram."""
     al_counts = Counter()
     for al in entity_symbols.get_all_aliases():
         num_entities = len(entity_symbols.get_qid_cands(al))
@@ -71,6 +76,7 @@ def compute_histograms(save_dir, entity_symbols):
 
 
 def get_all_aliases(alias2qidcands):
+    """Get all aliases."""
     # Load alias2qids
     alias2qids = {}
     for al in tqdm(alias2qidcands):
@@ -81,6 +87,7 @@ def get_all_aliases(alias2qidcands):
 
 
 def get_num_lines(input_src):
+    """Get number of lines."""
     # get number of lines
     num_lines = 0
     with open(input_src, "r", encoding="utf-8") as in_file:
@@ -95,6 +102,7 @@ def get_num_lines(input_src):
 
 
 def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
+    """Chunk text data."""
     logging.info(f"Reading in {input_src}")
     start = time.time()
     # write out chunks as text data
@@ -119,6 +127,7 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
 
 
 def compute_occurrences_single(args, max_alias_len=6):
+    """Compute statistics single process."""
     data_file, lower, strip = args
     num_lines = sum(1 for _ in open(data_file))
     global all_aliases
@@ -160,6 +169,7 @@ def compute_occurrences_single(args, max_alias_len=6):
 
 
 def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_workers=8):
+    """Compute statistics."""
     global all_aliases
     all_aliases = get_all_aliases(entity_dump._alias2qids)
 
@@ -221,6 +231,7 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
 
 
 def main():
+    """Run."""
     args = parse_args()
     logging.info(json.dumps(vars(args), indent=4))
     entity_symbols = EntitySymbols.load_from_cache(

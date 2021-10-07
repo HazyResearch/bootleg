@@ -1,3 +1,4 @@
+"""Test eval utils."""
 import os
 import shutil
 import tempfile
@@ -16,7 +17,10 @@ from bootleg.utils.utils import create_single_item_trie
 
 
 class EntitySymbolsSubclass(EntitySymbols):
+    """Mock entity symbols class."""
+
     def __init__(self):
+        """Entity symbols initializer."""
         self.max_candidates = 2
         # Used if we need to do any string searching for aliases. This keep track of the largest n-gram needed.
         self.max_alias_len = 1
@@ -41,9 +45,11 @@ class EntitySymbolsSubclass(EntitySymbols):
 
 
 class EvalUtils(unittest.TestCase):
+    """Eval utils test."""
 
     # tests if we match standard torch fns where expected
     def test_masked_class_logsoftmax_basic(self):
+        """Test masked class softmax."""
         # shape batch x M x K
         # model outputs
         preds = torch.tensor([[[2.0, 2.0, 1.0], [3.0, 5.0, 4.0]]])
@@ -74,6 +80,7 @@ class EvalUtils(unittest.TestCase):
 
     # combines with loss fn to see if we match torch cross entropy where expected
     def test_masked_class_logsoftmax_with_loss(self):
+        """Test masked class softmax with loss."""
         # shape batch x M x K
         # model outputs
         preds = torch.tensor([[[2.0, 2.0, 1.0], [3.0, 5.0, 4.0]]])
@@ -95,6 +102,7 @@ class EvalUtils(unittest.TestCase):
 
     # tests if masking is done correctly
     def test_masked_class_logsoftmax_masking(self):
+        """Test masked class softmax masking."""
         preds = torch.tensor([[[2.0, 4.0, 1.0], [3.0, 5.0, 4.0]]])
         entity_ids = torch.tensor([[[1, 3, -1], [5, -1, -1]]])
         first_sample = torch.tensor([[2.0, 4.0]])
@@ -118,6 +126,7 @@ class EvalUtils(unittest.TestCase):
 
     # check the case where the entire row is masked out
     def test_masked_class_logsoftmax_grads_full_mask(self):
+        """Test masked class softmax gradients full mask."""
         preds = torch.tensor([[[2.0, 4.0], [3.0, 5.0], [1.0, 4.0]]], requires_grad=True)
         # batch x M x K
         entity_ids = torch.tensor([[[1, -1], [-1, -1], [4, 5]]])
@@ -146,6 +155,7 @@ class EvalUtils(unittest.TestCase):
 
     # check the case where the entire row is masked out
     def test_masked_class_logsoftmax_grads_excluded_alias(self):
+        """Test masked class softmax gradients excluding alias."""
         preds = torch.tensor([[[2.0, 4.0], [1.0, 4.0], [8.0, 2.0]]], requires_grad=True)
         # batch x M x K
         entity_ids = torch.tensor([[[1, -1], [4, 5], [8, 9]]])
@@ -174,6 +184,7 @@ class EvalUtils(unittest.TestCase):
 
     # compare grads with and without masking
     def test_masked_class_logsoftmax_grads(self):
+        """Test masked class softmax grads."""
         # check gradients on preds since that will go back into the rest of the network
         preds = torch.tensor(
             [[[2.0, 4.0, 1.0], [3.0, 5.0, 4.0], [1.0, 4.0, 6.0]]], requires_grad=True
@@ -226,7 +237,7 @@ class EvalUtils(unittest.TestCase):
         assert torch.allclose(torch_grad, actual_grad)
 
     def test_merge_subsentences(self):
-
+        """Test merge subsentences in eval."""
         test_full_emb_file = tempfile.NamedTemporaryFile()
         test_merged_emb_file = tempfile.NamedTemporaryFile()
         gold_merged_emb_file = tempfile.NamedTemporaryFile()
@@ -405,7 +416,7 @@ class EvalUtils(unittest.TestCase):
         cache_folder.cleanup()
 
     def test_write_out_subsentences(self):
-
+        """Test write out subsentences in eval."""
         merged_entity_emb_file = tempfile.NamedTemporaryFile()
         out_file = tempfile.NamedTemporaryFile()
         data_file = tempfile.NamedTemporaryFile()

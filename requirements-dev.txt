@@ -3,6 +3,7 @@ docformatter==1.4
 flake8>=3.9.2
 isort>=5.9.3
 nbsphinx==0.8.1
+pep8_naming==0.12.1
 pre-commit>=2.14.0
 pytest==6.2.2
 python-dotenv==0.15.0

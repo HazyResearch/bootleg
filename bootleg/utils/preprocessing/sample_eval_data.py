@@ -1,4 +1,7 @@
-"""This will sample a jsonl train or eval data based on the slices in the data.
+"""
+Sample eval data.
+
+This will sample a jsonl train or eval data based on the slices in the data.
 This is useful for subsampling a smaller eval dataset.py.
 
 The output of this file is a files with a subset of sentences from the
@@ -27,6 +30,7 @@ FINAL_SENT_TO_SLICE_PREFIX = "final_sent_to_slices"
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", type=str, default="merged.jsonl")
     parser.add_argument(
@@ -63,7 +67,7 @@ def parse_args():
 
 
 def get_slice_stats(num_processes, file):
-    """Gets true anchor slice counts."""
+    """Get true anchor slice counts."""
     pool = multiprocessing.Pool(processes=num_processes)
     final_counts = defaultdict(int)
     final_slice_to_sent = defaultdict(set)
@@ -108,6 +112,7 @@ def get_slice_stats(num_processes, file):
 
 
 def get_slice_stats_hlp(args):
+    """Get slice count helper."""
     i, lines, offset, temp_out_dir = args
 
     res = defaultdict(int)  # slice -> cnt
@@ -144,6 +149,7 @@ def get_slice_stats_hlp(args):
 
 
 def main():
+    """Run."""
     args = parse_args()
     print(ujson.dumps(vars(args), indent=4))
     num_processes = int(0.8 * multiprocessing.cpu_count())

@@ -1,3 +1,4 @@
+"""Test entity profile."""
 import os
 import shutil
 import unittest
@@ -15,7 +16,10 @@ from bootleg.utils.parser import parser_utils
 
 
 class EntityProfileTest(unittest.TestCase):
+    """Entity profile test."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.dir = Path("tests/data/entity_profile_test")
         self.save_dir = Path(self.dir / "entity_db_save")
         self.save_dir.mkdir(exist_ok=True, parents=True)
@@ -29,15 +33,18 @@ class EntityProfileTest(unittest.TestCase):
         self.arg_file = self.dir / "args.json"
 
     def tearDown(self) -> None:
+        """Tear down."""
         if os.path.exists(self.dir):
             shutil.rmtree(self.dir, ignore_errors=True)
 
     def write_data(self, file, data):
+        """Write data to file."""
         with open(file, "w") as out_f:
             for d in data:
                 out_f.write(ujson.dumps(d) + "\n")
 
     def test_profile_load_simple(self):
+        """Test profile load simple."""
         data = [
             {
                 "entity_id": "Q123",
@@ -130,6 +137,7 @@ class EntityProfileTest(unittest.TestCase):
             self.assertDictEqual(qid_obj, found_other_obj)
 
     def test_profile_load_jsonl_errors(self):
+        """Test profile load from jsonl."""
         data = [
             {
                 "entity_id": 123,
@@ -149,6 +157,7 @@ class EntityProfileTest(unittest.TestCase):
         assert type(context.exception) is ValidationError
 
     def test_profile_dump_load(self):
+        """Test profile load from dump."""
         data = [
             {
                 "entity_id": "Q123",
@@ -232,6 +241,7 @@ class EntityProfileTest(unittest.TestCase):
         assert "type system hyena is not one" in str(context.exception)
 
     def test_checks(self):
+        """Test checks."""
         data = [
             {
                 "entity_id": "Q123",
@@ -286,6 +296,7 @@ class EntityProfileTest(unittest.TestCase):
         assert "type system blah is not one" in str(context.exception)
 
     def test_add_entity(self):
+        """Test add entity."""
         data = [
             {
                 "entity_id": "Q123",
@@ -429,6 +440,7 @@ class EntityProfileTest(unittest.TestCase):
         )
 
     def test_reindentify_entity(self):
+        """Test reindentify entity."""
         data = [
             {
                 "entity_id": "Q123",
@@ -501,6 +513,7 @@ class EntityProfileTest(unittest.TestCase):
         )
 
     def test_prune_to_entities(self):
+        """Test prune to entities."""
         data = [
             {
                 "entity_id": "Q123",
@@ -565,6 +578,7 @@ class EntityProfileTest(unittest.TestCase):
         )
 
     def test_end2end(self):
+        """Test end2end."""
         # ======================
         # PART 1: TRAIN A SMALL MODEL WITH ONE PROFILE DUMP
         # ======================

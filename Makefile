@@ -30,7 +30,7 @@ livedocs:
 clean:
 	pip uninstall -y bootleg
 	rm -rf src/bootleg.egg-info
-	rm -rf _build/
+	rm -rf build/ dist/
 
 prune:
 	@bash -c "git fetch -p";

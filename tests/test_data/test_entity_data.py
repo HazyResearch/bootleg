@@ -1,3 +1,4 @@
+"""Test entity dataset."""
 import os
 import shutil
 import unittest
@@ -14,7 +15,10 @@ from bootleg.utils.parser import parser_utils
 
 
 class DataEntityLoader(unittest.TestCase):
+    """Entity data loader."""
+
     def setUp(self):
+        """Set up."""
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args(
@@ -39,6 +43,7 @@ class DataEntityLoader(unittest.TestCase):
         self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -55,7 +60,10 @@ class DataEntityLoader(unittest.TestCase):
             shutil.rmtree(self.entity_temp_dir)
 
     def test_load_type_data(self):
-        """ENTITY SYMBOLS
+        """
+        Test load type data.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -88,8 +96,10 @@ class DataEntityLoader(unittest.TestCase):
         self.assertDictEqual(qid2typename, qid2typename_gold)
 
     def test_load_type_data_extra_entity(self):
-        # Test that we only add entities in our save
-        """ENTITY SYMBOLS
+        """
+        Test load type data extra entity.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -127,7 +137,10 @@ class DataEntityLoader(unittest.TestCase):
             os.remove(file)
 
     def test_simple_entity_data(self):
-        """ENTITY SYMBOLS
+        """
+        Test simple entity data.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -216,7 +229,10 @@ class DataEntityLoader(unittest.TestCase):
         )
 
     def test_max_ent_type_len(self):
-        """ENTITY SYMBOLS
+        """
+        Test max entity type length.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -307,7 +323,10 @@ class DataEntityLoader(unittest.TestCase):
         )
 
     def test_desc_entity_data(self):
-        """ENTITY SYMBOLS
+        """
+        Test entity description data.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -419,7 +438,10 @@ class DataEntityLoader(unittest.TestCase):
         )
 
     def test_entity_kg_data(self):
-        """ENTITY SYMBOLS
+        """
+        Test entity KG data.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -515,7 +537,10 @@ class DataEntityLoader(unittest.TestCase):
         )
 
     def test_multiprocess_entity_data(self):
-        """ENTITY SYMBOLS
+        """
+        Test multiprocessing entity data.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],

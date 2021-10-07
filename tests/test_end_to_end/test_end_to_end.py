@@ -1,3 +1,4 @@
+"""End2end test."""
 import os
 import shutil
 import unittest
@@ -11,7 +12,10 @@ from bootleg.utils.parser import parser_utils
 
 
 class TestEnd2End(unittest.TestCase):
+    """Test end to end."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.args = parser_utils.parse_boot_and_emm_args(
             "tests/run_args/test_end2end.json"
         )
@@ -21,6 +25,7 @@ class TestEnd2End(unittest.TestCase):
             os.makedirs(emmental.Meta.log_path)
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -36,6 +41,7 @@ class TestEnd2End(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_end2end(self):
+        """End2end base test."""
         # Just setting this for testing pipelines
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
@@ -60,6 +66,7 @@ class TestEnd2End(unittest.TestCase):
 
     # Doubling up a test here to also test accumulation steps
     def test_end2end_accstep(self):
+        """Test end2end with accumulation steps."""
         # Just setting this for testing pipelines
         self.args.data_config.eval_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
@@ -86,6 +93,7 @@ class TestEnd2End(unittest.TestCase):
 
     # Doubling up a test here to also test greater than 1 eval batch size
     def test_end2end_evalbatch(self):
+        """Test end2end with eval batch size."""
         self.args.data_config.eval_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
         self.args.run_config.eval_batch_size = 2
@@ -115,6 +123,7 @@ class TestEnd2End(unittest.TestCase):
 
     # Doubling up a test here to also test long context
     def test_end2end_bert_long_context(self):
+        """Test end2end with longer sentence context."""
         self.args.data_config.max_seq_len = 256
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict

@@ -1,3 +1,4 @@
+"""Generate alias candidate map."""
 import argparse
 from collections import defaultdict
 
@@ -11,6 +12,7 @@ from bootleg.utils.utils import get_lnrm
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--alias2qids_file", type=str, required=True, help="Path to write alias2qids"
@@ -23,6 +25,7 @@ def parse_args():
 
 
 def main():
+    """Run."""
     args = parse_args()
     alias2qids_dict = defaultdict(set)
     qid2freq = defaultdict(int)

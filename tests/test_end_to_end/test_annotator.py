@@ -1,3 +1,4 @@
+"""Test annotator."""
 import os
 import shutil
 import unittest
@@ -12,7 +13,10 @@ from bootleg.utils.parser import parser_utils
 
 
 class TestEnd2End(unittest.TestCase):
+    """Test annotator end to end."""
+
     def setUp(self) -> None:
+        """Set up."""
         self.args = parser_utils.parse_boot_and_emm_args(
             "tests/run_args/test_end2end.json"
         )
@@ -22,6 +26,7 @@ class TestEnd2End(unittest.TestCase):
             os.makedirs(emmental.Meta.log_path)
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -37,6 +42,7 @@ class TestEnd2End(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_annotator(self):
+        """Test annotator end to end."""
         torch.multiprocessing.set_start_method("fork", force=True)
         # Just to make it go faster
         self.args["learner_config"]["n_epochs"] = 1

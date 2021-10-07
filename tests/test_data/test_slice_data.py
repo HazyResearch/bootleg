@@ -1,3 +1,4 @@
+"""Test slice data."""
 import os
 import shutil
 import unittest
@@ -13,6 +14,7 @@ from bootleg.utils.parser import parser_utils
 
 
 def assert_data_dicts_equal(dict_l, dict_r):
+    """Assert dicts are equal."""
     for k in dict_l:
         assert k in dict_r
         if type(dict_l[k]) is torch.Tensor:
@@ -26,6 +28,7 @@ def assert_data_dicts_equal(dict_l, dict_r):
 
 
 def assert_slice_data_equal(gold_data, data):
+    """Assert slice data is equal."""
     assert len(gold_data) == len(data)
     assert len(gold_data[0].tolist()[0]) == len(data[0].tolist()[0])
     assert len(gold_data[0].tolist()[0][0]) == len(data[0].tolist()[0][0])
@@ -40,7 +43,10 @@ def assert_slice_data_equal(gold_data, data):
 
 
 class DataSlice(unittest.TestCase):
+    """Slice data test."""
+
     def setUp(self):
+        """Set up."""
         # tests that the sampling is done correctly on indices
         # load data from directory
         self.args = parser_utils.parse_boot_and_emm_args(
@@ -55,6 +61,7 @@ class DataSlice(unittest.TestCase):
         self.temp_file_name = "tests/data/data_loader/test_slice_data.jsonl"
 
     def tearDown(self) -> None:
+        """Tear down."""
         dir = os.path.join(
             self.args.data_config.data_dir, self.args.data_config.data_prep_dir
         )
@@ -69,7 +76,10 @@ class DataSlice(unittest.TestCase):
             os.remove(self.temp_file_name)
 
     def test_simple_dataset(self):
-        """ENTITY SYMBOLS
+        """
+        Test simple dataset.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -129,7 +139,10 @@ class DataSlice(unittest.TestCase):
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
     def test_single_mention_dataset(self):
-        """ENTITY SYMBOLS
+        """
+        Test single mention dataset.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -188,7 +201,10 @@ class DataSlice(unittest.TestCase):
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
     def test_long_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test long number aliases.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -358,7 +374,10 @@ class DataSlice(unittest.TestCase):
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
     def test_non_gold_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test non-gold aliases.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -561,7 +580,10 @@ class DataSlice(unittest.TestCase):
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
     def test_non_gold_no_weak_label_aliases(self):
-        """ENTITY SYMBOLS
+        """
+        Test non gold aliases without weak labels.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],
@@ -780,7 +802,10 @@ class DataSlice(unittest.TestCase):
         self.assertDictEqual(gold_sent_to_row_id_dict, dataset.sent_to_row_id_dict)
 
     def test_multiple_processes(self):
-        """ENTITY SYMBOLS
+        """
+        Test multiple processes.
+
+        ENTITY SYMBOLS
         {
           "multi word alias2":[["Q2",5.0],["Q1",3.0],["Q4",2.0]],
           "alias1":[["Q1",10.0],["Q4",6.0]],

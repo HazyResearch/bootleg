@@ -1,3 +1,4 @@
+"""Test scorer."""
 import unittest
 
 import numpy as np
@@ -6,7 +7,10 @@ from bootleg.scorer import BootlegSlicedScorer
 
 
 class BootlegMockScorer(BootlegSlicedScorer):
+    """Bootleg mock scorer class."""
+
     def __init__(self, train_in_candidates):
+        """Mock initializer."""
         self.mock_slices = {
             0: {"all": [1], "slice_1": [0]},
             1: {"all": [1], "slice_1": [1]},
@@ -18,11 +22,15 @@ class BootlegMockScorer(BootlegSlicedScorer):
         self.train_in_candidates = train_in_candidates
 
     def get_slices(self, uid):
+        """Get slices."""
         return self.mock_slices[uid]
 
 
 class TestScorer(unittest.TestCase):
+    """Scorer test."""
+
     def test_bootleg_scorer(self):
+        """Test scorer."""
         # batch = 6
         scorer = BootlegMockScorer(train_in_candidates=True)
 
@@ -55,6 +63,7 @@ class TestScorer(unittest.TestCase):
         self.assertDictEqual(res, gold_res)
 
     def test_bootleg_scorer_notincand(self):
+        """Test scorer non in candidate."""
         # batch = 6
         scorer = BootlegMockScorer(train_in_candidates=False)
 

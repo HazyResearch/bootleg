@@ -38,10 +38,7 @@ BOOTLEG_MODEL_PATHS = {
 
 
 def get_default_cache():
-    """Gets default cache directory for saving Bootleg data.
-
-    Returns:
-    """
+    """Get default cache directory for saving Bootleg data."""
     try:
         from torch.hub import _get_torch_home
 
@@ -57,7 +54,7 @@ def get_default_cache():
 
 
 def create_config(model_path, data_path, model_name):
-    """Creates Bootleg config.
+    """Create Bootleg config.
 
     Args:
         model_path: model directory
@@ -91,14 +88,12 @@ def create_config(model_path, data_path, model_name):
 
 
 def create_sources(model_path, data_path, model_name):
-    """Downloads Bootleg data and saves in log dir.
+    """Download Bootleg data and saves in log dir.
 
     Args:
         model_path: model directory
         data_path: data directory
         model_name: model name to download
-
-    Returns:
     """
     download_path = BOOTLEG_MODEL_PATHS[model_name]
     if not (model_path / model_name).exists():
@@ -129,7 +124,10 @@ def create_sources(model_path, data_path, model_name):
 
 
 class BootlegAnnotator(object):
-    """BootlegAnnotator class: convenient wrapper of preprocessing and model
+    """
+    Booteg on-the-fly annotator.
+
+    BootlegAnnotator class: convenient wrapper of preprocessing and model
     eval to allow for annotating single sentences at a time for quick
     experimentation, e.g. in notebooks.
 
@@ -159,6 +157,7 @@ class BootlegAnnotator(object):
         return_embs=False,
         verbose=False,
     ):
+        """Bootleg annotator initializer."""
         self.min_alias_len = min_alias_len
         self.max_alias_len = max_alias_len
         self.verbose = verbose
@@ -284,7 +283,7 @@ class BootlegAnnotator(object):
         self.all_aliases_trie = get_all_aliases(alias_map, verbose)
 
     def extract_mentions(self, text, label_func):
-        """Wrapper function for mention extraction.
+        """Mention extraction wrapper.
 
         Args:
             text: text to extract mentions from
@@ -307,12 +306,10 @@ class BootlegAnnotator(object):
         }
 
     def set_threshold(self, value):
-        """Sets threshold.
+        """Set threshold.
 
         Args:
             value: threshold value
-
-        Returns:
         """
         self.threshold = value
 
@@ -322,8 +319,9 @@ class BootlegAnnotator(object):
         label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
-        """Extracts mentions and runs disambiguation. If user provides
-        extracted_examples, we will ignore text_list.
+        """Extract mentions and runs disambiguation.
+
+        If user provides extracted_examples, we will ignore text_list.
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
@@ -610,6 +608,15 @@ class BootlegAnnotator(object):
         return res_dict
 
     def get_sentence_tokens(self, sample, men_idx):
+        """
+        Get context tokens.
+
+        Args:
+            sample: Dict sample after extraction
+            men_idx: mention index to select
+
+        Returns: Dict of tokenized outputs
+        """
         span = sample["spans"][men_idx]
         tokens = sample["sentence"].split()
         prev_context, next_context = extract_context_windows(
@@ -634,6 +641,15 @@ class BootlegAnnotator(object):
         return inputs
 
     def get_entity_tokens(self, qid):
+        """
+        Get entity tokens.
+
+        Args:
+            qid: entity QID
+
+        Returns:
+            Dict of input tokens for forward pass.
+        """
         constants = {
             "max_ent_len": self.config.data_config.max_ent_len,
             "max_ent_type_len": self.config.data_config.entity_type_data.max_ent_type_len,
@@ -668,7 +684,7 @@ class BootlegAnnotator(object):
         entity_attention_mask,
         entity_cand_eid,
     ):
-        """Generates emmental batch.
+        """Generate emmental batch.
 
         Args:
             input_ids: word token ids
