@@ -47,7 +47,6 @@ jobs:
                   isort --version
                   black --version
                   flake8 --version
-                  mypy --version
                   make check
                   make docs
             - name: Test with pytest
