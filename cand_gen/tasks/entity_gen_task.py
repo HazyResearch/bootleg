@@ -2,7 +2,7 @@ from torch import nn
 from transformers import AutoModel
 
 from bootleg.layers.bert_encoder import Encoder
-from bootleg.task_config import NED_TASK
+from cand_gen.task_config import CANDGEN_TASK
 from emmental.scorer import Scorer
 from emmental.task import EmmentalTask
 
@@ -49,7 +49,7 @@ def create_task(args, len_context_tok):
     ]
 
     return EmmentalTask(
-        name=NED_TASK,
+        name=CANDGEN_TASK,
         module_pool=module_pool,
         task_flow=task_flow,
         loss_func=None,

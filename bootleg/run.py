@@ -63,7 +63,13 @@ def parse_cmdline_args():
         "--mode",
         type=str,
         default="train",
-        choices=["train", "eval_batch_cands", "eval", "dump_preds", "dump_embs"],
+        choices=["train", "eval", "dump_preds", "dump_embs"],
+    )
+    cli_parser.add_argument(
+        "--entity_emb_file",
+        type=str,
+        default=None,
+        help="Path to dumped entity embeddings (see ```extract_all_entities.py``` for how). Used in eval and dumping",
     )
 
     # you can add other args that will override those in the config_script
@@ -78,7 +84,8 @@ def parse_cmdline_args():
     #  Modify the local rank param from the cli args
     config.learner_config.local_rank = int(os.getenv("LOCAL_RANK", -1))
     mode = cli_args.mode
-    return mode, config, cli_args.config_script
+    entity_emb_file = cli_args.entity_emb_file
+    return mode, config, cli_args.config_script, entity_emb_file
 
 
 def setup(config, run_config_path=None):
@@ -184,13 +191,14 @@ def configure_optimizer():
 
 
 # TODO: optimize slices so we split them based on max aliases (save A LOT of memory)
-def run_model(mode, config, run_config_path=None):
+def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     """
     Main run method for Emmental Bootleg models.
     Args:
         mode: run mode (train, eval, dump_preds, dump_embs)
         config: parsed model config
         run_config_path: original config path (for saving)
+        entity_emb_file: file for dumped entity embeddings
 
     Returns:
 
@@ -216,7 +224,7 @@ def run_model(mode, config, run_config_path=None):
     # Slices are for eval so we only split on test/dev
     slice_splits = [DEV_SPLIT, TEST_SPLIT]
     # If doing eval, only run on test data
-    if mode in ["eval_batch_cands", "eval", "dump_preds", "dump_embs"]:
+    if mode in ["eval", "dump_preds", "dump_embs"]:
         data_splits = [TEST_SPLIT]
         slice_splits = [TEST_SPLIT]
         # We only do dumping if weak labels is True
@@ -226,8 +234,13 @@ def run_model(mode, config, run_config_path=None):
                     "When calling dump_preds or dump_embs, we require use_weak_label to be True."
                 )
 
-    # Batch cands is for training and eval_batch_cands
-    use_batch_cands = mode in ["train", "eval_batch_cands"]
+    if mode == "train":
+        assert (
+            entity_emb_file is None
+        ), "We do not accept entity_emb_file when training."
+
+    # Batch cands is for training
+    use_batch_cands = mode == "train"
 
     # Create tokenizer
     context_tokenizer = AutoTokenizer.from_pretrained(
@@ -259,6 +272,7 @@ def run_model(mode, config, run_config_path=None):
             use_batch_cands,
             len(context_tokenizer),
             slice_datasets,
+            entity_emb_file,
         )
     )
     # Print param counts
@@ -286,7 +300,7 @@ def run_model(mode, config, run_config_path=None):
             model.save(f"{emmental.Meta.log_path}/last_model.pth")
 
     # Multi-gpu DataParallel eval (NOT distributed)
-    if mode in ["eval_batch_cands", "eval", "dump_embs", "dump_preds"]:
+    if mode in ["eval", "dump_embs", "dump_preds"]:
         # This happens inside EmmentalLearner for training
         if (
             config["learner_config"]["local_rank"] == -1
@@ -295,7 +309,7 @@ def run_model(mode, config, run_config_path=None):
             model._to_dataparallel()
 
     # If just finished training a model or in eval mode, run eval
-    if mode in ["train", "eval_batch_cands", "eval"]:
+    if mode in ["train", "eval"]:
         if config.learner_config.local_rank in [0, -1]:
             if mode == "train":
                 # Skip the TRAIN dataloader
@@ -442,5 +456,5 @@ def run_model(mode, config, run_config_path=None):
 
 
 if __name__ == "__main__":
-    mode, config, run_config_path = parse_cmdline_args()
-    run_model(mode, config, run_config_path)
+    mode, config, run_config_path, entity_emb_file = parse_cmdline_args()
+    run_model(mode, config, run_config_path, entity_emb_file)
