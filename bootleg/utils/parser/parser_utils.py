@@ -1,5 +1,9 @@
-"""Parses a Booleg input config into a DottedDict of config values (with
-defaults filled in) for running a model."""
+"""
+Bootleg parser utils.
+
+Parses a Booleg input config into a DottedDict of config values (with
+defaults filled in) for running a model.
+"""
 
 import argparse
 import fileinput
@@ -8,7 +12,7 @@ import os
 import ujson
 
 import bootleg.utils.classes.comment_json as comment_json
-from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict
+from bootleg.utils.classes.dotted_dict import DottedDict, create_bool_dotted_dict
 from bootleg.utils.parser.bootleg_args import config_args
 from bootleg.utils.parser.emm_parse_args import (
     parse_args as emm_parse_args,
@@ -17,7 +21,9 @@ from bootleg.utils.parser.emm_parse_args import (
 from bootleg.utils.utils import load_yaml_file
 
 
-def OrNone(default):
+def or_none(default):
+    """Return or None function."""
+
     def func(x):
         # Convert "none" to proper None object
         if x.lower() == "none":
@@ -38,7 +44,7 @@ def OrNone(default):
 
 
 def is_number(s):
-    """Returns True is string is a number."""
+    """Return True is string is a number."""
     try:
         float(s)
         return True
@@ -47,7 +53,7 @@ def is_number(s):
 
 
 def is_json(value):
-    """Returns True if json."""
+    """Return True if json."""
     # ujson is weird in that a string of a number is a dictionary; we don't want this
     if is_number(value):
         return False
@@ -69,7 +75,7 @@ def recursive_keys(dictionary):
 
 
 def merge_configs(config_l, config_r, new_config=None):
-    """Merges two dotted dict configs."""
+    """Merge two dotted dict configs."""
     if new_config is None:
         new_config = {}
     for k in config_l:
@@ -92,16 +98,16 @@ def merge_configs(config_l, config_r, new_config=None):
 
 def add_nested_flags_from_config(parser, config_dict, parser_hierarchy, prefix):
     """
-    Add the flags from config file, keeping the hierarchy the same. When a lower level is needed,
-     parser.add_argument_group is called. Note, we append the parent key to the --param option (via prefix parameter).
+    Add flags from config file, keeping the hierarchy the same.
+
+    When a lower level is needed, parser.add_argument_group is called.
+    Note, we append the parent key to the --param option (via prefix parameter).
+
     Args:
         parser: arg parser to add options to
         config_dict: raw config dictionary
         parser_hierarchy: Dict to add parser hierarhcy to
         prefix: prefix to add to arg parser
-
-    Returns:
-
     """
     for param in config_dict:
         if isinstance(config_dict[param], dict):
@@ -142,7 +148,7 @@ def add_nested_flags_from_config(parser, config_dict, parser_hierarchy, prefix):
                     # pass
                     parser.add_argument(
                         f"--{prefix}{param}",
-                        type=OrNone(default),
+                        type=or_none(default),
                         default=default,
                         help=description,
                     )
@@ -155,8 +161,7 @@ def add_nested_flags_from_config(parser, config_dict, parser_hierarchy, prefix):
 
 
 def flatten_nested_args_for_parser(args, new_args, groups, prefix):
-    """This will flatten all parameters to be passed as a single list to arg
-    parse."""
+    """Flatten all parameters to be passed as a single list to arg parse."""
     for key in args:
         if isinstance(args[key], dict):
             if key in groups:
@@ -181,8 +186,7 @@ def flatten_nested_args_for_parser(args, new_args, groups, prefix):
 
 
 def reconstructed_nested_args(args, names, parser_hierarchy, prefix):
-    """After getting the args back, we need to reconstruct the arguments and
-    pass them to the necessary subparsers."""
+    """Reconstruct the arguments and pass them to the necessary subparsers."""
     for key, sub_parser in parser_hierarchy.items():
         if isinstance(sub_parser, dict):
             names[key] = {}
@@ -216,7 +220,10 @@ def load_commented_json_file(file):
 
 def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     """
-    Returns a parsed Bootleg config from config. Config can be a path to a config file or an already loaded dictionary.
+    Return a parsed Bootleg config from config.
+
+    Config can be a path to a config file or an already loaded dictionary.
+
     The high level work flow
        1. Reads Bootleg default config (config_args) and addes params to a arg parser,
           flattening all hierarchical values into "." values
@@ -226,14 +233,12 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
           Allows the user to add --data_config.word_embedding.layers to command line that overwrite values in file
        4. Parses the flattened args w.r.t the arg parser
        5. Reconstruct the args back into their hierarchical form
+
     Args:
         config: model specific config
         parser_hierarchy: Dict of hierarchy of config (or None)
         parser: arg parser (or None)
         unknown: unknown arg values passed from command line to be added to config and overwrite values in file
-
-    Returns: parsed config
-
     """
     if unknown is None:
         unknown = []
@@ -247,7 +252,7 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
         assert os.path.splitext(config)[1] in [
             ".json",
             ".yaml",
-        ], f"We only accept json or yaml ending for configs"
+        ], "We only accept json or yaml ending for configs"
         if os.path.splitext(config)[1] == ".json":
             params = load_commented_json_file(config)
         else:
@@ -255,7 +260,7 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     else:
         assert (
             type(config) is dict
-        ), f"We only support loading configs that are paths to json/yaml files or preloaded configs."
+        ), "We only support loading configs that are paths to json/yaml files or preloaded configs."
         params = config
     all_keys = list(recursive_keys(parser_hierarchy))
     new_params = flatten_nested_args_for_parser(params, [], groups=all_keys, prefix="")
@@ -283,23 +288,24 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     top_names = {}
     reconstructed_nested_args(args, top_names, parser_hierarchy, prefix="")
     # final_args = argparse.Namespace(**top_names)
-    final_args = createBoolDottedDict(top_names)
+    final_args = create_bool_dotted_dict(top_names)
     # turn_to_dotdicts(final_args)
     return final_args
 
 
 def parse_boot_and_emm_args(config_script, unknown=None):
     """
-    Merges the Emmental config with the Bootleg config.
+    Merge the Emmental config with the Bootleg config.
+
     As we have an emmental: ... level in our config for emmental commands,
     we need to parse those with the Emmental parser and then merge the Bootleg only config values
     with the Emmental ones.
+
     Args:
         config_script: config script for Bootleg and Emmental args
         unknown: unknown arg values passed from command line to overwrite file values
 
     Returns: parsed merged Bootleg and Emmental config
-
     """
     if unknown is None:
         unknown = []
@@ -318,7 +324,7 @@ def parse_boot_and_emm_args(config_script, unknown=None):
         emm_args[k] = v
     del all_args["emmental"]
     # create and add Emmental hierarchy
-    config = emm_parse_args_to_config(createBoolDottedDict(emm_args))
+    config = emm_parse_args_to_config(create_bool_dotted_dict(emm_args))
     # Merge configs back (merge workds on dicts so must convert to dict first)
-    config = createBoolDottedDict(merge_configs(all_args, config))
+    config = create_bool_dotted_dict(merge_configs(all_args, config))
     return config

@@ -1,3 +1,4 @@
+"""Bootleg utils."""
 import collections
 import json
 import logging
@@ -7,7 +8,6 @@ import pathlib
 import shutil
 import time
 import unicodedata
-from importlib import import_module
 from itertools import chain, islice
 
 import marisa_trie
@@ -22,35 +22,32 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_dir(d):
-    """Checks if a directory exists. If not, it makes it.
+    """
+    Check if a directory exists. If not, it makes it.
 
     Args:
         d: path
-
-    Returns:
     """
     pathlib.Path(d).mkdir(exist_ok=True, parents=True)
 
 
 def exists_dir(d):
-    """Checks if directory exists.
+    """
+    Check if directory exists.
 
     Args:
         d: path
-
-    Returns:
     """
     return pathlib.Path(d).exists()
 
 
 def dump_json_file(filename, contents):
-    """Dumps dictionary to json file.
+    """
+    Dump dictionary to json file.
 
     Args:
         filename: file to write to
         contents: dictionary to save
-
-    Returns:
     """
     filename = pathlib.Path(filename)
     filename.parent.mkdir(exist_ok=True, parents=True)
@@ -62,13 +59,12 @@ def dump_json_file(filename, contents):
 
 
 def dump_yaml_file(filename, contents):
-    """Dumps dictionary to yaml file.
+    """
+    Dump dictionary to yaml file.
 
     Args:
         filename: file to write to
         contents: dictionary to save
-
-    Returns:
     """
     filename = pathlib.Path(filename)
     filename.parent.mkdir(exist_ok=True, parents=True)
@@ -77,7 +73,8 @@ def dump_yaml_file(filename, contents):
 
 
 def load_json_file(filename):
-    """Loads dictionary from json file.
+    """
+    Load dictionary from json file.
 
     Args:
         filename: file to read from
@@ -90,7 +87,8 @@ def load_json_file(filename):
 
 
 def load_yaml_file(filename):
-    """Loads dictionary from yaml file.
+    """
+    Load dictionary from yaml file.
 
     Args:
         filename: file to read from
@@ -104,14 +102,14 @@ def load_yaml_file(filename):
 
 def recurse_redict(d):
     """
-    Casts all DottedDict values in a dictionary to be dictionaries. Useful for YAML
-    dumping.
+    Cast all DottedDict values in a dictionary to be dictionaries.
+
+    Useful for YAML dumping.
 
     Args:
         d: Dict
 
     Returns: Dict with no DottedDicts
-
     """
     d = dict(d)
     for k, v in d.items():
@@ -122,7 +120,8 @@ def recurse_redict(d):
 
 def assert_keys_in_dict(allowable_keys, d):
     """
-    Checks that all keys in d are in allowable keys
+    Check that all keys in d are in allowable keys.
+
     Args:
         allowable_keys: Set or List of allowable keys
         d: Dict
@@ -136,8 +135,10 @@ def assert_keys_in_dict(allowable_keys, d):
 
 
 def write_to_file(filename, value):
-    """Write generic value to a file. If value is not string, will cast to
-    str()
+    """
+    Write generic value to a file.
+
+    If value is not string, will cast to str().
 
     Args:
         filename: file to write to
@@ -154,7 +155,8 @@ def write_to_file(filename, value):
 
 
 def load_jsonl(filepath):
-    """Loads jsonlines data from jsonl file.
+    """
+    Load jsonlines data from jsonl file.
 
     Args:
         filepath: file to read from
@@ -172,13 +174,13 @@ def load_jsonl(filepath):
 
 
 def write_jsonl(filepath, values):
-    """Writes List[Dict] data to jsonlines file.
+    """
+    Write List[Dict] data to jsonlines file.
 
     Args:
         filepath: file to write to
         values: list of dictionary data to write
 
-    Returns:
     """
     with open(filepath, "w") as out_f:
         for val in values:
@@ -187,7 +189,8 @@ def write_jsonl(filepath, values):
 
 
 def chunks(iterable, n):
-    """Chunks data.
+    """
+    Chunk data.
 
     chunks(ABCDE,2) => AB CD E.
 
@@ -206,7 +209,8 @@ def chunks(iterable, n):
 
 
 def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
-    """Chunks a file into num_lines chunks.
+    """
+    Chunk a file into num_lines chunks.
 
     Args:
         in_file: input file
@@ -246,7 +250,10 @@ def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
 
 
 def create_single_item_trie(in_dict, out_file=""):
-    """Creates a marisa trie from the input dictionary. We assume the
+    """
+    Create marisa trie.
+
+    Creates a marisa trie from the input dictionary. We assume the
     dictionary has string keys and integer values.
 
     Args:
@@ -270,7 +277,8 @@ def create_single_item_trie(in_dict, out_file=""):
 
 
 def load_single_item_trie(file):
-    """Load a marisa trie with integer values from memmap file.
+    """
+    Load a marisa trie with integer values from memmap file.
 
     Args:
         file: marisa input file
@@ -281,33 +289,11 @@ def load_single_item_trie(file):
     return marisa_trie.RecordTrie("<l").mmap(file)
 
 
-def import_class(prefix_string, base_string):
-    """
-    Takes the prefix path and import that plus all but the rightmost modules in base string.
-    This can be used in conjunciton with
-        `getattr(mod, load_class)(...)`
-    to initialize the base_string class
-    Ex: import_class("bootleg.embeddings", "LearnedEntityEmb") will return
-    bootleg.embeddings module and "LearnedEntityEmb"
-
-    Args:
-        prefix_string: prefix path
-        base_string: base string
-
-    Returns: imported module, class string
-
-    """
-    if "." in base_string:
-        path, load_class = base_string.rsplit(".", 1)
-        mod = import_module(f"{prefix_string}.{path}")
-    else:
-        load_class = base_string
-        mod = import_module(f"{prefix_string}")
-    return mod, load_class
-
-
 def get_lnrm(s, strip, lower):
-    """Convert a string to its lnrm form We form the lower-cased normalized
+    """
+    Convert to lnrm form.
+
+    Convert a string to its lnrm form We form the lower-cased normalized
     version l(s) of a string s by canonicalizing its UTF-8 characters,
     eliminating diacritics, lower-casing the UTF-8 and throwing out all ASCII-
     range characters that are not alpha-numeric.
@@ -341,7 +327,10 @@ def get_lnrm(s, strip, lower):
 
 
 def strip_nan(input_list):
-    """Replaces float('nan') with nulls. Used for ujson loading/dumping.
+    """
+    Replace float('nan') with nulls.
+
+    Used for ujson loading/dumping.
 
     Args:
         input_list: list of items to remove the Nans from
@@ -358,13 +347,14 @@ def strip_nan(input_list):
 
 
 def try_rmtree(rm_dir):
-    """In the case a resource is open, rmtree will fail. This retries to rmtree
+    """
+    Try to remove a directory tree.
+
+    In the case a resource is open, rmtree will fail. This retries to rmtree
     after 1 second waits for 5 times.
 
     Args:
         rm_dir: directory to remove
-
-    Returns:
     """
     num_retries = 0
     max_retries = 5

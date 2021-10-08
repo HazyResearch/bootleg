@@ -21,6 +21,7 @@ class KGSymbols:
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
+        """KG initializer."""
         self.max_connections = max_connections
         self.edit_mode = edit_mode
         self.verbose = verbose
@@ -60,13 +61,11 @@ class KGSymbols:
                         self._obj2head[qid2].add(qid)
 
     def save(self, save_dir, prefix=""):
-        """Dumps the kg symbols.
+        """Dump the kg symbols.
 
         Args:
             save_dir: directory string to save
             prefix: prefix to add to beginning to file
-
-        Returns:
         """
         utils.ensure_dir(str(save_dir))
         utils.dump_json_file(
@@ -93,7 +92,7 @@ class KGSymbols:
 
     @classmethod
     def load_from_cache(cls, load_dir, prefix="", edit_mode=False, verbose=False):
-        """Loads type symbols from load_dir.
+        """Load type symbols from load_dir.
 
         Args:
             load_dir: directory to load from
@@ -114,7 +113,7 @@ class KGSymbols:
         return cls(qid2relations, relation_vocab, max_connections, edit_mode, verbose)
 
     def get_connections_by_relation(self, qid, relation):
-        """Returns list of other_qids connected to ``qid`` by relation.
+        """Return list of other_qids connected to ``qid`` by relation.
 
         Args:
             qid: QID
@@ -125,8 +124,7 @@ class KGSymbols:
         return self._qid2relations[qid].get(relation, [])
 
     def get_all_connections(self, qid):
-        """Returns dictionary of relation -> list of other_qids connected to
-        ``qid`` by relation.
+        """Return dictionary of relation -> list of other_qids connected to ``qid`` by relation.
 
         Args:
             qid: QID
@@ -143,7 +141,7 @@ class KGSymbols:
         return self._all_relations
 
     def get_relation_name(self, relation):
-        """Returns human readable relation from vocab
+        """Return human readable relation from vocab.
 
         Args:
             relation: relation
@@ -153,7 +151,7 @@ class KGSymbols:
         return self._relation_vocab_inv[relation]
 
     def is_connected(self, qid1, qid2):
-        """Checks if two QIDs are connected in KG.
+        """Check if two QIDs are connected in KG.
 
         Args:
             qid1: QID one
@@ -171,16 +169,15 @@ class KGSymbols:
     # ============================================================
     @edit_op
     def add_relation(self, qid, relation, qid2):
-        """Adds a relationship triple to our mapping. If the QID already has
-        max connection through ``relation``, the last ``other_qid`` is removed
-        and replaced by ``qid2``.
+        """Add a relationship triple to our mapping.
+
+        If the QID already has max connection through ``relation``,
+        the last ``other_qid`` is removed and replaced by ``qid2``.
 
         Args:
             qid: head entity QID
             relation: relation
-            qid2: tail entity QID
-
-        Returns:
+            qid2: tail entity QID:
         """
         if relation not in self._all_relations:
             raise ValueError(
@@ -207,14 +204,12 @@ class KGSymbols:
 
     @edit_op
     def remove_relation(self, qid, relation, qid2):
-        """Removes a relation triple from our mapping.
+        """Remove a relation triple from our mapping.
 
         Args:
             qid: head entity QID
             relation: relation
             qid2: tail entity QID
-
-        Returns:
         """
         if relation not in self._qid2relations[qid]:
             return
@@ -231,13 +226,11 @@ class KGSymbols:
 
     @edit_op
     def add_entity(self, qid, relation_dict):
-        """Adds a new entity to our relation mapping.
+        """Add a new entity to our relation mapping.
 
         Args:
             qid: QID
             relation_dict: dictionary of relation -> list of connected other_qids by relation
-
-        Returns:
         """
         for relation in relation_dict:
             if relation not in self._all_relations:
@@ -264,8 +257,6 @@ class KGSymbols:
         Args:
             old_qid: old QID
             new_qid: new QID
-
-        Returns:
         """
         assert old_qid in self._qid2relations and new_qid not in self._qid2relations, (
             f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} "
@@ -306,8 +297,6 @@ class KGSymbols:
 
         Args:
             entities_to_keep: Set of entities to keep
-
-        Returns:
         """
         # Update qid2relations
         self._qid2relations = {

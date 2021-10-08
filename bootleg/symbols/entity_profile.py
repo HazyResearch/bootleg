@@ -1,3 +1,4 @@
+"""Entity profile."""
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -33,8 +34,7 @@ class EntityObj(BaseModel):
 
 
 class EntityProfile:
-    """Entity Profile object to handle and manage entity, type, and KG
-    metadata."""
+    """Entity Profile object to handle and manage entity, type, and KG metadata."""
 
     def __init__(
         self,
@@ -44,6 +44,7 @@ class EntityProfile:
         edit_mode=False,
         verbose=False,
     ):
+        """Entity profile initializer."""
         self.edit_mode = edit_mode
         self.verbose = verbose
         self._entity_symbols = entity_symbols
@@ -55,8 +56,6 @@ class EntityProfile:
 
         Args:
             save_dir: save directory
-
-        Returns:
         """
         save_dir = Path(save_dir)
         self._entity_symbols.save(save_dir / ENTITY_SUBFOLDER)
@@ -75,7 +74,7 @@ class EntityProfile:
         no_type=False,
         type_systems_to_load=None,
     ):
-        """Loaded a pre-saved profile.
+        """Load a pre-saved profile.
 
         Args:
             load_dir: load directory
@@ -110,8 +109,8 @@ class EntityProfile:
         )
         if no_type:
             print(
-                f"Not loading type information. We will act as if there is no types associated with any entity "
-                f"and will not modify the types in any way, even if calling `add`."
+                "Not loading type information. We will act as if there is no types associated with any entity "
+                "and will not modify the types in any way, even if calling `add`."
             )
         type_sys_dict = {}
         for fold in type_subfolder.iterdir():
@@ -128,11 +127,11 @@ class EntityProfile:
                     verbose=verbose,
                 )
         if verbose:
-            print(f"Loading KG Symbols")
+            print("Loading KG Symbols")
         if no_kg:
             print(
-                f"Not loading KG information. We will act as if there is no KG connections between entities. "
-                f"We will not modify the KG information in any way, even if calling `add`."
+                "Not loading KG information. We will act as if there is no KG connections between entities. "
+                "We will not modify the KG information in any way, even if calling `add`."
             )
         kg_symbols = None
         if not no_kg:
@@ -152,8 +151,9 @@ class EntityProfile:
         max_kg_connections=100,
         edit_mode=False,
     ):
-        """Loads an entity profile from the raw jsonl file. Each line is a JSON
-        object with entity metadata.
+        """Load an entity profile from the raw jsonl file.
+
+        Each line is a JSON object with entity metadata.
 
         Example object::
 
@@ -205,7 +205,7 @@ class EntityProfile:
 
     @classmethod
     def _read_profile_file(cls, profile_file):
-        """Helper method for reading profile data.
+        """Read profile data helper.
 
         Args:
             profile_file: file where jsonl data lives
@@ -260,7 +260,7 @@ class EntityProfile:
                 for rel_pair in ent.relations:
                     if "relation" not in rel_pair or "object" not in rel_pair:
                         raise ValueError(
-                            f"For each value in relations, it must be a JSON with keys relation and object"
+                            "For each value in relations, it must be a JSON with keys relation and object"
                         )
                     if ent.entity_id not in qid2relations:
                         qid2relations[ent.entity_id] = {}
@@ -290,8 +290,6 @@ class EntityProfile:
 
         Args:
             profile_file: file to save the data
-
-        Returns:
         """
         with open(profile_file, "w") as out_f:
             for qid in tqdm(self.get_all_qids(), disable=not self.verbose):
@@ -326,7 +324,7 @@ class EntityProfile:
     # GETTERS
     # ============================================================
     def qid_exists(self, qid):
-        """Checks if QID exists.
+        """Check if QID exists.
 
         Args:
             qid: entity QID
@@ -336,7 +334,7 @@ class EntityProfile:
         return self._entity_symbols.qid_exists(qid)
 
     def mention_exists(self, mention):
-        """Checks if mention exists.
+        """Check if mention exists.
 
         Args:
             mention: mention
@@ -346,28 +344,28 @@ class EntityProfile:
         return self._entity_symbols.alias_exists(mention)
 
     def get_all_qids(self):
-        """Returns all entity QIDs.
+        """Return all entity QIDs.
 
         Returns: List of strings
         """
         return self._entity_symbols.get_all_qids()
 
     def get_all_mentions(self):
-        """Returns list of all mentions.
+        """Return list of all mentions.
 
         Returns: List of strings
         """
         return self._entity_symbols.get_all_aliases()
 
     def get_all_typesystems(self):
-        """Returns list of all type systems.
+        """Return list of all type systems.
 
         Returns: List of strings
         """
         return list(self._type_systems.keys())
 
     def get_all_types(self, type_system):
-        """Returns list of all type names for a type system.
+        """Return list of all type names for a type system.
 
         Args:
             type_system: type system
@@ -382,7 +380,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_title(self, qid):
-        """Gets the title of an entity QID.
+        """Get the title of an entity QID.
 
         Args:
             qid: entity QID
@@ -393,7 +391,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_desc(self, qid):
-        """Gets the description of an entity QID.
+        """Get the description of an entity QID.
 
         Args:
             qid: entity QID
@@ -404,7 +402,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_eid(self, qid):
-        """Gets the entity EID (internal number) of an entity QID.
+        """Get the entity EID (internal number) of an entity QID.
 
         Args:
             qid: entity QID
@@ -414,7 +412,7 @@ class EntityProfile:
         return self._entity_symbols.get_eid(qid)
 
     def get_qid_cands(self, mention):
-        """Gets the entity QID candidates of the mention.
+        """Get the entity QID candidates of the mention.
 
         Args:
             mention: mention
@@ -424,7 +422,7 @@ class EntityProfile:
         return self._entity_symbols.get_qid_cands(mention)
 
     def get_qid_count_cands(self, mention):
-        """Gets the entity QID candidates with their scores of the mention.
+        """Get the entity QID candidates with their scores of the mention.
 
         Args:
             mention: mention
@@ -435,7 +433,7 @@ class EntityProfile:
 
     @property
     def num_entities_with_pad_and_nocand(self):
-        """Gets the number of entities including a PAD and UNK entity.
+        """Get the number of entities including a PAD and UNK entity.
 
         Returns: integer
         """
@@ -443,8 +441,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_types(self, qid, type_system):
-        """Gets the type names associated with the given QID for the
-        ``type_system`` system.
+        """Get the type names associated with the given QID for the ``type_system`` system.
 
         Args:
             qid: QID
@@ -460,7 +457,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_connections_by_relation(self, qid, relation):
-        """Returns list of other_qids connected to ``qid`` by relation.
+        """Return list of other_qids connected to ``qid`` by relation.
 
         Args:
             qid: QID
@@ -474,8 +471,7 @@ class EntityProfile:
 
     @check_qid_exists
     def get_all_connections(self, qid):
-        """Returns dictionary of relation -> list of other_qids connected to
-        ``qid`` by relation.
+        """Return dictionary of relation -> list of other_qids connected to ``qid`` by relation.
 
         Args:
             qid: QID
@@ -488,7 +484,7 @@ class EntityProfile:
 
     @check_qid_exists
     def is_connected(self, qid, qid2):
-        """Checks if two QIDs are connected in KG.
+        """Check if two QIDs are connected in KG.
 
         Args:
             qid: QID one
@@ -508,7 +504,7 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def get_mentions(self, qid):
-        """Gets the mentions for the QID.
+        """Get the mentions for the QID.
 
         Args:
             qid: QID
@@ -520,7 +516,7 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def get_mentions_with_scores(self, qid):
-        """Gets the mentions with thier scores associated with the QID.
+        """Get the mentions with thier scores associated with the QID.
 
         Args:
             qid: QID
@@ -531,8 +527,7 @@ class EntityProfile:
 
     @edit_op
     def get_entities_of_type(self, typename, type_system):
-        """Get all entities of type ``typename`` for type system
-        ``type_system``
+        """Get all entities of type ``typename`` for type system ``type_system``.
 
         Args:
             typename: type name
@@ -553,8 +548,6 @@ class EntityProfile:
 
         Args:
             entity_obj: JSON object of entity metadata
-
-        Returns:
         """
         if (
             type(entity_obj) is not dict
@@ -562,8 +555,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
-                f"you are replacing the entity information in bulk."
+                "The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                "you are replacing the entity information in bulk."
             )
         try:
             ent = EntityObj(
@@ -594,7 +587,7 @@ class EntityProfile:
         for rel_pair in ent.relations:
             if "relation" not in rel_pair or "object" not in rel_pair:
                 raise ValueError(
-                    f"For each value in relations, it must be a JSON with keys relation and object"
+                    "For each value in relations, it must be a JSON with keys relation and object"
                 )
             if (
                 self._kg_symbols is not None
@@ -624,13 +617,11 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def reidentify_entity(self, qid, new_qid):
-        """Rename ``qid`` to ``new_qid``
+        """Rename ``qid`` to ``new_qid``.
 
         Args:
             qid: old QID
             new_qid: new QID
-
-        Returns:
         """
         # We assume this is a new entity
         if self._entity_symbols.qid_exists(new_qid):
@@ -645,13 +636,12 @@ class EntityProfile:
 
     @edit_op
     def update_entity(self, entity_obj):
-        """Updates the metadata associated with the entity. The entity must
-        already be in our dump to be updated.
+        """Update the metadata associated with the entity.
+
+        The entity must already be in our dump to be updated.
 
         Args:
             entity_obj: JSON of entity metadata.
-
-        Returns:
         """
         if (
             type(entity_obj) is not dict
@@ -659,8 +649,8 @@ class EntityProfile:
             or "mentions" not in entity_obj
         ):
             raise ValueError(
-                f"The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
-                f"you are replacing the entity information in bulk."
+                "The input to update_entity needs to be a dictionary with an entity_id key and mentions key as "
+                "you are replacing the entity information in bulk."
             )
         if not self._entity_symbols.qid_exists(entity_obj["entity_id"]):
             raise ValueError(f"The entity {entity_obj['entity_id']} is not in our dump")
@@ -709,8 +699,6 @@ class EntityProfile:
 
         Args:
             entities_to_keep: List or Set of entities to keep
-
-        Returns:
         """
         entities_to_keep = set(entities_to_keep)
         # Check that all entities to keep actually exist
@@ -727,7 +715,7 @@ class EntityProfile:
                 print(f"Pruning {type_sys} data")
             self._type_systems[type_sys].prune_to_entities(entities_to_keep)
         if self.verbose:
-            print(f"Pruning kg data")
+            print("Pruning kg data")
         if self._kg_symbols is not None:
             self._kg_symbols.prune_to_entities(entities_to_keep)
 
@@ -740,8 +728,6 @@ class EntityProfile:
             qid: QID
             type: type name
             type_system: type system
-
-        Returns:
         """
         if type_system not in self._type_systems:
             raise ValueError(
@@ -758,8 +744,6 @@ class EntityProfile:
             qid: head QID
             relation: relation
             qid2: tail QID
-
-        Returns:
         """
         if self._kg_symbols is not None:
             self._kg_symbols.add_relation(qid, relation, qid2)
@@ -767,14 +751,12 @@ class EntityProfile:
     @edit_op
     @check_qid_exists
     def add_mention(self, qid: str, mention: str, score: float):
-        """Adds the mention with its score to the QID.
+        """Add the mention with its score to the QID.
 
         Args:
             qid: QID
             mention: mention
             score: score
-
-        Returns:
         """
         self._entity_symbols.add_mention(qid, mention, score)
 
@@ -787,8 +769,6 @@ class EntityProfile:
             qid: QID
             type: type to remove
             type_system: type system
-
-        Returns:
         """
         if type_system not in self._type_systems:
             raise ValueError(
@@ -805,8 +785,6 @@ class EntityProfile:
             qid: head QID
             relation: relation
             qid2: tail QID
-
-        Returns:
         """
         if self._kg_symbols is not None:
             self._kg_symbols.remove_relation(qid, relation, qid2)
@@ -819,7 +797,5 @@ class EntityProfile:
         Args:
             qid: QID
             mention: mention
-
-        Returns:
         """
         self._entity_symbols.remove_mention(qid, mention)

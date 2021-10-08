@@ -1,18 +1,20 @@
+"""Entity gen task definitions."""
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
 from bootleg.layers.bert_encoder import Encoder
 from bootleg.task_config import NED_TASK
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 
 def entity_output_func(intermediate_output_dict):
+    """Entity output func."""
     return intermediate_output_dict["entity_encoder"][0]
 
 
 def create_task(args, len_context_tok):
-    """Returns an EmmentalTask for a forward pass through the entity encoder only.
+    """Return an EmmentalTask for entity encoder only.
 
     Args:
         args: args
@@ -20,7 +22,6 @@ def create_task(args, len_context_tok):
 
     Returns: EmmentalTask for entity embedding extraction
     """
-
     entity_model = AutoModel.from_pretrained(args.data_config.word_embedding.bert_model)
     entity_model.encoder.layer = entity_model.encoder.layer[
         : args.data_config.word_embedding.entity_layers

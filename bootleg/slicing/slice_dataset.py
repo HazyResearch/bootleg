@@ -1,3 +1,4 @@
+"""Bootleg slice dataset."""
 import hashlib
 import logging
 import multiprocessing
@@ -22,6 +23,7 @@ class InputExample(object):
     """A single training/test example."""
 
     def __init__(self, sent_idx, subslice_idx, anchor, num_alias2pred, slices):
+        """Input example initializer."""
         self.sent_idx = sent_idx
         self.subslice_idx = subslice_idx
         self.anchor = anchor
@@ -29,6 +31,7 @@ class InputExample(object):
         self.slices = slices
 
     def to_dict(self):
+        """Turn object to dictionary."""
         return {
             "sent_idx": self.sent_idx,
             "subslice_idx": self.subslice_idx,
@@ -39,6 +42,7 @@ class InputExample(object):
 
     @classmethod
     def from_dict(cls, in_dict):
+        """Create object from dictionary."""
         return cls(
             in_dict["sent_idx"],
             in_dict["subslice_idx"],
@@ -48,6 +52,7 @@ class InputExample(object):
         )
 
     def __repr__(self):
+        """Repr."""
         return (
             f"Sent: {self.sent_idx} Subsent: {self.subslice_idx} Anchors: {self.anchor} "
             f"Num Alias2Pred: {self.num_alias2pred} Slices: {self.slices}"
@@ -58,12 +63,14 @@ class InputFeatures(object):
     """A single set of features of data."""
 
     def __init__(self, sent_idx, subslice_idx, alias_slice_incidence, alias2pred_probs):
+        """Input feature initializer."""
         self.sent_idx = sent_idx
         self.subslice_idx = subslice_idx
         self.alias_slice_incidence = alias_slice_incidence
         self.alias2pred_probs = alias2pred_probs
 
     def to_dict(self):
+        """Object to dictionary."""
         return {
             "sent_idx": self.sent_idx,
             "subslice_idx": self.subslice_idx,
@@ -73,6 +80,7 @@ class InputFeatures(object):
 
     @classmethod
     def from_dict(cls, in_dict):
+        """Create object from dictionary."""
         return cls(
             in_dict["sent_idx"],
             in_dict["subslice_idx"],
@@ -82,8 +90,10 @@ class InputFeatures(object):
 
 
 def get_slice_values(slice_names, line):
-    """Results a dictionary of all slice values for an input example. Any
-    mention with a slice value of > 0.5 gets assigned that slice. If some
+    """
+    Results a dictionary of all slice values for an input example.
+
+    Any mention with a slice value of > 0.5 gets assigned that slice. If some
     slices are missing from the input, we assign all mentions as not being in
     that slice (getting a 0 label value). We also check that slices are
     formatted correctly.
@@ -123,6 +133,7 @@ def get_slice_values(slice_names, line):
 def create_examples_initializer(
     data_config, slice_names, use_weak_label, split, train_in_candidates
 ):
+    """Create example multiprocessing initialiezr."""
     global constants_global
     constants_global = {
         "slice_names": slice_names,
@@ -143,7 +154,7 @@ def create_examples(
     use_weak_label,
     split,
 ):
-    """Creates examples from the raw input data.
+    """Create examples from the raw input data.
 
     Args:
         dataset: dataset file
@@ -155,14 +166,12 @@ def create_examples(
         slice_names: list of slices to evaluate on
         use_weak_label: whether to use weak labeling or not
         split: data split
-
-    Returns:
     """
     log_rank_0_debug(logger, "Starting to extract subsentences")
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
 
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     if num_processes == 1:
         out_file_name = os.path.join(create_ex_outdir, os.path.basename(dataset))
@@ -204,7 +213,7 @@ def create_examples(
         assert (
             total_input == total_input_from_chunks
         ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-        log_rank_0_debug(logger, f"Done chunking files")
+        log_rank_0_debug(logger, "Done chunking files")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -244,6 +253,7 @@ def create_examples(
 
 
 def create_examples_hlp(args):
+    """Create examples wrapper helper."""
     in_file_name, in_file_lines, out_file_name = args
     return create_examples_single(
         in_file_name, in_file_lines, out_file_name, constants_global
@@ -331,7 +341,7 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
                 ), f"If {FINAL_LOSS} isn't in slice, it must be that all anchors are False. This is not true"
                 assert (
                     split != "train" or not use_weak_label
-                ), f"As all anchors are false, this must happen if you are evaling or training and using weak labels"
+                ), "As all anchors are false, this must happen if you are evaling or training and using weak labels"
             # TODO: optimizer here
             # for i in range(0, num_alias2pred, 1):
             #     subset_slices = {}
@@ -368,6 +378,7 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
 
 
 def convert_examples_to_features_and_save_initializer(save_dataset_name, storage):
+    """Convert to features multiprocessing initializer."""
     global mmap_file_global
     mmap_file_global = np.memmap(save_dataset_name, dtype=storage, mode="r+")
 
@@ -375,8 +386,9 @@ def convert_examples_to_features_and_save_initializer(save_dataset_name, storage
 def convert_examples_to_features_and_save(
     meta_file, dataset_threads, slice_names, save_dataset_name, storage
 ):
-    """Converts the prepped examples into input features and saves in memmap
-    files. These are used in the __get_item__ method.
+    """Convert the prepped examples into input features.
+
+    Saves in memmap files. These are used in the __get_item__ method.
 
     Args:
         meta_file: metadata file where input file paths are saved
@@ -384,8 +396,6 @@ def convert_examples_to_features_and_save(
         slice_names: list of slice names to evaluation on
         save_dataset_name: data file name to save
         storage: data storage type (for memmap)
-
-    Returns:
     """
     log_rank_0_debug(logger, "Starting to extract subsentences")
     start = time.time()
@@ -395,7 +405,7 @@ def convert_examples_to_features_and_save(
         logger, f"Starting to build and save features with {num_processes} threads"
     )
 
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = utils.load_json_file(meta_file)["num_mentions"]
     max_alias2pred = utils.load_json_file(meta_file)["max_alias2pred"]
     files_and_counts = utils.load_json_file(meta_file)["files_and_counts"]
@@ -471,6 +481,7 @@ def convert_examples_to_features_and_save(
 
 
 def convert_examples_to_features_and_save_hlp(input_dict):
+    """Convert to features helper."""
     return convert_examples_to_features_and_save_single(input_dict, mmap_file_global)
 
 
@@ -566,7 +577,10 @@ def convert_examples_to_features_and_save_single(input_dict, mmap_file):
 
 
 class BootlegSliceDataset:
-    """Our dataset class for holding data slices (or subpopulations).
+    """
+    Slice dataset class.
+
+    Our dataset class for holding data slices (or subpopulations).
 
     Each mention can be part of 0 or more slices. When running eval, we use
     the SliceDataset to determine which mentions are part of what slices. Importantly, although the model
@@ -590,6 +604,7 @@ class BootlegSliceDataset:
         dataset_threads,
         split="train",
     ):
+        """Slice dataset initializer."""
         global_start = time.time()
         log_rank_0_info(logger, f"Building slice dataset for {split} from {dataset}.")
         spawn_method = main_args.run_config.spawn_method
@@ -697,7 +712,7 @@ class BootlegSliceDataset:
         )
         assert len(self.data) > 0
         assert len(self.sent_to_row_id_dict) > 0
-        log_rank_0_debug(logger, f"Removing temporary output files")
+        log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
         # Set spawn back to original/default, which is "fork" or "spawn". This is needed for the Meta.config to
         # be correctly passed in the collate_fn.
@@ -709,7 +724,10 @@ class BootlegSliceDataset:
 
     @classmethod
     def build_data_dict(cls, save_dataset_name, storage):
-        """Loads the memmap slice dataset and create a mapping from sentence
+        """
+        Build the slice dataset from saved file.
+
+        Loads the memmap slice dataset and create a mapping from sentence
         index to row index.
 
         Args:
@@ -741,7 +759,10 @@ class BootlegSliceDataset:
         return sent_idx in self.sent_to_row_id_dict
 
     def get_slice_incidence_arr(self, sent_idx, alias_orig_list_pos):
-        """Given the sentence index and the list of aliases to get slice
+        """
+        Get slice incident array.
+
+        Given the sentence index and the list of aliases to get slice
         indices for (may have -1 indicating no alias), return a dictionary of
         slice_name -> 0/1 incidence array of if each alias in
         alias_orig_list_pos was in the slice or not (-1 for no alias).

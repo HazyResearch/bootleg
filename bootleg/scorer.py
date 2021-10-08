@@ -1,3 +1,4 @@
+"""Bootleg scorer."""
 import logging
 from collections import Counter
 from typing import Dict, List, Optional
@@ -16,11 +17,15 @@ class BootlegSlicedScorer:
     """
 
     def __init__(self, train_in_candidates, slices_datasets=None):
+        """Bootleg scorer initializer."""
         self.train_in_candidates = train_in_candidates
         self.slices_datasets = slices_datasets
 
     def get_slices(self, uid):
-        """Get slice incidence matrices for the uid Uid is dtype
+        """
+        Get slices incidence matrices.
+
+        Get slice incidence matrices for the uid Uid is dtype
         (np.dtype([('sent_idx', 'i8', 1), ('subsent_idx', 'i8', 1),
         ("alias_orig_list_pos", 'i8', max_aliases)]) where alias_orig_list_pos
         gives the mentions original positions in the sentence.

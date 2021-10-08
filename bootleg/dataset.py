@@ -1,3 +1,4 @@
+"""Bootleg NED Dataset."""
 import logging
 import multiprocessing
 import os
@@ -12,6 +13,7 @@ import warnings
 import numpy as np
 import torch
 import ujson
+from emmental.data import EmmentalDataset
 from tqdm import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
@@ -20,7 +22,6 @@ from bootleg.symbols.constants import ANCHOR_KEY, PAD_ID, STOP_WORDS
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import data_utils, utils
 from bootleg.utils.data_utils import read_in_relations, read_in_types
-from emmental.data import EmmentalDataset
 
 warnings.filterwarnings(
     "ignore",
@@ -52,6 +53,7 @@ class InputExample(object):
         qid,
         qid_cnt_mask_score,
     ):
+        """Init InputExample."""
         assert (
             type(sent_idx) is int
         ), f"We need the sentence index is an int. You have {type(sent_idx)}"
@@ -66,6 +68,7 @@ class InputExample(object):
         self.qid_cnt_mask_score = qid_cnt_mask_score
 
     def to_dict(self):
+        """Return dictionary of object."""
         return {
             "sent_idx": self.sent_idx,
             "subsent_idx": self.subsent_idx,
@@ -80,6 +83,7 @@ class InputExample(object):
 
     @classmethod
     def from_dict(cls, in_dict):
+        """Create pobject from dictionary."""
         return cls(
             in_dict["sent_idx"],
             in_dict["subsent_idx"],
@@ -111,6 +115,7 @@ class InputFeatures(object):
         subsent_idx,
         guid,
     ):
+        """Initialize InputFeature."""
         self.alias_idx = alias_idx
         self.word_input_ids = word_input_ids
         self.word_token_type_ids = word_token_type_ids
@@ -125,6 +130,7 @@ class InputFeatures(object):
         self.guid = guid
 
     def to_dict(self):
+        """Return dictionary of object."""
         return {
             "alias_idx": self.alias_idx,
             "word_input_ids": self.word_input_ids,
@@ -142,6 +148,7 @@ class InputFeatures(object):
 
     @classmethod
     def from_dict(cls, in_dict):
+        """Create pobject from dictionary."""
         return cls(
             in_dict["alias_idx"],
             in_dict["word_input_ids"],
@@ -159,8 +166,7 @@ class InputFeatures(object):
 
 
 def extract_context_windows(span, tokens, max_seq_window_len):
-    """
-    Extracts the left and right context window around a span
+    """Extract the left and right context window around a span.
 
     Args:
         span: span (left and right values)
@@ -168,7 +174,6 @@ def extract_context_windows(span, tokens, max_seq_window_len):
         max_seq_window_len: maximum window length around a span
 
     Returns: left context, right context
-
     """
     # If more tokens to the right, shift weight there
     if span[0] < len(tokens) - span[1]:
@@ -185,8 +190,7 @@ def extract_context_windows(span, tokens, max_seq_window_len):
 
 
 def get_structural_entity_str(items, max_tok_len, sep_tok):
-    """For structural resources in items. Returns sep_tok joined list of items such
-    that the number of words is less than max tok len.
+    """Return sep_tok joined list of items of strucutral resources.
 
     Args:
         items: list of structural resources
@@ -195,7 +199,6 @@ def get_structural_entity_str(items, max_tok_len, sep_tok):
 
     Returns:
         result string, number of items that went beyond ``max_tok_len``
-
     """
     i = 1
     over_len = 0
@@ -218,8 +221,11 @@ def get_entity_string(
     qid2typenames,
 ):
     """
-    For each entity, generates a string that is fed into a language model to generate an entity embedding. Returns
-    all tokens that are the title of the entity (even if in the description)
+    Get string representation of entity.
+
+    For each entity, generates a string that is fed into a language model to
+    generate an entity embedding. Returns all tokens that are the title of the
+    entity (even if in the description)
 
     Args:
         qid: QID
@@ -229,7 +235,6 @@ def get_entity_string(
         qid2typenames: Dict of QID to list of types
 
     Returns: entity strings, number of types over max length, number of relations over max length
-
     """
     over_kg_len = 0
     over_type_len = 0
@@ -291,6 +296,7 @@ def get_entity_string(
 
 
 def create_examples_initializer(constants_dict):
+    """Create examples multiprocessing initializer."""
     global constants_global
     constants_global = constants_dict
 
@@ -307,7 +313,7 @@ def create_examples(
     is_bert,
     tokenizer,
 ):
-    """Creates examples from the raw input data.
+    """Create examples from the raw input data.
 
     Args:
         dataset: data file to read
@@ -320,15 +326,13 @@ def create_examples(
         split: data split
         is_bert: is the tokenizer a BERT one
         tokenizer: tokenizer
-
-    Returns:
     """
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
     qidcnt_file = os.path.join(
         data_config.entity_dir, data_config.entity_map_dir, data_config.qid_cnt_map
     )
-    log_rank_0_debug(logger, f"Counting lines")
+    log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     constants_dict = {
         "is_bert": is_bert,
@@ -372,7 +376,7 @@ def create_examples(
         assert (
             total_input == total_input_from_chunks
         ), f"Lengths of files {total_input} doesn't mathc {total_input_from_chunks}"
-        log_rank_0_debug(logger, f"Done chunking files. Starting pool.")
+        log_rank_0_debug(logger, "Done chunking files. Starting pool.")
 
         pool = multiprocessing.Pool(
             processes=num_processes,
@@ -427,6 +431,7 @@ def create_examples_single(
     out_file_name,
     constants_dict,
 ):
+    """Create examples."""
     split = constants_dict["split"]
     max_seq_window_len = constants_dict["max_seq_window_len"]
     use_weak_label = constants_dict["use_weak_label"]
@@ -555,6 +560,7 @@ def convert_examples_to_features_and_save_initializer(
     X_storage,
     Y_storage,
 ):
+    """Create examples multiprocessing initializer."""
     global tokenizer_global
     tokenizer_global = tokenizer
     global entitysymbols_global
@@ -584,7 +590,10 @@ def convert_examples_to_features_and_save(
     tokenizer,
     entity_symbols,
 ):
-    """Converts the prepped examples into input features and saves in memmap
+    """
+    Create features from examples.
+
+    Converts the prepped examples into input features and saves in memmap
     files. These are used in the __get_item__ method.
 
     Args:
@@ -601,8 +610,6 @@ def convert_examples_to_features_and_save(
         Y_storage: data labels storage type (for memmap)
         tokenizer: tokenizer
         entity_symbols: entity symbols
-
-    Returns:
     """
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
@@ -701,6 +708,7 @@ def convert_examples_to_features_and_save(
 
 
 def convert_examples_to_features_and_save_hlp(input_dict):
+    """Convert examples to features multiprocessing initializer."""
     return convert_examples_to_features_and_save_single(
         input_dict,
         tokenizer_global,
@@ -761,7 +769,7 @@ def convert_examples_to_features_and_save_single(
         if not entitysymbols.alias_exists(alias):
             # if we do not have this alias in our set, we give it an index of -2, meaning we will
             # always get it wrong in eval
-            assert split in ["test", "dev",], (
+            assert split in ["test", "dev"], (
                 f"Expected split of 'test' or 'dev'. If you are training, "
                 f"the alias {alias} must be in our entity dump"
             )
@@ -785,7 +793,7 @@ def convert_examples_to_features_and_save_single(
                 # if we are not using a NC (no candidate) but are in eval mode, we let the gold
                 # candidate not be in the candidate set we give in a true index of -2,
                 # meaning our model will always get this example incorrect
-                assert split in ["test", "dev",], (
+                assert split in ["test", "dev"], (
                     f"Expected split of 'test' or 'dev' in sent {example.sent_idx}. If you are training, "
                     f"the QID {qid} must be in the candidate list for data_args.train_in_candidates to be True"
                 )
@@ -988,6 +996,7 @@ def build_and_save_entity_inputs_initializer(
     qid2relations_file,
     tokenizer,
 ):
+    """Create entity features multiprocessing initializer."""
     global qid2typenames_global
     qid2typenames_global = ujson.load(open(qid2typenames_file))
     global qid2relations_global
@@ -1016,7 +1025,7 @@ def build_and_save_entity_inputs(
     tokenizer,
     entity_symbols,
 ):
-    """Generates data for the entity encoder input.
+    """Create entity features.
 
     Args:
         save_entity_dataset_name: memmap filename to save the entity data
@@ -1025,8 +1034,6 @@ def build_and_save_entity_inputs(
         dataset_threads: number of threads
         tokenizer: tokenizer
         entity_symbols: entity symbols
-
-    Returns:
     """
     add_entity_type = data_config.entity_type_data.use_entity_types
     qid2typenames = {}
@@ -1155,6 +1162,7 @@ def build_and_save_entity_inputs(
 
 
 def build_and_save_entity_inputs_hlp(input_qids):
+    """Create entity features multiprocessing helper."""
     return build_and_save_entity_inputs_single(
         input_qids,
         constants_global,
@@ -1175,6 +1183,7 @@ def build_and_save_entity_inputs_single(
     tokenizer,
     entity_symbols,
 ):
+    """Create entity features."""
     printed = 0
     num_overflow = 0
     for qid in tqdm(input_qids, desc="Processing entities"):
@@ -1223,7 +1232,7 @@ def build_and_save_entity_inputs_single(
 
 
 class BootlegDataset(EmmentalDataset):
-    """Bootleg Dataset class to be used in dataloader.
+    """Bootleg Dataset class.
 
     Args:
         main_args: input config
@@ -1235,8 +1244,6 @@ class BootlegDataset(EmmentalDataset):
         dataset_threads: number of threads to use
         split: data split
         is_bert: is the tokenizer a BERT or not
-
-    Returns:
     """
 
     def __init__(
@@ -1251,6 +1258,7 @@ class BootlegDataset(EmmentalDataset):
         split="train",
         is_bert=True,
     ):
+        """Bootleg dataset initlializer."""
         log_rank_0_info(
             logger,
             f"Starting to build data for {split} from {dataset}",
@@ -1463,7 +1471,7 @@ class BootlegDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(
@@ -1490,7 +1498,7 @@ class BootlegDataset(EmmentalDataset):
         )
         self.X_entity_dict = X_entity_dict
 
-        log_rank_0_debug(logger, f"Removing temporary output files")
+        log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
         log_rank_0_info(
             logger,
@@ -1505,8 +1513,7 @@ class BootlegDataset(EmmentalDataset):
     def build_data_dicts(
         cls, save_dataset_name, save_labels_name, X_storage, Y_storage
     ):
-        """Returns the X_dict and Y_dict of inputs and labels for the entity
-        disambiguation task.
+        """Return the X_dict and Y_dict of inputs and labels.
 
         Args:
             save_dataset_name: memmap file name with inputs
@@ -1558,7 +1565,7 @@ class BootlegDataset(EmmentalDataset):
 
     @classmethod
     def build_data_entity_dicts(cls, save_dataset_name, X_storage):
-        """Returns the X_dict for the entity data.
+        """Return the X_dict for the entity data.
 
         Args:
             save_dataset_name: memmap file name with entity data
@@ -1641,7 +1648,12 @@ class BootlegDataset(EmmentalDataset):
         return x_dict, y_dict
 
     def _mask_input_ids(self, x_dict):
-        """Mask the entity mention with high probability, especially if rare. Further mask tokens 10% of the time"""
+        """
+        Mask input context ids.
+
+        Mask the entity mention with high probability, especially if rare.
+        Further mask tokens 10% of the time
+        """
         # Get core dump if you don't do this
         input_ids = torch.clone(x_dict["input_ids"])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]
@@ -1688,7 +1700,12 @@ class BootlegDataset(EmmentalDataset):
         return input_ids
 
     def _mask_entity_input_ids(self, x_dict, eid):
-        """Mask the entity to_mask index with high probability, especially if mention is rare."""
+        """
+        Mask entity input ids.
+
+        Mask the entity to_mask index with high probability, especially if
+        mention is rare.
+        """
         # Get core dump if you don't do this
         entity_input_ids = torch.clone(self.X_entity_dict["entity_input_ids"][eid])
         cnt_ratio = x_dict["word_qid_cnt_mask_score"]
@@ -1714,12 +1731,14 @@ class BootlegDataset(EmmentalDataset):
         return entity_input_ids
 
     def __getstate__(self):
+        """Get state."""
         state = self.__dict__.copy()
         del state["X_dict"]
         del state["Y_dict"]
         return state
 
     def __setstate__(self, state):
+        """Set state."""
         self.__dict__.update(state)
         self.X_dict, self.Y_dict = self.build_data_dicts(
             self.save_dataset_name,
@@ -1730,6 +1749,7 @@ class BootlegDataset(EmmentalDataset):
         return state
 
     def __repr__(self):
+        """Repr."""
         return (
             f"Bootleg Dataset. Data at {self.save_dataset_name}. "
             f"Labels at {self.save_labels_name}. "
@@ -1737,7 +1757,7 @@ class BootlegDataset(EmmentalDataset):
 
 
 class BootlegEntityDataset(EmmentalDataset):
-    """Bootleg Dataset class for generating entity embeddings.
+    """Bootleg Dataset class for entities.
 
     Args:
         main_args: input config
@@ -1747,8 +1767,6 @@ class BootlegEntityDataset(EmmentalDataset):
         entity_symbols: entity database class
         dataset_threads: number of threads to use
         split: data split
-
-    Returns:
     """
 
     def __init__(
@@ -1761,7 +1779,8 @@ class BootlegEntityDataset(EmmentalDataset):
         dataset_threads,
         split="test",
     ):
-        assert split == "test", f"Split must be test split for EntityDataset"
+        """Bootleg entity dataset initializer."""
+        assert split == "test", "Split must be test split for EntityDataset"
         log_rank_0_info(
             logger,
             f"Starting to build data for {split} from {dataset}",
@@ -1817,7 +1836,7 @@ class BootlegEntityDataset(EmmentalDataset):
             not os.path.exists(self.save_entity_dataset_name)
         ):
             st_time = time.time()
-            log_rank_0_info(logger, f"Building entity data from scatch.")
+            log_rank_0_info(logger, "Building entity data from scatch.")
             try:
                 # Creating/saving data
                 build_and_save_entity_inputs(
@@ -1855,7 +1874,7 @@ class BootlegEntityDataset(EmmentalDataset):
 
     @classmethod
     def build_data_entity_dicts(cls, save_dataset_name, X_storage):
-        """Returns the X_dict for the entity data.
+        """Return the X_dict for the entity data.
 
         Args:
             save_dataset_name: memmap file name with entity data
@@ -1894,14 +1913,17 @@ class BootlegEntityDataset(EmmentalDataset):
         return x_dict
 
     def __getstate__(self):
+        """Get state."""
         state = self.__dict__.copy()
         del state["X_dict"]
         del state["Y_dict"]
         return state
 
     def __setstate__(self, state):
+        """Set state."""
         self.__dict__.update(state)
         return state
 
     def __repr__(self):
+        """Repr."""
         return f"Bootleg Entity Dataset. Data at {self.save_entity_dataset_name}."

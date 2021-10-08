@@ -21,8 +21,9 @@ class TypeSymbols:
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
+        """Type Symbols initializer."""
         if max_types <= 0:
-            raise ValueError(f"max_types must be greater than 0")
+            raise ValueError("max_types must be greater than 0")
         self.max_types = max_types
         self.edit_mode = edit_mode
         self.verbose = verbose
@@ -40,7 +41,7 @@ class TypeSymbols:
             self._type_vocab: Dict[str, int] = type_vocab
             assert (
                 0 not in self._type_vocab.values()
-            ), f"You can't have a type id that is 0. That is reserved for UNK"
+            ), "You can't have a type id that is 0. That is reserved for UNK"
 
         for qid in qid2typenames:
             self._qid2typenames[qid] = qid2typenames.get(qid, [])[: self.max_types]
@@ -54,9 +55,7 @@ class TypeSymbols:
             self._qid2typeid: Dict[str, List[int]] = qid2typeid
 
         for typeids in self._qid2typeid.values():
-            assert (
-                0 not in typeids
-            ), f"Typeids can't be 0. This is reserved for UNK type"
+            assert 0 not in typeids, "Typeids can't be 0. This is reserved for UNK type"
 
         self._typename2qids = None
         if edit_mode:
@@ -71,15 +70,17 @@ class TypeSymbols:
                     if typname not in self._typename2qids:
                         self._typename2qids[typname] = set()
                     self._typename2qids[typname].add(qid)
+            # In case extra types in vocab without qids
+            for typname in self._type_vocab:
+                if typname not in self._typename2qids:
+                    self._typename2qids[typname] = set()
 
     def save(self, save_dir, prefix=""):
-        """Dumps the type symbols.
+        """Dump the type symbols.
 
         Args:
             save_dir: directory string to save
             prefix: prefix to add to beginning to file
-
-        Returns:
         """
         utils.ensure_dir(str(save_dir))
         utils.dump_json_file(
@@ -103,7 +104,7 @@ class TypeSymbols:
 
     @classmethod
     def load_from_cache(cls, load_dir, prefix="", edit_mode=False, verbose=False):
-        """Loads type symbols from load_dir.
+        """Load type symbols from load_dir.
 
         Args:
             load_dir: directory to load from
@@ -127,14 +128,11 @@ class TypeSymbols:
         return cls(qid2typenames, qid2typeid, type_vocab, max_types, edit_mode, verbose)
 
     def get_all_types(self):
-        """Returns all typenames.
-
-        Returns:
-        """
+        """Return all typenames."""
         return list(self._type_vocab.keys())
 
     def get_types(self, qid):
-        """Gets the type names associated with the given QID.
+        """Get the type names associated with the given QID.
 
         Args:
             qid: QID
@@ -145,7 +143,7 @@ class TypeSymbols:
         return types
 
     def get_typeids(self, qid):
-        """Gets the type ids associated with the given QID.
+        """Get the type ids associated with the given QID.
 
         Args:
             qid: QID
@@ -153,6 +151,16 @@ class TypeSymbols:
         Returns: list of type id ints
         """
         return self._qid2typeid.get(qid, [])
+
+    def get_type_typeid(self, type):
+        """Get the type id associated with the type.
+
+        Args:
+            type: type
+
+        Returns: type id
+        """
+        return self._type_vocab[type]
 
     # ============================================================
     # EDIT MODE OPERATIONS
@@ -173,14 +181,14 @@ class TypeSymbols:
 
     @edit_op
     def add_type(self, qid, typename):
-        """Adds the type to the QID. If the QID already has maximum types, the
+        """Add the type to the QID.
+
+        If the QID already has maximum types, the
         last type is removed and replaced by ``typename``.
 
         Args:
             qid: QID
             typename: type name
-
-        Returns:
         """
         if typename not in self._type_vocab:
             max_type_id = max(self._type_vocab.values()) + 1
@@ -209,8 +217,6 @@ class TypeSymbols:
         Args:
             qid: QID
             typename: type name to remove
-
-        Returns:
         """
         if typename not in self._type_vocab:
             raise ValueError(
@@ -234,13 +240,11 @@ class TypeSymbols:
     @edit_op
     def add_entity(self, qid, types):
         """
-        Add an entity QID with its types to our mappings
+        Add an entity QID with its types to our mappings.
+
         Args:
             qid: QID
             types: list of type names
-
-        Returns:
-
         """
         for typename in types:
             if typename not in self._type_vocab:
@@ -268,8 +272,6 @@ class TypeSymbols:
         Args:
             old_qid: old QID
             new_qid: new QID
-
-        Returns:
         """
         assert (
             old_qid in self._qid2typenames and new_qid not in self._qid2typenames
@@ -291,8 +293,6 @@ class TypeSymbols:
 
         Args:
             entities_to_keep: Set of entities to keep
-
-        Returns:
         """
         # Update qid2typenames
         self._qid2typenames = {

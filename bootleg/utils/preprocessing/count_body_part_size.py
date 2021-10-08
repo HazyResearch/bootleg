@@ -1,5 +1,9 @@
-"""Util file to count the number of mentions in each "body part" (head, torso,
-tail, toes) such that they have more than one candidate."""
+"""
+Count subpopulations in NED data.
+
+Util file to count the number of mentions in each "body part" (head, torso,
+tail, toes) such that they have more than one candidate.
+"""
 
 import argparse
 import multiprocessing
@@ -15,6 +19,7 @@ FINAL_SENT_TO_SLICE_PREFIX = "final_sent_to_slices"
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_dir",
@@ -29,6 +34,7 @@ def parse_args():
 
 
 def init_pool(qid_cnt, a2q_f):
+    """Multiprocess pool initializer."""
     global qid_cnt_global
     qid_cnt_global = qid_cnt
     global a2q_global
@@ -36,7 +42,7 @@ def init_pool(qid_cnt, a2q_f):
 
 
 def get_slice_counts(num_processes, qid_cnt, a2q_f, files):
-    """Gets true anchor slice counts."""
+    """Get true anchor slice counts."""
     pool = multiprocessing.Pool(
         processes=num_processes, initializer=init_pool, initargs=[qid_cnt, a2q_f]
     )
@@ -52,6 +58,7 @@ def get_slice_counts(num_processes, qid_cnt, a2q_f, files):
 
 
 def get_slice_counts_hlp(args):
+    """Get slice counts single process."""
     file = args
     cnts = Counter()
     with open(file) as in_f:
@@ -80,7 +87,7 @@ def get_slice_counts_hlp(args):
 
 
 def get_counts(num_processes, files):
-    """Gets true anchor slice counts."""
+    """Get true anchor slice counts."""
     pool = multiprocessing.Pool(processes=num_processes)
     qid_cnts = defaultdict(int)
     for res in tqdm(
@@ -94,6 +101,7 @@ def get_counts(num_processes, files):
 
 
 def get_counts_hlp(file):
+    """Get entity count helper."""
     res = defaultdict(int)  # qid -> cnt
     with open(file) as in_f:
         for line in in_f:
@@ -104,6 +112,7 @@ def get_counts_hlp(file):
 
 
 def main():
+    """Run."""
     args = parse_args()
     print(ujson.dumps(vars(args), indent=4))
     num_processes = min(args.processes, int(0.8 * multiprocessing.cpu_count()))
@@ -115,7 +124,7 @@ def main():
 
     a2q_f = data_dir / "entity_db" / "entity_mappings" / "alias2qids.json"
 
-    print(f"Getting slice counts from test and dev")
+    print("Getting slice counts from test and dev")
     for prefix in ["test", "dev"]:
         subfolder = data_dir / prefix
         input_files = list(subfolder.glob("*.jsonl"))

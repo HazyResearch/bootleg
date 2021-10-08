@@ -1,3 +1,4 @@
+"""Bootleg data utils."""
 import os
 
 import ujson
@@ -7,7 +8,10 @@ from bootleg.utils import utils
 
 
 def correct_not_augmented_dict_values(gold, dict_values):
-    """Modifies the dict_values to only contain those mentions that are gold
+    """
+    Correct gold label dict values in data prep.
+
+    Modifies the dict_values to only contain those mentions that are gold
     labels. The new dictionary has the alias indices be corrected to start at 0
     and end at the number of gold mentions.
 
@@ -34,7 +38,10 @@ def correct_not_augmented_dict_values(gold, dict_values):
 
 # eval_slices must include FINAL_LOSS
 def get_eval_slices(eval_slices):
-    """Given input eval slices (passed in config), ensure FINAL_LOSS is in the
+    """
+    Get eval slices in data prep.
+
+    Given input eval slices (passed in config), ensure FINAL_LOSS is in the
     eval slices. FINAL_LOSS gives overall metrics.
 
     Args:
@@ -50,7 +57,8 @@ def get_eval_slices(eval_slices):
 
 
 def get_save_data_folder(data_args, use_weak_label, dataset):
-    """Give save data folder for the prepped data.
+    """
+    Get save data folder for the prepped data.
 
     Args:
         data_args: data config
@@ -75,8 +83,8 @@ def get_save_data_folder(data_args, use_weak_label, dataset):
 
 
 def generate_slice_name(data_args, slice_names, use_weak_label, dataset):
-    """Generate name for slice datasets, taking into account the eval slices in
-    the config.
+    """
+    Generate name for slice datasets, taking into account the config eval slices.
 
     Args:
         data_args: data args
@@ -95,8 +103,8 @@ def generate_slice_name(data_args, slice_names, use_weak_label, dataset):
 
 
 def get_emb_prep_dir(data_config):
-    """Get embedding prep directory for saving prep files. Lives inside
-    entity_dir.
+    """
+    Get embedding prep directory for saving prep files.
 
     Args:
         data_config: data config
@@ -109,7 +117,8 @@ def get_emb_prep_dir(data_config):
 
 
 def get_data_prep_dir(data_config):
-    """Get data prep directory for saving prep files. Lives inside data_dir.
+    """
+    Get data prep directory for saving prep files.
 
     Args:
         data_config: data config
@@ -122,7 +131,8 @@ def get_data_prep_dir(data_config):
 
 
 def get_chunk_dir(prep_dir):
-    """Get directory for saving data chunks.
+    """
+    Get directory for saving data chunks.
 
     Args:
         prep_dir: prep directory
@@ -133,21 +143,23 @@ def get_chunk_dir(prep_dir):
 
 
 def add_special_tokens(tokenizer):
-    """Adds special tokens.
+    """
+    Add special tokens.
 
     Args:
         tokenizer: tokenizer
         data_config: data config
         entitysymbols: entity symbols
-
-    Returns:
     """
     # Add standard tokens
     tokenizer.add_special_tokens(SPECIAL_TOKENS)
 
 
 def read_in_types(data_config, entitysymbols):
-    """Reads in type mapping from QID -> list of types ids and converts
+    """
+    Read in type mappings.
+
+    Reads in type mapping from QID -> list of types ids and converts
     dictionary of QID -> type names. If type id is type string, we do not
     convert via vocab mapping.
 
@@ -169,10 +181,9 @@ def read_in_types(data_config, entitysymbols):
             f"Inverse vocab from {vocab_file} not" f"same length as vocab"
         )
     all_type_ids = set(vocab.values())
-    assert 0 not in all_type_ids, (
-        f"We assume type indices start at 1. 0 is reserved for UNK type. "
-        f"You have index 0."
-    )
+    assert (
+        0 not in all_type_ids
+    ), "We assume type indices start at 1. 0 is reserved for UNK type. You have index 0."
     with open(type_file) as in_f:
         # take the first type; UNK type is 0
         qid2typenames = {}
@@ -196,7 +207,10 @@ def read_in_types(data_config, entitysymbols):
 
 
 def read_in_relations(data_config, entitysymbols):
-    """Reads in relation kg mapping from QID -> relation id -> list of "tail"
+    """
+    Read in relation mapping.
+
+    Reads in relation kg mapping from QID -> relation id -> list of "tail"
     qid. Outputs dict of QID -> list of relationship strings of "<relation>
     <tail qid>" We map the relation id to a string via vocab mapping.
 

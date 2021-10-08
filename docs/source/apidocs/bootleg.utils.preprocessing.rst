@@ -4,22 +4,6 @@ bootleg.utils.preprocessing package
 Submodules
 ----------
 
-bootleg.utils.preprocessing.build\_regularization\_mapping module
------------------------------------------------------------------
-
-.. automodule:: bootleg.utils.preprocessing.build_regularization_mapping
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-bootleg.utils.preprocessing.build\_static\_embeddings module
-------------------------------------------------------------
-
-.. automodule:: bootleg.utils.preprocessing.build_static_embeddings
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 bootleg.utils.preprocessing.compute\_statistics module
 ------------------------------------------------------
 

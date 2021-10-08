@@ -1,4 +1,6 @@
 """
+Merge contextual candidates for NED.
+
 This file
 1. Reads in raw wikipedia sentences from /lfs/raiders7/0/lorr1/sentences
 2. Reads in map of WPID-Title-QID from /lfs/raiders7/0/lorr1/title_to_all_ids.jsonl
@@ -29,6 +31,7 @@ from bootleg.utils import utils
 
 
 def get_arg_parser():
+    """Get arg parser."""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -68,6 +71,7 @@ def get_arg_parser():
 
 
 def init_process(entity_dump_f):
+    """Multiprocessing initializer."""
     global ed_global
     ed_global = EntitySymbols.load_from_cache(load_dir=entity_dump_f)
 
@@ -80,6 +84,7 @@ def merge_data(
     file_pairs,
     entity_dump_f,
 ):
+    """Merge contextual cand data."""
     # File pair is in file, cand map file, out file, is_train
 
     # Chunk file for parallel writing
@@ -95,7 +100,7 @@ def merge_data(
         os.path.dirname(file_pairs[0]), "_bootleg_temp_outdir"
     )
     utils.ensure_dir(create_ex_outdir)
-    print(f"Counting lines")
+    print("Counting lines")
     total_input = sum(1 for _ in open(file_pairs[0]))
     total_input_cands = sum(1 for _ in open(file_pairs[1]))
     assert (
@@ -161,7 +166,7 @@ def merge_data(
         f"Overall Recall for {file_pairs[0]}: {(total_seen - total_dropped) / total_seen} for seeing {total_seen}"
     )
     # Merge output files to final file
-    print(f"Merging output files")
+    print("Merging output files")
     with open(file_pairs[2], "wb") as outfile:
         for filename in glob.glob(os.path.join(create_ex_outdir, "*")):
             if filename == file_pairs[2]:
@@ -177,6 +182,7 @@ def merge_data(
 
 
 def merge_data_hlp(args):
+    """Merge data multiprocessing helper function."""
     (
         train_in_candidates,
         keep_orig,
@@ -280,6 +286,7 @@ def merge_data_hlp(args):
 
 
 def main():
+    """Run."""
     gl_start = time.time()
     multiprocessing.set_start_method("spawn")
     args = get_arg_parser().parse_args()
@@ -329,7 +336,7 @@ def main():
             final_cand_map[al] = new_alias2qids[al]
             max_cands = max(max_cands, len(final_cand_map[al]))
 
-    print(f"Buidling new entity symbols")
+    print("Buidling new entity symbols")
     entity_dump = EntitySymbols.load_from_cache(load_dir=args.entity_dump)
     entity_dump_new = EntitySymbols(
         max_candidates=max_cands,

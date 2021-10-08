@@ -7,12 +7,13 @@ import subprocess
 import sys
 from copy import copy
 
+import emmental
 import numpy as np
 import torch
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_info
 from bootleg.data import get_entity_dataloaders
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -26,13 +27,15 @@ from bootleg.utils.utils import (
     recurse_redict,
     write_to_file,
 )
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
 
 def parse_cmdline_args():
-    """Takes an input config file and parses it into the correct subdictionary
+    """
+    Parse command line.
+
+    Takes an input config file and parses it into the correct subdictionary
     groups for the model.
 
     Returns:
@@ -61,7 +64,7 @@ def parse_cmdline_args():
     # 'unknown' are what we pass on to our override any args from the second phase of arg parsing from the json file
     cli_args, unknown = cli_parser.parse_known_args()
     if len(cli_args.config_script) == 0:
-        raise ValueError(f"You must pass a config script via --config.")
+        raise ValueError("You must pass a config script via --config.")
     config = parse_boot_and_emm_args(cli_args.config_script, unknown)
 
     #  Modify the local rank param from the cli args
@@ -71,12 +74,11 @@ def parse_cmdline_args():
 
 def setup(config, run_config_path=None):
     """
-    Setup distributed backend and save configuration files.
+    Set distributed backend and save configuration files.
+
     Args:
         config: config
         run_config_path: path for original run config
-
-    Returns:
     """
     # torch.multiprocessing.set_sharing_strategy("file_system")
     # spawn method must be fork to work with Meta.config
@@ -133,20 +135,17 @@ def setup(config, run_config_path=None):
 
 def run_model(config, run_config_path=None):
     """
-    Main run method for Emmental Bootleg model.
+    Run Emmental Bootleg model.
+
     Args:
         config: parsed model config
         run_config_path: original config path (for saving)
-
-    Returns:
-
     """
-
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 
     # Load entity symbols
-    log_rank_0_info(logger, f"Loading entity symbols...")
+    log_rank_0_info(logger, "Loading entity symbols...")
     entity_symbols = EntitySymbols.load_from_cache(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
@@ -156,7 +155,7 @@ def run_model(config, run_config_path=None):
     )
     qid2eid = entity_symbols.get_qid2eid()
     eid2qid = {v: k for k, v in qid2eid.items()}
-    assert len(qid2eid) == len(eid2qid), f"Duplicate EIDs detected"
+    assert len(qid2eid) == len(eid2qid), "Duplicate EIDs detected"
 
     # Create tasks
     tasks = [NED_TASK]
@@ -176,7 +175,7 @@ def run_model(config, run_config_path=None):
     )
 
     # Create models and add tasks
-    log_rank_0_info(logger, f"Starting Bootleg Model")
+    log_rank_0_info(logger, "Starting Bootleg Model")
     model_name = "Bootleg"
     model = EmmentalModel(name=model_name)
 
@@ -204,7 +203,7 @@ def run_model(config, run_config_path=None):
     log_rank_0_info(logger, f"Saving entity embeddings into {final_out_emb_file}")
     log_rank_0_info(
         logger,
-        f"Use the entity profile's ```get_eid``` command to get the emb ids for QIDs",
+        "Use the entity profile's ```get_eid``` command to get the emb ids for QIDs",
     )
 
     np.save(final_out_emb_file, np.array(preds["probs"][NED_TASK]))

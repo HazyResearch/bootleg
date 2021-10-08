@@ -5,13 +5,14 @@ import tarfile
 import urllib
 from pathlib import Path
 
+import emmental
 import numpy as np
 import torch
 import ujson
+from emmental.model import EmmentalModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
 from bootleg.end2end.extract_mentions import (
@@ -20,7 +21,7 @@ from bootleg.end2end.extract_mentions import (
 )
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.task_config import CANDS_LABEL, NED_TASK
+from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
 from bootleg.utils.data_utils import read_in_relations, read_in_types
@@ -28,7 +29,6 @@ from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +38,7 @@ BOOTLEG_MODEL_PATHS = {
 
 
 def get_default_cache():
-    """Gets default cache directory for saving Bootleg data.
-
-    Returns:
-    """
+    """Get default cache directory for saving Bootleg data."""
     try:
         from torch.hub import _get_torch_home
 
@@ -57,7 +54,7 @@ def get_default_cache():
 
 
 def create_config(model_path, data_path, model_name):
-    """Creates Bootleg config.
+    """Create Bootleg config.
 
     Args:
         model_path: model directory
@@ -91,14 +88,12 @@ def create_config(model_path, data_path, model_name):
 
 
 def create_sources(model_path, data_path, model_name):
-    """Downloads Bootleg data and saves in log dir.
+    """Download Bootleg data and saves in log dir.
 
     Args:
         model_path: model directory
         data_path: data directory
         model_name: model name to download
-
-    Returns:
     """
     download_path = BOOTLEG_MODEL_PATHS[model_name]
     if not (model_path / model_name).exists():
@@ -110,7 +105,7 @@ def create_sources(model_path, data_path, model_name):
             filename=str(model_path / f"{model_name}.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
-        print(f"Downloaded. Decompressing...")
+        print("Downloaded. Decompressing...")
         tar = tarfile.open(str(model_path / f"{model_name}.tar.gz"), "r:gz")
         tar.extractall(model_path)
         tar.close()
@@ -122,14 +117,17 @@ def create_sources(model_path, data_path, model_name):
             filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )
-        print(f"Downloaded. Decompressing...")
+        print("Downloaded. Decompressing...")
         tar = tarfile.open(str(data_path / "entity_db.tar.gz"), "r:gz")
         tar.extractall(data_path)
         tar.close()
 
 
 class BootlegAnnotator(object):
-    """BootlegAnnotator class: convenient wrapper of preprocessing and model
+    """
+    Booteg on-the-fly annotator.
+
+    BootlegAnnotator class: convenient wrapper of preprocessing and model
     eval to allow for annotating single sentences at a time for quick
     experimentation, e.g. in notebooks.
 
@@ -159,6 +157,7 @@ class BootlegAnnotator(object):
         return_embs=False,
         verbose=False,
     ):
+        """Bootleg annotator initializer."""
         self.min_alias_len = min_alias_len
         self.max_alias_len = max_alias_len
         self.verbose = verbose
@@ -256,8 +255,8 @@ class BootlegAnnotator(object):
         )
         data_utils.add_special_tokens(self.tokenizer)
 
-        # Create tasks - CANDS_LABEL as we are not doing batch cands in annotator
-        self.task_to_label_dict = {NED_TASK: CANDS_LABEL}
+        # Create tasks
+        self.task_to_label_dict = {NED_TASK: None}
 
         # Create tasks
         self.model = EmmentalModel(name="Bootleg")
@@ -272,19 +271,19 @@ class BootlegAnnotator(object):
         # Load the best model from the pretrained model
         assert (
             self.config["model_config"]["model_path"] is not None
-        ), f"Must have a model to load in the model_path for the BootlegAnnotator"
+        ), "Must have a model to load in the model_path for the BootlegAnnotator"
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
         if cand_map is None:
             alias_map = self.entity_db.get_alias2qids()
         else:
-            logger.debug(f"Loading candidate map")
+            logger.debug("Loading candidate map")
             alias_map = ujson.load(open(cand_map))
 
         self.all_aliases_trie = get_all_aliases(alias_map, verbose)
 
     def extract_mentions(self, text, label_func):
-        """Wrapper function for mention extraction.
+        """Mention extraction wrapper.
 
         Args:
             text: text to extract mentions from
@@ -307,12 +306,10 @@ class BootlegAnnotator(object):
         }
 
     def set_threshold(self, value):
-        """Sets threshold.
+        """Set threshold.
 
         Args:
             value: threshold value
-
-        Returns:
         """
         self.threshold = value
 
@@ -322,7 +319,9 @@ class BootlegAnnotator(object):
         label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
-        """Extracts mentions and runs disambiguation. If user provides extracted_examples, we will ignore text_list
+        """Extract mentions and runs disambiguation.
+
+        If user provides extracted_examples, we will ignore text_list.
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
@@ -347,7 +346,7 @@ class BootlegAnnotator(object):
             do_extract_mentions = False
             assert (
                 type(extracted_examples) is list
-            ), f"Must provide a list of Dics for extracted_examples"
+            ), "Must provide a list of Dics for extracted_examples"
             check_ex = extracted_examples[0]
             assert (
                 len(
@@ -363,13 +362,12 @@ class BootlegAnnotator(object):
         else:
             assert (
                 text_list is not None
-            ), f"If you do not provide extracted_examples you must provide text_list"
+            ), "If you do not provide extracted_examples you must provide text_list"
 
         if text_list is None:
-            assert extracted_examples is not None, (
-                f"If you do not provide text_list "
-                f"you must provide extracted_exampels"
-            )
+            assert (
+                extracted_examples is not None
+            ), "If you do not provide text_list you must provide extracted_exampels"
         else:
             if type(text_list) is str:
                 text_list = [text_list]
@@ -378,7 +376,7 @@ class BootlegAnnotator(object):
                     type(text_list) is list
                     and len(text_list) > 0
                     and type(text_list[0]) is str
-                ), f"We only accept inputs of strings and lists of strings"
+                ), "We only accept inputs of strings and lists of strings"
 
         # Get number of examples
         if extracted_examples is not None:
@@ -546,7 +544,7 @@ class BootlegAnnotator(object):
             del x_dict
             if self.return_embs:
                 (uid_bdict, _, prob_bdict, _, out_bdict) = res
-                output_embs = out_bdict[NED_TASK][f"entity_encoder_0"]
+                output_embs = out_bdict[NED_TASK]["entity_encoder_0"]
             else:
                 output_embs = None
                 (uid_bdict, _, prob_bdict, _) = res
@@ -610,6 +608,15 @@ class BootlegAnnotator(object):
         return res_dict
 
     def get_sentence_tokens(self, sample, men_idx):
+        """
+        Get context tokens.
+
+        Args:
+            sample: Dict sample after extraction
+            men_idx: mention index to select
+
+        Returns: Dict of tokenized outputs
+        """
         span = sample["spans"][men_idx]
         tokens = sample["sentence"].split()
         prev_context, next_context = extract_context_windows(
@@ -634,6 +641,15 @@ class BootlegAnnotator(object):
         return inputs
 
     def get_entity_tokens(self, qid):
+        """
+        Get entity tokens.
+
+        Args:
+            qid: entity QID
+
+        Returns:
+            Dict of input tokens for forward pass.
+        """
         constants = {
             "max_ent_len": self.config.data_config.max_ent_len,
             "max_ent_type_len": self.config.data_config.entity_type_data.max_ent_type_len,
@@ -668,8 +684,7 @@ class BootlegAnnotator(object):
         entity_attention_mask,
         entity_cand_eid,
     ):
-        """
-        Generates emmental batch
+        """Generate emmental batch.
 
         Args:
             input_ids: word token ids
@@ -681,7 +696,6 @@ class BootlegAnnotator(object):
             entity_cand_eid: entity candidate eids
 
         Returns: X_dict for emmental
-
         """
         entity_cand_eval_mask = entity_cand_eid == -1
         entity_cand_eid_noneg = torch.where(

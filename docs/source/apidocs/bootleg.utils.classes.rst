@@ -20,14 +20,6 @@ bootleg.utils.classes.comment\_json module
    :undoc-members:
    :show-inheritance:
 
-bootleg.utils.classes.cross\_entropy\_with\_probs module
---------------------------------------------------------
-
-.. automodule:: bootleg.utils.classes.cross_entropy_with_probs
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 bootleg.utils.classes.dotted\_dict module
 -----------------------------------------
 

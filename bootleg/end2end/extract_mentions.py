@@ -1,5 +1,9 @@
-# This file takes in a jsonlines file with sentences and extract aliases and spans using a pre-computed alias table.
+"""
+Extract mentions.
 
+This file takes in a jsonlines file with sentences
+and extract aliases and spans using a pre-computed alias table.
+"""
 import argparse
 import logging
 import multiprocessing
@@ -26,12 +30,12 @@ try:
     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 except OSError:
     logger.warning(
-        f"Spacy models en_core_web_sm not found.  Downloading and installing."
+        "Spacy models en_core_web_sm not found.  Downloading and installing."
     )
     try:
         spacy_download("en_core_web_sm")
         nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-    except:
+    except OSError:
         nlp = None
 
 # We want this to pass gracefully in the case Readthedocs is trying to build.
@@ -49,10 +53,7 @@ table = str.maketrans(
 
 
 def parse_args():
-    """Generates args.
-
-    Returns: parsed args
-    """
+    """Generate args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--in_file", type=str, required=True, help="File to extract mentions from"
@@ -75,7 +76,7 @@ def parse_args():
 
 
 def create_out_line(sent_obj, final_aliases, final_spans):
-    """Creates JSON output line.
+    """Create JSON output line.
 
     Args:
         sent_obj: input sentence JSON
@@ -96,7 +97,7 @@ def create_out_line(sent_obj, final_aliases, final_spans):
 
 
 def get_all_aliases(alias2qidcands, verbose):
-    """Loads all aliases.
+    """Load all aliases.
 
     Args
         alias2qidcands: Dict of alias to list of QID candidates with score
@@ -116,9 +117,10 @@ def get_all_aliases(alias2qidcands, verbose):
 
 
 def get_new_to_old_dict(split_sentence):
-    """Returns a mapped dictionary from new tokenized words with Spacy to old.
+    """Return a mapped dictionary from new tokenized words with Spacy to old.
 
     (Spacy sometimes splits words with - and other punc).
+
     Args:
         split_sentence: list of words in sentence
 
@@ -143,7 +145,7 @@ def get_new_to_old_dict(split_sentence):
 def find_aliases_in_sentence_tag(
     sentence, all_aliases, min_alias_len=1, max_alias_len=6
 ):
-    """Mention extraction function.
+    """Extract function.
 
     Args:
         sentence: text
@@ -284,7 +286,7 @@ def find_aliases_in_sentence_tag(
 
 
 def get_num_lines(input_src):
-    """Counts number of lines in file.
+    """Count number of lines in file.
 
     Args:
         input_src: input file
@@ -305,16 +307,13 @@ def get_num_lines(input_src):
 
 
 def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
-    """Chunks text input file into chunk_size chunks and saves in filename
-    saved in chunk files.
+    """Chunk text input file into chunk_size chunks.
 
     Args:
         input_src: input file
         chunk_files: list of chunk file names
         chunk_size: chunk size in number of lines
         num_lines: total number of lines
-
-    Returns:
     """
     logger.debug(f"Reading in {input_src}")
     start = time.time()
@@ -340,12 +339,11 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
 
 
 def subprocess(args):
-    """Subprocess for mention extraction.
+    """
+    Extract mentions single process.
 
     Args:
         args: subprocess args
-
-    Returns:
     """
     in_file = args["in_file"]
     out_file = args["out_file"]
@@ -365,13 +363,11 @@ def subprocess(args):
 
 
 def merge_files(chunk_outfiles, out_filepath):
-    """Merges output files.
+    """Merge output files.
 
     Args:
         chunk_outfiles: list of chunk files
         out_filepath: final output file path
-
-    Returns:
     """
     sent_idx_unq = 0
     with jsonlines.open(out_filepath, "w") as f_out:
@@ -394,7 +390,7 @@ def extract_mentions(
     num_chunks=None,
     verbose=False,
 ):
-    """Extracts mentions from file.
+    """Extract mentions from file.
 
     Args:
         in_filepath: input file
@@ -405,8 +401,6 @@ def extract_mentions(
         num_workers: number of multiprocessing workers
         num_chunks: number of subchunks to feed to workers
         verbose: verbose boolean
-
-    Returns:
     """
     assert os.path.exists(in_filepath), f"{in_filepath} does not exist"
     candidate_map = ujson.load(open(cand_map_file))
@@ -465,7 +459,7 @@ def extract_mentions(
 
     # single process
     else:
-        logger.debug(f"Using 1 worker...")
+        logger.debug("Using 1 worker...")
         with jsonlines.open(in_filepath, "r") as in_file, jsonlines.open(
             out_filepath, "w"
         ) as out_file:
@@ -486,6 +480,7 @@ def extract_mentions(
 
 
 def main():
+    """Run."""
     args = parse_args()
     in_file = args.in_file
     out_file = args.out_file

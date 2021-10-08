@@ -1,3 +1,4 @@
+"""Bootleg data creation."""
 import copy
 import logging
 import os
@@ -5,15 +6,15 @@ from collections import defaultdict
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from emmental import Meta
+from emmental.data import EmmentalDataLoader, emmental_collate_fn
+from emmental.utils.utils import list_to_tensor
 from torch.utils.data import DistributedSampler, RandomSampler
 
 from bootleg import log_rank_0_info
 from bootleg.dataset import BootlegDataset, BootlegEntityDataset
 from bootleg.slicing.slice_dataset import BootlegSliceDataset
 from bootleg.task_config import BATCH_CANDS_LABEL, CANDS_LABEL
-from emmental import Meta
-from emmental.data import EmmentalDataLoader, emmental_collate_fn
-from emmental.utils.utils import list_to_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def get_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -76,7 +77,7 @@ def get_dataloaders(
         )
         datasets[split] = BootlegDataset(
             main_args=args,
-            name=f"Bootleg",
+            name="Bootleg",
             dataset=dataset_path,
             use_weak_label=args.data_config[f"{split}_dataset"].use_weak_label,
             tokenizer=tokenizer,
@@ -100,8 +101,8 @@ def get_dataloaders(
             if Meta.config["learner_config"]["local_rank"] != -1:
                 log_rank_0_info(
                     logger,
-                    f"You are using distributed computing for eval. We are not using a distributed sampler. "
-                    f"Please use DataParallel and not DDP.",
+                    "You are using distributed computing for eval. We are not using a distributed sampler. "
+                    "Please use DataParallel and not DDP.",
                 )
         dataloaders.append(
             EmmentalDataLoader(
@@ -136,7 +137,7 @@ def get_entity_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the entity dataloaders.
 
     Args:
         args: main args
@@ -145,7 +146,7 @@ def get_entity_dataloaders(
 
     Returns: list of dataloaders
     """
-    task_to_label_dict = {t: CANDS_LABEL for t in tasks}
+    task_to_label_dict = {t: None for t in tasks}
     split = "test"
 
     dataset_path = os.path.join(
@@ -153,7 +154,7 @@ def get_entity_dataloaders(
     )
     dataset = BootlegEntityDataset(
         main_args=args,
-        name=f"Bootleg",
+        name="Bootleg",
         dataset=dataset_path,
         tokenizer=tokenizer,
         entity_symbols=entity_symbols,
@@ -164,8 +165,8 @@ def get_entity_dataloaders(
     if Meta.config["learner_config"]["local_rank"] != -1:
         log_rank_0_info(
             logger,
-            f"You are using distributed computing for eval. We are not using a distributed sampler. "
-            f"Please use DataParallel and not DDP.",
+            "You are using distributed computing for eval. We are not using a distributed sampler. "
+            "Please use DataParallel and not DDP.",
         )
     dataloader = EmmentalDataLoader(
         task_to_label_dict=task_to_label_dict,
@@ -195,7 +196,9 @@ def bootleg_collate_fn(
         List[Tuple[Dict[str, Any], Dict[str, torch.Tensor]]], List[Dict[str, Any]]
     ]
 ) -> Union[Tuple[Dict[str, Any], Dict[str, torch.Tensor]], Dict[str, Any]]:
-    """Collate function (modified from emmental collate fn). The main
+    """Collate function (modified from emmental collate fn).
+
+    The main
     difference is our collate function merges candidates from across the batch for disambiguation.
     Args:
       batch: The batch to collate.
