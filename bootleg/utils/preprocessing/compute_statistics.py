@@ -18,6 +18,7 @@ from collections import Counter
 import marisa_trie
 import nltk
 import numpy as np
+import ujson
 import ujson as json
 from tqdm import tqdm
 
@@ -44,20 +45,10 @@ def parse_args():
         default="entity_db/entity_mappings",
         help="Path to entities inside data_dir",
     )
-    parser.add_argument(
-        "--emb_dir",
-        type=str,
-        default="/dfs/scratch0/lorr1/projects/bootleg-data/embs",
-        help="Path to embeddings",
-    )
-    parser.add_argument("--max_types", type=int, default=3, help="Max types to load")
-    parser.add_argument(
-        "--no_types", action="store_true", help="Do not compute type statistics"
-    )
     parser.add_argument("--lower", action="store_true", help="Lower aliases")
     parser.add_argument("--strip", action="store_true", help="Strip punc aliases")
     parser.add_argument(
-        "--num_workers", type=int, help="Number of workers to parallelize"
+        "--num_workers", type=int, help="Number of workers to parallelize", default=2
     )
     args = parser.parse_args()
     return args
@@ -82,8 +73,7 @@ def get_all_aliases(alias2qidcands):
     for al in tqdm(alias2qidcands):
         alias2qids[al] = [c[0] for c in alias2qidcands[al]]
     logging.info(f"Loaded entity save with {len(alias2qids)} aliases.")
-    all_aliases = marisa_trie.Trie(alias2qids.keys())
-    return all_aliases
+    return list(alias2qids.keys())
 
 
 def get_num_lines(input_src):
@@ -128,9 +118,10 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
 
 def compute_occurrences_single(args, max_alias_len=6):
     """Compute statistics single process."""
-    data_file, lower, strip = args
+    data_file, aliases_file, lower, strip = args
     num_lines = sum(1 for _ in open(data_file))
-    global all_aliases
+    all_aliases = ujson.load(open(aliases_file))
+    all_aliases = marisa_trie.Trie(all_aliases)
     # entity histogram
     ent_occurrences = Counter()
     # alias histogram
@@ -170,15 +161,16 @@ def compute_occurrences_single(args, max_alias_len=6):
 
 def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_workers=8):
     """Compute statistics."""
-    global all_aliases
     all_aliases = get_all_aliases(entity_dump._alias2qids)
-
+    chunk_file_path = os.path.join(save_dir, "tmp")
+    all_aliases_f = os.path.join(chunk_file_path, "all_aliases.json")
+    utils.ensure_dir(chunk_file_path)
+    ujson.dump(all_aliases, open(all_aliases_f, "w"))
     # divide up data into chunks
     num_lines = get_num_lines(data_file)
     num_processes = min(num_workers, int(multiprocessing.cpu_count()))
     logging.info(f"Using {num_processes} workers...")
     chunk_size = int(np.ceil(num_lines / (num_processes)))
-    chunk_file_path = os.path.join(save_dir, "tmp")
     utils.ensure_dir(chunk_file_path)
     chunk_infiles = [
         os.path.join(f"{chunk_file_path}", f"data_chunk_{chunk_id}_in.jsonl")
@@ -187,7 +179,9 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
     chunk_text_data(data_file, chunk_infiles, chunk_size, num_lines)
 
     pool = multiprocessing.Pool(processes=num_processes)
-    subprocess_args = [[chunk_infiles[i], lower, strip] for i in range(num_processes)]
+    subprocess_args = [
+        [chunk_infiles[i], all_aliases_f, lower, strip] for i in range(num_processes)
+    ]
     results = pool.map(compute_occurrences_single, subprocess_args)
     pool.close()
     pool.join()

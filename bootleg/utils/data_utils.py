@@ -212,6 +212,7 @@ def read_in_relations(data_config, entitysymbols):
 
     Reads in relation kg mapping from QID -> relation id -> list of "tail"
     qid. Outputs dict of QID -> list of relationship strings of "<relation>
+
     <tail qid>" We map the relation id to a string via vocab mapping.
 
     Args:
