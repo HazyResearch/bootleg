@@ -1,6 +1,7 @@
 <p align="center">
 <img src="web/images/full_logo.png" width="150" class="center"/>
 </p>
+
 ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/HazyResearch/bootleg/CI)
 [![codecov](https://codecov.io/gh/HazyResearch/bootleg/branch/master/graph/badge.svg)](https://codecov.io/gh/HazyResearch/bootleg)
 [![Documentation Status](https://readthedocs.org/projects/bootleg/badge/?version=latest)](https://bootleg.readthedocs.io/en/latest/?badge=latest)
