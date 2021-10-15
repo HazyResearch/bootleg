@@ -1,0 +1,58 @@
+{
+    "emmental": {
+        "n_epochs": 6,
+        "seed": 1234,
+        "lr_scheduler": "linear",
+        "lr": 1e-4
+    },
+    "run_config": {
+        "dataloader_threads": 0,
+        "eval_accumulation_steps": 1,
+        "eval_batch_size": 1,
+        "dataset_threads": 1,
+        "spawn_method": "fork",
+        "log_level": "debug"
+    },
+    "train_config": {
+        "batch_size": 2,
+    },
+    "model_config": {
+        "hidden_size": 32,
+    },
+    "data_config": {
+        "entity_dir": "tests/data/entity_loader/entity_data",
+        "train_in_candidates": true,
+        "max_seq_len": 32,
+        "data_dir": "tests/data/data_loader",
+        "overwrite_preprocessed_data": true,
+        "print_examples_prep": false,
+        "use_entity_desc": false,
+        "entity_type_data": {
+            "use_entity_types": false,
+            "max_ent_type_len": 10,
+            "type_labels": "type_pred_mapping.json",
+            "type_vocab": "type_pred_vocab.json"
+        },
+        "entity_kg_data": {
+            "use_entity_kg": false,
+            "max_ent_kg_len": 10,
+            "kg_labels": "qid2relations.json",
+            "kg_vocab": "relation_vocab.json"
+        },
+        "word_embedding":
+        {
+            "context_layers": 1,
+            "entity_layers": 1,
+            "cache_dir": "tests/data/emb_data/pretrained_bert_models"
+        },
+        "train_dataset": {
+            "file": "end2end_train.jsonl"
+        },
+        "dev_dataset": {
+            "file": "end2end_dev.jsonl"
+        },
+        "test_dataset": {
+            "file": "end2end_dev.jsonl"
+        }
+    }
+}

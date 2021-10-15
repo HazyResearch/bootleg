@@ -1,3 +1,4 @@
+"""Bootleg data creation."""
 import copy
 import logging
 import os
@@ -5,15 +6,15 @@ from collections import defaultdict
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from emmental import Meta
+from emmental.data import EmmentalDataLoader, emmental_collate_fn
+from emmental.utils.utils import list_to_tensor
 from torch.utils.data import DistributedSampler, RandomSampler
 
 from bootleg import log_rank_0_info
 from bootleg.dataset import BootlegDataset, BootlegEntityDataset
 from bootleg.slicing.slice_dataset import BootlegSliceDataset
 from bootleg.task_config import BATCH_CANDS_LABEL, CANDS_LABEL
-from emmental import Meta
-from emmental.data import EmmentalDataLoader, emmental_collate_fn
-from emmental.utils.utils import list_to_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def get_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -136,7 +137,7 @@ def get_entity_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the entity dataloaders.
 
     Args:
         args: main args

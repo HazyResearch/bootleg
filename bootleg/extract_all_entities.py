@@ -7,12 +7,13 @@ import subprocess
 import sys
 from copy import copy
 
+import emmental
 import numpy as np
 import torch
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_info
 from bootleg.data import get_entity_dataloaders
 from bootleg.symbols.entity_symbols import EntitySymbols
@@ -26,13 +27,15 @@ from bootleg.utils.utils import (
     recurse_redict,
     write_to_file,
 )
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
 
 def parse_cmdline_args():
-    """Takes an input config file and parses it into the correct subdictionary
+    """
+    Parse command line.
+
+    Takes an input config file and parses it into the correct subdictionary
     groups for the model.
 
     Returns:
@@ -71,14 +74,13 @@ def parse_cmdline_args():
 
 def setup(config, run_config_path=None):
     """
-    Setup distributed backend and save configuration files.
+    Set distributed backend and save configuration files.
+
     Args:
         config: config
         run_config_path: path for original run config
-
-    Returns:
     """
-    # torch.multiprocessing.set_sharing_strategy("file_system")
+    torch.multiprocessing.set_sharing_strategy("file_system")
     # spawn method must be fork to work with Meta.config
     torch.multiprocessing.set_start_method("fork", force=True)
     """
@@ -133,15 +135,12 @@ def setup(config, run_config_path=None):
 
 def run_model(config, run_config_path=None):
     """
-    Main run method for Emmental Bootleg model.
+    Run Emmental Bootleg model.
+
     Args:
         config: parsed model config
         run_config_path: original config path (for saving)
-
-    Returns:
-
     """
-
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 

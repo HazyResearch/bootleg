@@ -7,11 +7,8 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   bootleg.datasets
-   bootleg.embeddings
    bootleg.end2end
    bootleg.layers
-   bootleg.optimizers
    bootleg.slicing
    bootleg.symbols
    bootleg.tasks
@@ -24,6 +21,22 @@ bootleg.data module
 -------------------
 
 .. automodule:: bootleg.data
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bootleg.dataset module
+----------------------
+
+.. automodule:: bootleg.dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bootleg.extract\_all\_entities module
+-------------------------------------
+
+.. automodule:: bootleg.extract_all_entities
    :members:
    :undoc-members:
    :show-inheritance:

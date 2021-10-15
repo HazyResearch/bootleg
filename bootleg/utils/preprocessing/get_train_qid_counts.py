@@ -1,4 +1,7 @@
-"""Helper function that computes a dictionary of QID -> count in training data.
+"""
+Compute QID counts.
+
+Helper function that computes a dictionary of QID -> count in training data.
 
 If a QID is not in this dictionary, it has a count of zero.
 """
@@ -14,6 +17,7 @@ from bootleg.utils import utils
 
 
 def parse_args():
+    """Parse args."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--train_file",
@@ -32,7 +36,7 @@ def parse_args():
 
 
 def get_counts(num_processes, file):
-    """Gets true anchor slice counts."""
+    """Get true anchor slice counts."""
     pool = multiprocessing.Pool(processes=num_processes)
     num_lines = sum(1 for _ in open(file))
     qid_cnts = defaultdict(int)
@@ -47,6 +51,7 @@ def get_counts(num_processes, file):
 
 
 def get_counts_hlp(line):
+    """Get count helper."""
     res = defaultdict(int)  # qid -> cnt
     line = ujson.loads(line)
     for qid in line["qids"]:
@@ -55,6 +60,7 @@ def get_counts_hlp(line):
 
 
 def main():
+    """Run."""
     args = parse_args()
     print(ujson.dumps(vars(args), indent=4))
     num_processes = int(0.8 * multiprocessing.cpu_count())

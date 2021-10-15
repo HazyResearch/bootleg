@@ -1,3 +1,4 @@
+"""Alias to candidate trie."""
 import json
 import os
 from typing import Any, Callable, Dict, List, Tuple
@@ -8,16 +9,19 @@ from tqdm import tqdm
 
 
 def flatten(arr):
+    """Flatten array."""
     return [item for sublist in arr for item in sublist]
 
 
 def load_json_file(filename):
+    """Load json file."""
     with open(filename, "r") as f:
         contents = ujson.load(f)
     return contents
 
 
 def dump_json_file(filename, contents):
+    """Dump json file."""
     with open(filename, "w") as f:
         try:
             ujson.dump(contents, f)
@@ -28,6 +32,7 @@ def dump_json_file(filename, contents):
 def get_qid_cand_with_score(
     max_value: int, value: List[Tuple[str, int]], vocabulary: marisa_trie
 ):
+    """Get the entity candidate with prob score numerical values."""
     assert type(value) is list
     if len(value) > 0:
         assert all(type(v[0]) is str for v in value)
@@ -39,6 +44,7 @@ def get_qid_cand_with_score(
 
 
 def inverse_qid_cand_with_score(value: List[int], itos: Callable[[int], str]):
+    """Return entity candidate and prob score from numerical values."""
     assert len(value) % 2 == 0
     new_value = []
     for i in range(0, len(value), 2):
@@ -50,6 +56,8 @@ def inverse_qid_cand_with_score(value: List[int], itos: Callable[[int], str]):
 
 
 class AliasCandRecordTrie:
+    """Alias entity candidate trie."""
+
     def __init__(
         self,
         load_dir: str = None,
@@ -57,6 +65,7 @@ class AliasCandRecordTrie:
         vocabulary: Dict[str, Any] = None,
         max_value: int = None,
     ) -> None:
+        """Alias trie initializer."""
         self._get_fmt_string = lambda x: f"<{'lf'*x}"
 
         if load_dir is not None:
@@ -70,6 +79,7 @@ class AliasCandRecordTrie:
             self._loaded_from_dir = None
 
     def dump(self, save_dir):
+        """Dump."""
         # memmapped files bahve badly if you try to overwrite them in memory,
         # which is what we'd be doing if load_dir == save_dir
         if self._loaded_from_dir is None or self._loaded_from_dir != save_dir:
@@ -83,6 +93,7 @@ class AliasCandRecordTrie:
             self._record_trie.save(os.path.join(save_dir, "record_trie.marisa"))
 
     def load(self, load_dir):
+        """Load."""
         self._max_value = load_json_file(
             filename=os.path.join(load_dir, "max_value.json")
         )
@@ -95,6 +106,7 @@ class AliasCandRecordTrie:
         ).mmap(os.path.join(load_dir, "record_trie.marisa"))
 
     def build_trie(self, input_dict: Dict[str, Any], max_value: int):
+        """Build trie."""
         all_values = []
         all_keys = sorted(list(input_dict.keys()))
         for key in tqdm(all_keys, desc="Building tri"):
@@ -110,6 +122,7 @@ class AliasCandRecordTrie:
         return trie
 
     def get_value(self, key, getter=lambda x: x):
+        """Get value for key."""
         record_trie = self._record_trie
         assert key in record_trie
         value = record_trie[key]
@@ -124,7 +137,9 @@ class AliasCandRecordTrie:
         return res
 
     def get_keys(self):
+        """Get keys."""
         return self._record_trie.keys()
 
     def is_key_in_trie(self, key):
+        """Return if key in trie."""
         return key in self._record_trie

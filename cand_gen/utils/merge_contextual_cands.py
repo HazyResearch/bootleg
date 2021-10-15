@@ -1,4 +1,6 @@
 """
+Merge contextual candidates for NED.
+
 This file
 1. Reads in raw wikipedia sentences from /lfs/raiders7/0/lorr1/sentences
 2. Reads in map of WPID-Title-QID from /lfs/raiders7/0/lorr1/title_to_all_ids.jsonl
@@ -29,6 +31,7 @@ from bootleg.utils import utils
 
 
 def get_arg_parser():
+    """Get arg parser."""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -63,6 +66,7 @@ def get_arg_parser():
 
 
 def init_process(entity_dump_f):
+    """Multiprocessing initializer."""
     global ed_global
     ed_global = EntitySymbols.load_from_cache(load_dir=entity_dump_f)
 
@@ -74,6 +78,7 @@ def merge_data(
     file_pairs,
     entity_dump_f,
 ):
+    """Merge contextual cand data."""
     # File pair is in file, cand map file, out file, is_train
 
     # Chunk file for parallel writing
@@ -170,6 +175,7 @@ def merge_data(
 
 
 def merge_data_hlp(args):
+    """Merge data multiprocessing helper function."""
     (
         no_add_gold_qid_to_train,
         max_candidates,
@@ -254,6 +260,7 @@ def merge_data_hlp(args):
 
 
 def main():
+    """Run."""
     gl_start = time.time()
     multiprocessing.set_start_method("spawn")
     args = get_arg_parser().parse_args()

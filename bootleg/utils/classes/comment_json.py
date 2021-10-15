@@ -1,4 +1,7 @@
-"""An example of how to remove comments and trailing commas from JSON before
+"""
+JSON with comments class.
+
+An example of how to remove comments and trailing commas from JSON before
 parsing.  You only need the two functions below, `remove_comments()` and
 `remove_trailing_commas()` to accomplish this.  This script serves as an
 example of how to use them but feel free to just copy & paste them into your
@@ -33,7 +36,8 @@ import re
 
 
 def remove_comments(json_like):
-    """Removes C-style comments from *json_like* and returns the result.
+    r"""Remove C-style comments from *json_like* and returns the result.
+
     Example::
 
         >>> test_json = '''\
@@ -60,7 +64,8 @@ def remove_comments(json_like):
 
 
 def remove_trailing_commas(json_like):
-    """Removes trailing commas from *json_like* and returns the result.
+    """Remove trailing commas from *json_like* and returns the result.
+
     Example::
 
         >>> remove_trailing_commas('{"foo":"bar","baz":["blah",],}')

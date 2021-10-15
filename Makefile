@@ -1,21 +1,21 @@
 dev:
 	pip install -r requirements-dev.txt
-	python3 setup.py develop
+	pip install -e .
 	pre-commit install
 
 test: dev check docs
 	pip install -e .
-	pytest test
+	pytest tests
 
 format:
-	isort --atomic bootleg/ test/
-	black bootleg/ test/
-	docformatter --in-place --recursive bootleg test
+	isort --atomic bootleg/ tests/
+	black bootleg/ tests/
+	# docformatter --in-place --recursive bootleg tests
 
 check:
-	isort -c bootleg/ test/
-	black bootleg/ test/ --check
-	flake8 bootleg/ test/
+	isort -c bootleg/ tests/
+	black bootleg/ tests/ --check
+	flake8 bootleg/ tests/
 
 docs:
 	sphinx-build -b html docs/source/ docs/build/html/
@@ -30,7 +30,7 @@ livedocs:
 clean:
 	pip uninstall -y bootleg
 	rm -rf src/bootleg.egg-info
-	rm -rf _build/
+	rm -rf build/ dist/
 
 prune:
 	@bash -c "git fetch -p";

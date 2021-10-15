@@ -3,7 +3,6 @@ import argparse
 from argparse import ArgumentParser
 from typing import Any, Dict, Optional, Tuple
 
-from bootleg.utils.classes.dotted_dict import DottedDict, createBoolDottedDict
 from emmental.utils.utils import (
     nullable_float,
     nullable_int,
@@ -12,9 +11,13 @@ from emmental.utils.utils import (
     str2dict,
 )
 
+from bootleg.utils.classes.dotted_dict import DottedDict, create_bool_dotted_dict
+
 
 def parse_args(parser: Optional[ArgumentParser] = None) -> Tuple[ArgumentParser, Dict]:
-    """Parser. Overrides the default Emmental parser to add the "emmental."
+    """Parse args.
+
+    Overrides the default Emmental parser to add the "emmental."
     level to the parser so we can parse it correctly with the Bootleg config.
 
     Args:
@@ -1167,4 +1170,4 @@ def parse_args_to_config(args: DottedDict) -> Dict[str, Any]:
         },
     }
 
-    return createBoolDottedDict(config)
+    return create_bool_dotted_dict(config)

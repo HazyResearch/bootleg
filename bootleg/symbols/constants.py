@@ -215,6 +215,8 @@ STOP_WORDS = {
 
 # profile constants/utils wrappers
 def edit_op(func):
+    """Edit op."""
+
     @wraps(func)
     def wrapper_check_edit_mode(obj, *args, **kwargs):
         if obj.edit_mode is False:
@@ -225,6 +227,8 @@ def edit_op(func):
 
 
 def check_qid_exists(func):
+    """Check QID exists."""
+
     @wraps(func)
     def wrapper_check_qid(obj, *args, **kwargs):
         if len(args) > 0:

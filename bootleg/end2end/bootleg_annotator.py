@@ -5,13 +5,14 @@ import tarfile
 import urllib
 from pathlib import Path
 
+import emmental
 import numpy as np
 import torch
 import ujson
+from emmental.model import EmmentalModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
 from bootleg.end2end.extract_mentions import (
@@ -28,7 +29,6 @@ from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +38,7 @@ BOOTLEG_MODEL_PATHS = {
 
 
 def get_default_cache():
-    """Gets default cache directory for saving Bootleg data.
-
-    Returns:
-    """
+    """Get default cache directory for saving Bootleg data."""
     try:
         from torch.hub import _get_torch_home
 
@@ -57,7 +54,7 @@ def get_default_cache():
 
 
 def create_config(model_path, data_path, model_name):
-    """Creates Bootleg config.
+    """Create Bootleg config.
 
     Args:
         model_path: model directory
@@ -91,14 +88,12 @@ def create_config(model_path, data_path, model_name):
 
 
 def create_sources(model_path, data_path, model_name):
-    """Downloads Bootleg data and saves in log dir.
+    """Download Bootleg data and saves in log dir.
 
     Args:
         model_path: model directory
         data_path: data directory
         model_name: model name to download
-
-    Returns:
     """
     download_path = BOOTLEG_MODEL_PATHS[model_name]
     if not (model_path / model_name).exists():
@@ -129,7 +124,10 @@ def create_sources(model_path, data_path, model_name):
 
 
 class BootlegAnnotator(object):
-    """BootlegAnnotator class: convenient wrapper of preprocessing and model
+    """
+    Bootleg on-the-fly annotator.
+
+    BootlegAnnotator class: convenient wrapper of preprocessing and model
     eval to allow for annotating single sentences at a time for quick
     experimentation, e.g. in notebooks.
 
@@ -142,6 +140,7 @@ class BootlegAnnotator(object):
         threshold: probability threshold (default 0.0)
         cache_dir: cache directory (default None)
         model_name: model name (default None)
+        entity_emb_file: entity embedding file (default None)
         return_embs: whether to return embeddings or not (default False)
         verbose: verbose boolean (default False)
     """
@@ -156,14 +155,22 @@ class BootlegAnnotator(object):
         threshold=0.0,
         cache_dir=None,
         model_name=None,
+        entity_emb_file=None,
         return_embs=False,
         verbose=False,
     ):
+        """Bootleg annotator initializer."""
         self.min_alias_len = min_alias_len
         self.max_alias_len = max_alias_len
         self.verbose = verbose
         self.threshold = threshold
         self.return_embs = return_embs
+        self.entity_emb_file = entity_emb_file
+
+        if self.entity_emb_file is not None:
+            assert Path(
+                self.entity_emb_file
+            ).exists(), f"{self.entity_emb_file} must exist."
 
         if not cache_dir:
             self.cache_dir = get_default_cache()
@@ -202,6 +209,9 @@ class BootlegAnnotator(object):
                 self.config.data_config.train_in_candidates
             )
 
+        if entity_emb_file is not None:
+            assert Path(entity_emb_file).exists(), f"{entity_emb_file} does not exist"
+
         if not device:
             device = 0 if torch.cuda.is_available() else -1
 
@@ -235,13 +245,15 @@ class BootlegAnnotator(object):
 
         add_entity_type = self.config.data_config.entity_type_data.use_entity_types
         self.qid2typenames = {}
-        if add_entity_type:
+        # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
+        if add_entity_type and self.entity_emb_file is None:
             logger.debug("Reading entity database")
             self.qid2typenames = read_in_types(self.config.data_config, self.entity_db)
 
         add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
         self.qid2relations = {}
-        if add_entity_kg:
+        # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
+        if add_entity_kg and self.entity_emb_file is None:
             self.qid2relations = read_in_relations(
                 self.config.data_config, self.entity_db
             )
@@ -262,7 +274,10 @@ class BootlegAnnotator(object):
         # Create tasks
         self.model = EmmentalModel(name="Bootleg")
         task_to_add = ned_task.create_task(
-            self.config, use_batch_cands=False, len_context_tok=len(self.tokenizer)
+            self.config,
+            use_batch_cands=False,
+            len_context_tok=len(self.tokenizer),
+            entity_emb_file=self.entity_emb_file,
         )
         # As we manually keep track of the aliases for scoring, we only need the embeddings as action outputs
         task_to_add.action_outputs = [("entity_encoder", 0)]
@@ -284,7 +299,7 @@ class BootlegAnnotator(object):
         self.all_aliases_trie = get_all_aliases(alias_map, verbose)
 
     def extract_mentions(self, text, label_func):
-        """Wrapper function for mention extraction.
+        """Mention extraction wrapper.
 
         Args:
             text: text to extract mentions from
@@ -307,12 +322,10 @@ class BootlegAnnotator(object):
         }
 
     def set_threshold(self, value):
-        """Sets threshold.
+        """Set threshold.
 
         Args:
             value: threshold value
-
-        Returns:
         """
         self.threshold = value
 
@@ -322,8 +335,9 @@ class BootlegAnnotator(object):
         label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
-        """Extracts mentions and runs disambiguation. If user provides
-        extracted_examples, we will ignore text_list.
+        """Extract mentions and runs disambiguation.
+
+        If user provides extracted_examples, we will ignore text_list.
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
@@ -472,18 +486,23 @@ class BootlegAnnotator(object):
                     ][0] + (not self.config.data_config.train_in_candidates)
 
                 # Get candidate tokens
-                entity_tokens = [
-                    self.get_entity_tokens(cand_qid) for cand_qid in example_qid_cands
-                ]
-                example_cand_input_ids = [
-                    ent_toks["input_ids"] for ent_toks in entity_tokens
-                ]
-                example_cand_token_type_ids = [
-                    ent_toks["token_type_ids"] for ent_toks in entity_tokens
-                ]
-                example_cand_attention_mask = [
-                    ent_toks["attention_mask"] for ent_toks in entity_tokens
-                ]
+                example_cand_input_ids = []
+                example_cand_token_type_ids = []
+                example_cand_attention_mask = []
+                if self.entity_emb_file is None:
+                    entity_tokens = [
+                        self.get_entity_tokens(cand_qid)
+                        for cand_qid in example_qid_cands
+                    ]
+                    example_cand_input_ids = [
+                        ent_toks["input_ids"] for ent_toks in entity_tokens
+                    ]
+                    example_cand_token_type_ids = [
+                        ent_toks["token_type_ids"] for ent_toks in entity_tokens
+                    ]
+                    example_cand_attention_mask = [
+                        ent_toks["attention_mask"] for ent_toks in entity_tokens
+                    ]
 
                 # ====================================================
                 # ACCUMULATE
@@ -531,6 +550,7 @@ class BootlegAnnotator(object):
                     b_i : b_i + ebs
                 ],
                 entity_cand_eid=batch_example_eid_cands[b_i : b_i + ebs],
+                generate_entity_inputs=(self.entity_emb_file is None),
             )
             x_dict["guid"] = torch.arange(b_i, b_i + ebs, device=self.torch_device)
             with torch.no_grad():
@@ -546,7 +566,11 @@ class BootlegAnnotator(object):
             del x_dict
             if self.return_embs:
                 (uid_bdict, _, prob_bdict, _, out_bdict) = res
-                output_embs = out_bdict[NED_TASK]["entity_encoder_0"]
+                output_embs = out_bdict[NED_TASK][
+                    "entity_encoder_0"
+                    if (self.entity_emb_file is None)
+                    else "entity_encoder_static_0"
+                ]
             else:
                 output_embs = None
                 (uid_bdict, _, prob_bdict, _) = res
@@ -610,6 +634,15 @@ class BootlegAnnotator(object):
         return res_dict
 
     def get_sentence_tokens(self, sample, men_idx):
+        """
+        Get context tokens.
+
+        Args:
+            sample: Dict sample after extraction
+            men_idx: mention index to select
+
+        Returns: Dict of tokenized outputs
+        """
         span = sample["spans"][men_idx]
         tokens = sample["sentence"].split()
         prev_context, next_context = extract_context_windows(
@@ -634,6 +667,15 @@ class BootlegAnnotator(object):
         return inputs
 
     def get_entity_tokens(self, qid):
+        """
+        Get entity tokens.
+
+        Args:
+            qid: entity QID
+
+        Returns:
+            Dict of input tokens for forward pass.
+        """
         constants = {
             "max_ent_len": self.config.data_config.max_ent_len,
             "max_ent_type_len": self.config.data_config.entity_type_data.max_ent_type_len,
@@ -667,8 +709,9 @@ class BootlegAnnotator(object):
         entity_type_ids,
         entity_attention_mask,
         entity_cand_eid,
+        generate_entity_inputs,
     ):
-        """Generates emmental batch.
+        """Generate emmental batch.
 
         Args:
             input_ids: word token ids
@@ -678,6 +721,7 @@ class BootlegAnnotator(object):
             entity_type_ids: entity type ids
             entity_attention_mask: entity attention mask
             entity_cand_eid: entity candidate eids
+            generate_entity_inputs: whether to generate entity id inputs
 
         Returns: X_dict for emmental
         """
@@ -695,10 +739,13 @@ class BootlegAnnotator(object):
             "input_ids": input_ids.to(self.torch_device),
             "token_type_ids": token_type_ids.to(self.torch_device),
             "attention_mask": attention_mask.to(self.torch_device),
-            "entity_cand_input_ids": entity_token_ids.to(self.torch_device),
-            "entity_cand_token_type_ids": entity_type_ids.to(self.torch_device),
-            "entity_cand_attention_mask": entity_attention_mask.to(self.torch_device),
             "entity_cand_eid": entity_cand_eid_noneg.to(self.torch_device),
             "entity_cand_eval_mask": entity_cand_eval_mask.to(self.torch_device),
         }
+        if generate_entity_inputs:
+            X_dict["entity_cand_input_ids"] = entity_token_ids.to(self.torch_device)
+            X_dict["entity_cand_token_type_ids"] = entity_type_ids.to(self.torch_device)
+            X_dict["entity_cand_attention_mask"] = entity_attention_mask.to(
+                self.torch_device
+            )
         return X_dict

@@ -1,14 +1,15 @@
+"""Data"""
 import logging
 import os
 
+from emmental import Meta
+from emmental.data import EmmentalDataLoader, emmental_collate_fn
 from torch.utils.data import DistributedSampler, RandomSampler
 
 from bootleg import log_rank_0_info
 from bootleg.data import bootleg_collate_fn
 from cand_gen.dataset import CandGenContextDataset, CandGenDataset, CandGenEntityDataset
 from cand_gen.task_config import BATCH_CANDS_LABEL
-from emmental import Meta
-from emmental.data import EmmentalDataLoader, emmental_collate_fn
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def get_dataloaders(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -99,7 +100,7 @@ def get_entity_dataloader(
     entity_symbols,
     tokenizer,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -108,7 +109,7 @@ def get_entity_dataloader(
 
     Returns: list of dataloaders
     """
-    # task_to_label_dict = {t: CANDS_LABEL for t in tasks}
+    task_to_label_dict = {t: None for t in tasks}
     split = "test"
 
     dataset_path = os.path.join(
@@ -131,7 +132,7 @@ def get_entity_dataloader(
             "Please use DataParallel and not DDP.",
         )
     dataloader = EmmentalDataLoader(
-        task_to_label_dict=tasks,
+        task_to_label_dict=task_to_label_dict,
         dataset=dataset,
         sampler=dataset_sampler,
         split=split,
@@ -160,7 +161,7 @@ def get_context_dataloader(
     tokenizer,
     dataset_range=None,
 ):
-    """Gets the dataloaders.
+    """Get the dataloaders.
 
     Args:
         args: main args
@@ -171,7 +172,7 @@ def get_context_dataloader(
 
     Returns: list of dataloaders
     """
-    # task_to_label_dict = {t: CANDS_LABEL for t in tasks}
+    task_to_label_dict = {t: None for t in tasks}
     split = "test"
     is_bert = True
     dataset_path = os.path.join(
@@ -198,7 +199,7 @@ def get_context_dataloader(
         )
 
     dataloader = EmmentalDataLoader(
-        task_to_label_dict=tasks,
+        task_to_label_dict=task_to_label_dict,
         dataset=dataset,
         sampler=dataset_sampler,
         split=split,

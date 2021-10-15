@@ -1,3 +1,4 @@
+"""Bootleg eval utils."""
 import glob
 import logging
 import math
@@ -7,26 +8,29 @@ import shutil
 import time
 from collections import defaultdict
 
+import emmental
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
 import ujson
+from emmental.utils.utils import array_to_numpy, prob_to_pred
 from tqdm import tqdm
 
-import emmental
 from bootleg import log_rank_0_debug
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
 from bootleg.utils.utils import strip_nan, try_rmtree
-from emmental.utils.utils import array_to_numpy, prob_to_pred
 
 logger = logging.getLogger(__name__)
 
 
 def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0, zero_delta=1e-45):
-    """Masked logsoftmax. Mask of 0/False means mask value (ignore it)
+    """
+    Masked logsoftmax.
+
+    Mask of 0/False means mask value (ignore it)
 
     Args:
         pred: input tensor
@@ -52,7 +56,8 @@ def masked_class_logsoftmax(pred, mask, dim=2, temp=1.0, zero_delta=1e-45):
 def map_aliases_to_candidates(
     train_in_candidates, max_candidates, alias_cand_map, aliases
 ):
-    """Get list of QID candidates for each alias.
+    """
+    Get list of QID candidates for each alias.
 
     Args:
         train_in_candidates: whether the model has a NC entity or not (assumes all gold QIDs are in candidate lists)
@@ -80,7 +85,8 @@ def map_aliases_to_candidates(
 
 
 def map_candidate_qids_to_eid(candidate_qids, qid2eid):
-    """Get list of EID candidates for each alias.
+    """
+    Get list of EID candidates for each alias.
 
     Args:
         candidate_qids: list of list of candidate QIDs
@@ -106,8 +112,10 @@ def map_candidate_qids_to_eid(candidate_qids, qid2eid):
 
 
 def get_eval_folder(file):
-    """Return eval folder for the given evaluation file. Stored in
-    log_path/filename/model_name.
+    """
+    Return eval folder for the given evaluation file.
+
+    Stored in log_path/filename/model_name.
 
     Args:
         file: eval file
@@ -124,7 +132,8 @@ def get_eval_folder(file):
 
 
 def get_char_spans(spans, text):
-    """Helper function to get character spans instead of default word spans.
+    """
+    Get character spans instead of default word spans.
 
     Args:
         spans: word spans
@@ -154,13 +163,11 @@ def get_char_spans(spans, text):
 
 
 def write_disambig_metrics_to_csv(file_path, dictionary):
-    """Saves disambiguation metrics in the dictionary to file_path.
+    """Save disambiguation metrics in the dictionary to file_path.
 
     Args:
         file_path: file path
         dictionary: dictionary of scores (output of Emmental score)
-
-    Returns:
     """
     # Only saving NED, ignore Type. dictionary has keys such as "NED/Bootleg/dev/unif_HD/total_men" which
     # corresponds to task/dataset/split/slice/metric, and the value is the associated value for that metric as
@@ -200,8 +207,9 @@ def write_disambig_metrics_to_csv(file_path, dictionary):
 
 
 def get_sent_idx2num_mens(data_file):
-    """Gets the map from sentence index to number of mentions and to data. Used
-    for calculating offsets and chunking file.
+    """Get the map from sentence index to number of mentions and to data.
+
+    Used for calculating offsets and chunking file.
 
     Args:
         data_file: eval file
@@ -242,7 +250,10 @@ def batched_pred_iter(
     eval_accumulation_steps,
     sent_idx2num_mens,
 ):
-    """Predict from dataloader taking into account eval accumulation steps.
+    """
+    Predict from dataloader.
+
+    Predict from dataloader taking into account eval accumulation steps.
     Will yield a new prediction set after each set accumulation steps for
     writing out.
 
@@ -263,8 +274,7 @@ def batched_pred_iter(
     """
 
     def collect_result(uid_d, gold_d, pred_d, prob_d, out_d, cur_sentidx_nummen):
-        """Merges results for the sentences where all mentions have been
-        evaluated."""
+        """Merge results for the sentences where all mentions have been evaluated."""
         final_uid_d = defaultdict(list)
         final_prob_d = defaultdict(list)
         final_pred_d = defaultdict(list)
@@ -447,14 +457,11 @@ def batched_pred_iter(
 
 
 def check_and_create_alias_cand_trie(save_folder, entity_symbols):
-    """Creates a mmap memory trie object if it doesn't exist for storing the
-    alias-candidate mappings.
+    """Create a mmap memory trie object for storing the alias-candidate mappings.
 
     Args:
         save_folder: save folder for alias trie
         entity_symbols: entity symbols
-
-    Returns:
     """
     try:
         AliasCandRecordTrie(load_dir=save_folder)
@@ -474,7 +481,7 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
 
 
 def get_emb_file(result_idx, save_folder):
-    """Gets the embedding numpy file for the `result_idx` batch.
+    """Get the embedding numpy file for the `result_idx` batch.
 
     Args:
         result_idx: result index of the result batch
@@ -486,7 +493,7 @@ def get_emb_file(result_idx, save_folder):
 
 
 def get_result_file(result_idx, save_folder):
-    """Gets the jsonl label file for the `result_idx` batch.
+    """Get the jsonl label file for the `result_idx` batch.
 
     Args:
         result_idx: result index of the result batch
@@ -509,7 +516,7 @@ def disambig_dump_preds(
     dump_embs,
     task_name,
 ):
-    """Dumps the predictions of a disambiguation task.
+    """Dump the predictions of a disambiguation task.
 
     Args:
         result_idx: batch index of the result arrays
@@ -752,7 +759,10 @@ def merge_subsentences(
     to_read_storage,
     dump_embs=False,
 ):
-    """Flatten all sentences back together over sub-sentences; removing the PAD
+    """
+    Merge and flatten sentence over sub-sentences.
+
+    Flatten all sentences back together over sub-sentences; removing the PAD
     aliases from the data I.e., converts from sent_idx -> array of values to
     (sent_idx, alias_idx) -> value with varying numbers of aliases per
     sentence.
@@ -766,8 +776,6 @@ def merge_subsentences(
         to_read_file: memmap file to read predictions from
         to_read_storage: read file storage type
         dump_embs: whether to save embeddings or not
-
-    Returns:
     """
     # Compute sent idx to offset so we know where to fill in mentions
     cur_offset = 0
@@ -856,7 +864,7 @@ def merge_subsentences(
 def merge_subsentences_initializer(
     to_write_file, to_write_storage, to_read_file, to_read_storage, sentidx2offset_file
 ):
-    """merge_subsentences initializer for multiprocessing.
+    """Merge subsentences initializer for multiprocessing.
 
     Args:
         to_write_file: file to write
@@ -864,8 +872,6 @@ def merge_subsentences_initializer(
         to_read_file: file to read
         to_read_storage: mmap storage type
         sentidx2offset_file: sentence index to offset in mmap data
-
-    Returns:
     """
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(to_write_file, dtype=to_write_storage, mode="r+")
@@ -876,7 +882,7 @@ def merge_subsentences_initializer(
 
 
 def merge_subsentences_hlp(args):
-    """merge_subsentences multiprocessing subprocess helper."""
+    """Merge subsentences multiprocessing subprocess helper."""
     K, hidden_size, dump_embs, r_idx_set = args
     return merge_subsentences_single(
         K,
@@ -899,7 +905,9 @@ def merge_subsentences_single(
     sentidx2offset,
 ):
     """
-    merge_subsentences single process. Will flatted out the results from `full_pred_data` so each line of
+    Merge subsentences single process.
+
+    Will flatted out the results from `full_pred_data` so each line of
      `filt_emb_data` is one alias prediction.
     Args:
         K: number candidates
@@ -909,9 +917,6 @@ def merge_subsentences_single(
         filt_emb_data: mmap embedding file to write
         full_pred_data: mmap result file to read
         sentidx2offset: sentence to emb data offset
-
-    Returns:
-
     """
     seen_ids = set()
     for r_idx in r_idx_set:
@@ -991,8 +996,7 @@ def write_data_labels(
     trie_candidate_map_folder=None,
     trie_qid2eid_file=None,
 ):
-    """Takes the flattened data from merge_sentences and writes out predictions
-    to a file, one line per sentence.
+    """Take the flattened data from merge_sentences and write out predictions.
 
     The embedding ids are added to the file if dump_embs is True.
 
@@ -1010,8 +1014,6 @@ def write_data_labels(
         dump_embs: whether to dump embeddings or not
         trie_candidate_map_folder: folder where trie of alias->candidate map is stored for parallel proccessing
         trie_qid2eid_file: file where trie of qid->eid map is stored for parallel proccessing
-
-    Returns:
     """
     st = time.time()
     sental2embid = get_sental2embid(merged_entity_emb_file, merged_storage_type)
@@ -1128,7 +1130,8 @@ def write_data_labels_initializer(
     trie_qid2eid_file,
 ):
     """
-    write_data_labels multiprocessing initializer
+    Write data labels multiprocessing initializer.
+
     Args:
         merged_entity_emb_file: flattened embedding input file
         merged_storage_type: mmap storage type
@@ -1139,9 +1142,6 @@ def write_data_labels_initializer(
         dump_embs: dump embedding flag
         trie_candidate_map_folder: alias trie folder
         trie_qid2eid_file: qid to eid trie file
-
-    Returns:
-
     """
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(
@@ -1164,7 +1164,7 @@ def write_data_labels_initializer(
 
 
 def write_data_labels_hlp(args):
-    """write_data_labels multiprocess helper function."""
+    """Write data labels multiprocess helper function."""
     input_file, output_file = args
     s_idx2row = {}
     with open(input_file) as in_f:
@@ -1197,8 +1197,9 @@ def write_data_labels_single(
     max_cands,
     dump_embs,
 ):
-    """write_data_labels single subprocess function. Will take the alias
-    predictions and merge them back by sentence to be written out.
+    """Write data labels single subprocess function.
+
+    Will take the alias predictions and merge them back by sentence to be written out.
 
     Args:
         sentidx2row: sentence index to raw eval data row
@@ -1211,8 +1212,6 @@ def write_data_labels_single(
         train_in_cands: training in candidates flag
         max_cands: maximum candidates
         dump_embs: dump embedding flag
-
-    Returns:
     """
     with open(output_file, "w") as f_out:
         for sent_idx in sentidx2row:

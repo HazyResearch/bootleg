@@ -1,10 +1,10 @@
 emmental:
   lr: 2e-5
-  n_epochs: 2
+  n_epochs: 1
   evaluation_freq: 1
   warmup_percentage: 0.1
   lr_scheduler: linear
-  log_path: /dfs/scratch0/lorr1/projects/bootleg-data/logs/logs_temp
+  log_path: /dfs/scratch0/lorr1/projects/bootleg-data/logs/cand_gen_korealiases
   checkpointing: true
   checkpoint_all: true
   checkpoint_freq: 1
@@ -22,7 +22,7 @@ run_config:
   dataset_threads: 40
   spawn_method: fork
 train_config:
-  batch_size: 16
+  batch_size: 8
 model_config:
   hidden_size: 100
   normalize: false

@@ -15,6 +15,7 @@ class EntityEmbedding(torch.nn.Module):
     """
 
     def __init__(self, entity_emb_file):
+        """Entity embedding initializer."""
         super(EntityEmbedding, self).__init__()
         embs = torch.FloatTensor(np.load(entity_emb_file))
         # Add -1 padding row; not required as dump from Bootleg should include PAD entity but as a safety

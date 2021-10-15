@@ -6,7 +6,6 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
-from scipy.special import softmax
 from tqdm import tqdm
 
 from bootleg import log_rank_0_debug
@@ -25,18 +24,14 @@ class AliasEntityTable(nn.Module):
     """
 
     def __init__(self, data_config, entity_symbols):
+        """Alias table initializer."""
         super(AliasEntityTable, self).__init__()
         self.num_entities_with_pad_and_nocand = (
             entity_symbols.num_entities_with_pad_and_nocand
         )
         self.num_aliases_with_pad_and_unk = len(entity_symbols.get_all_aliases()) + 2
         self.K = get_max_candidates(entity_symbols, data_config)
-        (
-            self.alias2entity_table,
-            self.alias2entityprior_table,
-            self.prep_file,
-            self.prep_score_file,
-        ) = self.prep(
+        (self.alias2entity_table, self.prep_file,) = self.prep(
             data_config,
             entity_symbols,
             num_aliases_with_pad_and_unk=self.num_aliases_with_pad_and_unk,
@@ -82,23 +77,12 @@ class AliasEntityTable(nn.Module):
             prep_dir,
             f"alias2entity_table_{alias_str}_InC{int(data_config.train_in_candidates)}.pt",
         )
-        prep_score_file = os.path.join(
-            prep_dir,
-            f"alias2entityprior_table_{alias_str}_InC{int(data_config.train_in_candidates)}.pt",
-        )
         log_rank_0_debug(logger, f"Looking for alias table in {prep_file}")
-        if (
-            not data_config.overwrite_preprocessed_data
-            and os.path.exists(prep_file)
-            and os.path.exists(prep_score_file)
-        ):
+        if not data_config.overwrite_preprocessed_data and os.path.exists(prep_file):
             log_rank_0_debug(logger, f"Loading alias table from {prep_file}")
             start = time.time()
             alias2entity_table = np.memmap(
                 prep_file, dtype="int64", mode="r+", shape=data_shape
-            )
-            alias2entityprior_table = np.memmap(
-                prep_score_file, dtype="float", mode="r", shape=data_shape
             )
             log_rank_0_debug(
                 logger, f"Loaded alias table in {round(time.time() - start, 2)}s"
@@ -107,28 +91,20 @@ class AliasEntityTable(nn.Module):
             start = time.time()
             log_rank_0_debug(logger, "Building alias table")
             utils.ensure_dir(prep_dir)
-            alias2entity_table, alias2entityprior_table = cls.build_alias_table(
-                data_config, entity_symbols
-            )
+            alias2entity_table = cls.build_alias_table(data_config, entity_symbols)
             mmap_file = np.memmap(prep_file, dtype="int64", mode="w+", shape=data_shape)
             mmap_file[:] = alias2entity_table[:]
             mmap_file.flush()
-            mmap_score_file = np.memmap(
-                prep_score_file, dtype="float", mode="w+", shape=data_shape
-            )
-            mmap_score_file[:] = alias2entityprior_table[:]
-            mmap_score_file.flush()
             log_rank_0_debug(
                 logger,
                 f"Finished building and saving alias table in {round(time.time() - start, 2)}s.",
             )
         alias2entity_table = torch.from_numpy(alias2entity_table)
-        alias2entityprior_table = torch.from_numpy(alias2entityprior_table)
-        return alias2entity_table, alias2entityprior_table, prep_file, prep_score_file
+        return alias2entity_table, prep_file
 
     @classmethod
     def build_alias_table(cls, data_config, entity_symbols):
-        """Constructs the alias to EID table.
+        """Construct the alias to EID table.
 
         Args:
             data_config: data config
@@ -149,37 +125,18 @@ class AliasEntityTable(nn.Module):
             )
             * -1
         )
-        alias2entityprior_table = np.zeros(
-            (
-                num_aliases_with_pad_and_unk,
-                get_max_candidates(entity_symbols, data_config),
-            )
-        )
         for alias in tqdm(
             entity_symbols.get_all_aliases(), desc="Iterating over aliases"
         ):
             alias_id = entity_symbols.get_alias_idx(alias)
             # set all to -1 and fill in with real values for padding and fill in with real values
             entity_list = np.ones(get_max_candidates(entity_symbols, data_config)) * -1
-            entityprior_list = np.zeros(get_max_candidates(entity_symbols, data_config))
             # set first column to zero
             # if we are using noncandidate entity, this will remain a 0
             # if we are not using noncandidate entities, this will get overwritten below.
             entity_list[0] = 0
-            entityprior_list[0] = 0
 
             eid_cands = entity_symbols.get_eid_cands(alias)
-            # Output of get_qid_count_cands is list of [qid, score]
-            eid_cand_scores = np.array(
-                [pair[1] for pair in entity_symbols.get_qid_count_cands(alias)]
-            )
-            # Make scores probability distribution - set to empty list of no candidates
-            eid_cand_scores = (
-                softmax(eid_cand_scores)
-                if len(eid_cand_scores) > 0
-                else eid_cand_scores
-            )
-            # eid_cand_scores = eid_cand_scores / eid_cand_scores.sum()
             # we get qids and want entity ids
             # first entry is the non candidate class
             # val[0] because vals is [qid, page_counts]
@@ -187,16 +144,11 @@ class AliasEntityTable(nn.Module):
                 (not data_config.train_in_candidates) : len(eid_cands)
                 + (not data_config.train_in_candidates)
             ] = np.array(eid_cands)
-            entityprior_list[
-                (not data_config.train_in_candidates) : len(eid_cands)
-                + (not data_config.train_in_candidates)
-            ] = eid_cand_scores
             alias2entity_table[alias_id, :] = entity_list
-            alias2entityprior_table[alias_id, :] = entityprior_list
-        return alias2entity_table, alias2entityprior_table
+        return alias2entity_table
 
     def get_alias_eid_priors(self, alias_indices):
-        """Returns the prior scores of the given alias_indices.
+        """Return the prior scores of the given alias_indices.
 
         Args:
             alias_indices: alias indices (B x M)
@@ -220,6 +172,7 @@ class AliasEntityTable(nn.Module):
         return candidate_entity_ids
 
     def __getstate__(self):
+        """Get state."""
         state = self.__dict__.copy()
         # Not picklable
         del state["alias2entity_table"]
@@ -227,6 +180,7 @@ class AliasEntityTable(nn.Module):
         return state
 
     def __setstate__(self, state):
+        """Set state."""
         self.__dict__.update(state)
         self.alias2entity_table = torch.tensor(
             np.memmap(
@@ -234,13 +188,5 @@ class AliasEntityTable(nn.Module):
                 dtype="int64",
                 mode="r",
                 shape=(self.num_aliases_with_pad_and_unk, self.K),
-            )
-        )
-        self.alias2entityprior_table = torch.tensor(
-            np.memmap(
-                self.prep_score_file,
-                dtype="float",
-                mode="r",
-                shape=(self.num_aliases_with_pad, self.K),
             )
         )

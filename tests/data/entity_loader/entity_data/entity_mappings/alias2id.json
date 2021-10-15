@@ -1,0 +1,19 @@
+{
+  "alias1": 0,
+  "alias3": 1,
+  "alias4": 2,
+  "multi word alias2": 3,
+  "highspeed": 4,
+  "observation": 5,
+  "deck": 6,
+  "elevators": 7,
+  "worldrecord": 8,
+  "speed": 9,
+  "air pressure": 10,
+  "sensations": 11,
+  "the door": 12,
+  "counterweights": 13,
+  "cabin": 14,
+  "downwards": 15,
+  "reduced speed": 16
+}

@@ -2,17 +2,19 @@
 import logging
 from typing import Any, Dict, Optional, Tuple, Union
 
-from torch import Tensor
-
 from emmental import EmmentalDataset
+from torch import Tensor
 
 logger = logging.getLogger(__name__)
 
 
 class RangedEmmentalDataset(EmmentalDataset):
-    """RangedEmmentalDataset dataset.
+    """
+    RangedEmmentalDataset dataset.
+
     An advanced dataset class to handle that the input data contains multiple fields
     and the output data contains multiple label sets.
+
     Args:
       name: The name of the dataset.
       X_dict: The feature dict where key is the feature name and value is the
@@ -31,8 +33,8 @@ class RangedEmmentalDataset(EmmentalDataset):
         uid: Optional[str] = None,
         data_range: Optional[list] = None,
     ) -> None:
-        super().__init__(name, X_dict, Y_dict, uid)
         """Initialize RangedEmmentalDataset."""
+        super().__init__(name, X_dict, Y_dict, uid)
         if data_range is not None:
             self.data_range = data_range
         else:
@@ -42,6 +44,7 @@ class RangedEmmentalDataset(EmmentalDataset):
         self, index: int
     ) -> Union[Tuple[Dict[str, Any], Dict[str, Tensor]], Dict[str, Any]]:
         """Get item by index after taking range into account.
+
         Args:
           index: The index of the item.
         Returns:

@@ -29,6 +29,7 @@ class EntitySymbols:
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
+        """Entity symbols initializer."""
         # We support different candidate mappings for the same set of entities
         self.alias_cand_map_file = alias_cand_map_file
         self.alias_idx_file = alias_idx_file
@@ -101,12 +102,10 @@ class EntitySymbols:
             self._alias_trie = marisa_trie.Trie(self._alias2qids.keys())
 
     def save(self, save_dir):
-        """Dumps the entity symbols.
+        """Dump the entity symbols.
 
         Args:
             save_dir: directory string to save
-
-        Returns:
         """
         self._sort_alias_cands()
         utils.ensure_dir(save_dir)
@@ -146,7 +145,7 @@ class EntitySymbols:
         edit_mode=False,
         verbose=False,
     ):
-        """Loads entity symbols from load_dir.
+        """Load entity symbols from load_dir.
 
         Args:
             load_dir: directory to load from
@@ -154,8 +153,6 @@ class EntitySymbols:
             alias_idx_file: alias2id file
             edit_mode: edit mode flag
             verbose: verbose flag
-
-        Returns:
         """
         config = utils.load_json_file(filename=os.path.join(load_dir, "config.json"))
         max_candidates = config["max_candidates"]
@@ -190,12 +187,7 @@ class EntitySymbols:
         )
 
     def _sort_alias_cands(self):
-        """
-        Sorts the candidate lists for each alias from largest to smallest score
-        (each candidate is a pair [QID, sort_value])
-        Returns:
-
-        """
+        """Sort the candidates for each alias from largest to smallest score."""
         for alias in self._alias2qids:
             # Add second key for determinism in case of same counts
             self._alias2qids[alias] = sorted(
@@ -204,54 +196,56 @@ class EntitySymbols:
 
     def get_qid2eid(self):
         """
-        Gets the qid2eid mapping
-        Returns: Dict qid2eid mapping
+        Get the qid2eid mapping.
 
+        Returns: Dict qid2eid mapping
         """
         return self._qid2eid
 
     def get_alias2qids(self):
         """
-        Gets the alias2qids mapping (key is alias, value is list of candidate tuple of length two of [QID, sort_value])
-        Returns: Dict alias2qids mapping
+        Get the alias2qids mapping.
 
+        Key is alias, value is list of candidate tuple of length two of [QID, sort_value].
+
+        Returns: Dict alias2qids mapping
         """
         return self._alias2qids
 
     def get_qid2title(self):
         """
-        Gets the qid2title mapping
-        Returns: Dict qid2title mapping
+        Get the qid2title mapping.
 
+        Returns: Dict qid2title mapping
         """
         return self._qid2title
 
     def get_all_qids(self):
         """
-        Gets all QIDs
-        Returns: Dict_keys of all QIDs
+        Get all QIDs.
 
+        Returns: Dict_keys of all QIDs
         """
         return self._qid2eid.keys()
 
     def get_all_aliases(self):
         """
-        Gets all aliases
-        Returns: Dict_keys of all aliases
+        Get all aliases.
 
+        Returns: Dict_keys of all aliases
         """
         return self._alias2qids.keys()
 
     def get_all_titles(self):
         """
-        Gets all QID titles
-        Returns: Dict_values of all titles
+        Get all QID titles.
 
+        Returns: Dict_values of all titles
         """
         return self._qid2title.values()
 
     def get_qid(self, id):
-        """Gets the QID associated with EID.
+        """Get the QID associated with EID.
 
         Args:
             id: EID
@@ -262,7 +256,7 @@ class EntitySymbols:
         return self._eid2qid[id]
 
     def alias_exists(self, alias):
-        """Does alias exist.
+        """Check alias existance.
 
         Args:
             alias: alias string
@@ -275,7 +269,7 @@ class EntitySymbols:
             return alias in self._alias2id
 
     def qid_exists(self, qid):
-        """Does QID exist.
+        """Check QID existance.
 
         Args:
             alias: QID string
@@ -285,7 +279,7 @@ class EntitySymbols:
         return qid in self._qid2eid
 
     def eid_exists(self, eid):
-        """Does EID exist.
+        """Check EID existance.
 
         Args:
             alias: EID int
@@ -295,7 +289,7 @@ class EntitySymbols:
         return eid in self._eid2qid[eid]
 
     def get_eid(self, id):
-        """Gets the QID for the EID.
+        """Get the QID for the EID.
 
         Args:
             id: EID int
@@ -351,7 +345,7 @@ class EntitySymbols:
         return res
 
     def get_title(self, id):
-        """Gets title for QID.
+        """Get title for QID.
 
         Args:
             id: QID string
@@ -362,7 +356,7 @@ class EntitySymbols:
         return self._qid2title[id]
 
     def get_desc(self, id):
-        """Gets description for QID.
+        """Get description for QID.
 
         Args:
             id: QID string
@@ -374,7 +368,7 @@ class EntitySymbols:
         return self._qid2desc.get(id, "")
 
     def get_alias_idx(self, alias):
-        """Gets the numeric index of an alias.
+        """Get the numeric index of an alias.
 
         Args:
             alias: alias
@@ -384,7 +378,7 @@ class EntitySymbols:
         return self._alias2id[alias]
 
     def get_alias_from_idx(self, alias_idx):
-        """Gets the alias from the numeric index.
+        """Get the alias from the numeric index.
 
         Args:
             alias_idx: alias numeric index
@@ -400,41 +394,36 @@ class EntitySymbols:
 
     @edit_op
     def set_title(self, qid: str, title: str):
-        """Sets the title for a QID.
+        """Set the title for a QID.
 
         Args:
             qid: QID
             title: title
-
-        Returns:
         """
         assert qid in self._qid2eid
         self._qid2title[qid] = title
 
     @edit_op
     def set_desc(self, qid: str, desc: str):
-        """Sets the description for a QID.
+        """Set the description for a QID.
 
         Args:
             qid: QID
             desc: description
-
-        Returns:
         """
         assert qid in self._qid2eid
         self._qid2desc[qid] = desc
 
     @edit_op
     def set_score(self, qid: str, mention: str, score: float):
-        """Changes the mention QID score and resorts candidates so highest
-        scoring is first.
+        """Change the mention QID score and resorts candidates.
+
+        Highest score is first.
 
         Args:
             qid: QID
             mention: mention
             score: score
-
-        Returns:
         """
         if mention not in self._alias2qids:
             raise ValueError(f"The mention {mention} is not in our mapping")
@@ -453,17 +442,16 @@ class EntitySymbols:
 
     @edit_op
     def add_mention(self, qid: str, mention: str, score: float):
-        """Add mention to QID with the associated score. The mention already
-        exists, error thrown to call ``set_score`` instead. If there are
-        already max candidates to that mention, the last candidate of the
+        """Add mention to QID with the associated score.
+
+        The mention already exists, error thrown to call ``set_score`` instead.
+        If there are already max candidates to that mention, the last candidate of the
         mention is removed in place of QID.
 
         Args:
             qid: QID
             mention: mention
             score: score
-
-        Returns:
         """
         # Cast to lower and stripped for aliases
         mention = utils.get_lnrm(mention, strip=True, lower=True)
@@ -516,8 +504,6 @@ class EntitySymbols:
         Args:
             qid: QID
             mention: mention to remove
-
-        Returns:
         """
         # Make sure the mention and qid pair is already in the mapping
         if mention not in self._alias2qids:
@@ -561,8 +547,6 @@ class EntitySymbols:
             mentions: List of tuples [mention, score]
             title: title
             desc: description
-
-        Returns:
         """
         assert (
             qid not in self._qid2eid
@@ -593,8 +577,6 @@ class EntitySymbols:
         Args:
             old_qid: old QID
             new_qid: new QID
-
-        Returns:
         """
         assert (
             old_qid in self._qid2eid and new_qid not in self._qid2eid
@@ -629,8 +611,6 @@ class EntitySymbols:
 
         Args:
             entities_to_keep: Set of entities to keep
-
-        Returns:
         """
         # Update qid based dictionaries
         self._qid2title = {
@@ -669,7 +649,7 @@ class EntitySymbols:
 
     @edit_op
     def get_mentions(self, qid):
-        """Gets the mentions for the QID.
+        """Get the mentions for the QID.
 
         Args:
             qid: QID
@@ -681,7 +661,7 @@ class EntitySymbols:
 
     @edit_op
     def get_mentions_with_scores(self, qid):
-        """Gets the mentions and the associated score for the QID.
+        """Get the mentions and the associated score for the QID.
 
         Args:
             qid: QID

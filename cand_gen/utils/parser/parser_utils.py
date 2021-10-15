@@ -4,7 +4,7 @@ defaults filled in) for running a model."""
 import argparse
 import os
 
-from bootleg.utils.classes.dotted_dict import createBoolDottedDict
+from bootleg.utils.classes.dotted_dict import create_bool_dotted_dict
 from bootleg.utils.parser.emm_parse_args import (
     parse_args as emm_parse_args,
     parse_args_to_config as emm_parse_args_to_config,
@@ -90,7 +90,7 @@ def get_boot_config(config, parser_hierarchy=None, parser=None, unknown=None):
     top_names = {}
     reconstructed_nested_args(args, top_names, parser_hierarchy, prefix="")
     # final_args = argparse.Namespace(**top_names)
-    final_args = createBoolDottedDict(top_names)
+    final_args = create_bool_dotted_dict(top_names)
     # turn_to_dotdicts(final_args)
     return final_args
 
@@ -125,7 +125,7 @@ def parse_boot_and_emm_args(config_script, unknown=None):
         emm_args[k] = v
     del all_args["emmental"]
     # create and add Emmental hierarchy
-    config = emm_parse_args_to_config(createBoolDottedDict(emm_args))
+    config = emm_parse_args_to_config(create_bool_dotted_dict(emm_args))
     # Merge configs back (merge workds on dicts so must convert to dict first)
-    config = createBoolDottedDict(merge_configs(all_args, config))
+    config = create_bool_dotted_dict(merge_configs(all_args, config))
     return config
