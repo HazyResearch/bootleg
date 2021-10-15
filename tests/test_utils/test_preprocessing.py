@@ -21,6 +21,7 @@ class PreprocessingUtils(unittest.TestCase):
         self.test_dir.cleanup()
 
     def write_data(self, file, data):
+        """Write data."""
         Path(file).parent.mkdir(parents=True, exist_ok=True)
         with open(file, "w") as out_f:
             for line in data:
@@ -48,7 +49,7 @@ class PreprocessingUtils(unittest.TestCase):
             assert res[k] == 100
 
     def test_compute_statistics(self):
-        """Test compute statistics"""
+        """Test compute statistics."""
         in_file = Path(self.test_dir.name) / "train.jsonl"
         entity_db = Path(self.test_dir.name) / "entity_db" / "entity_mappings"
 
@@ -96,7 +97,7 @@ class PreprocessingUtils(unittest.TestCase):
         assert all(v == 100 for v in alias_cnts.values())
 
     def test_sample_eval_data(self):
-        """Test sample eval data"""
+        """Test sample eval data."""
         in_file = Path(self.test_dir.name) / "train.jsonl"
         data = [
             {

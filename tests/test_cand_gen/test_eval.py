@@ -1,26 +1,24 @@
-"""Test generate entities."""
+"""Test entity embedding generation."""
 import os
 import shutil
 import unittest
 
 import emmental
-import numpy as np
 import torch
-import ujson
 
-import bootleg.extract_all_entities as extract_all_entities
-import bootleg.run as run
+import cand_gen.eval as eval
+import cand_gen.train as train
 from bootleg.utils import utils
-from bootleg.utils.parser import parser_utils
+from cand_gen.utils.parser import parser_utils
 
 
 class TestGenEntities(unittest.TestCase):
-    """Test generate entites."""
+    """Test entity generation."""
 
     def setUp(self) -> None:
         """Set up."""
         self.args = parser_utils.parse_boot_and_emm_args(
-            "tests/run_args/test_end2end.json"
+            "tests/run_args/test_candgen.json"
         )
         # This _MUST_ get passed the args so it gets a random seed set
         emmental.init(log_dir="tests/temp_log", config=self.args)
@@ -44,12 +42,12 @@ class TestGenEntities(unittest.TestCase):
             shutil.rmtree(dir, ignore_errors=True)
 
     def test_end2end(self):
-        """Test end to end."""
+        """Test end2end entity generation."""
         # For the collate and dataloaders to play nicely, the spawn must be fork (this is set in run.py)
         torch.multiprocessing.set_start_method("fork", force=True)
 
         # Train and save model
-        run.run_model(mode="train", config=self.args)
+        train.run_model(config=self.args)
 
         self.args["model_config"][
             "model_path"
@@ -58,25 +56,11 @@ class TestGenEntities(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        out_emb_file = extract_all_entities.run_model(config=self.args)
-        assert os.path.exists(out_emb_file)
-        embs = np.load(out_emb_file)
-        assert list(embs.shape) == [6, 32]
-
-        final_result_file, final_out_emb_file = run.run_model(
-            mode="dump_embs", config=self.args, entity_emb_file=out_emb_file
-        )
-
-        lines = [ujson.loads(ln) for ln in open(final_result_file)]
-        embs = np.load(final_out_emb_file)
-
-        final_result_file, final_out_emb_file = run.run_model(
-            mode="dump_embs", config=self.args, entity_emb_file=None
-        )
-        lines_no_emb_file = [ujson.loads(ln) for ln in open(final_result_file)]
-        embs_no_emb_file = np.load(final_out_emb_file)
-        assert len(lines) == len(lines_no_emb_file)
-        assert embs.shape == embs_no_emb_file.shape
+        candidates_file, metrics_file = eval.run_model(config=self.args)
+        assert os.path.exists(candidates_file)
+        assert os.path.exists(candidates_file)
+        num_sents = len([_ for _ in open(candidates_file)])
+        assert num_sents == 17
 
 
 if __name__ == "__main__":

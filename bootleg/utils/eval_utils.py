@@ -643,9 +643,16 @@ def disambig_dump_preds(
         disambig_res_dict["preds"],
     ]
     all_sent_idx = set()
+    entity_encoder_str = None
     for i, (uid, gold, probs, model_pred) in enumerate(zip(*for_iteration)):
         # disambig_res_dict["output"] is dict with keys ['_input__alias_orig_list_pos',
         # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train', '_input__subsent_idx', 0, 1]
+        if entity_encoder_str is None:
+            entity_encoder_str = [
+                k
+                for k in disambig_res_dict["outputs"].keys()
+                if k.startswith("entity_encoder")
+            ][0]
         sent_idx = disambig_res_dict["outputs"]["_input__sent_idx"][i]
         # print("INSIDE LOOP", sent_idx, "AT", i)
         subsent_idx = disambig_res_dict["outputs"]["_input__subsent_idx"][i]
@@ -655,7 +662,7 @@ def disambig_dump_preds(
         gold_cand_K_idx_train = disambig_res_dict["outputs"][
             "_input__for_dump_gold_cand_K_idx_train"
         ][i]
-        output_embeddings = disambig_res_dict["outputs"]["entity_encoder_0"][i]
+        output_embeddings = disambig_res_dict["outputs"][entity_encoder_str][i]
         mmap_file[i]["K"] = K
         mmap_file[i]["hidden_size"] = config.model_config.hidden_size
         mmap_file[i]["sent_idx"] = sent_idx

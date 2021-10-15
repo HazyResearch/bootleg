@@ -1,8 +1,7 @@
 <p align="center">
 <img src="web/images/full_logo.png" width="150" class="center"/>
 </p>
-
-[![Build Status](https://travis-ci.com/HazyResearch/bootleg.svg?branch=master)](https://travis-ci.com/HazyResearch/bootleg)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/HazyResearch/bootleg/CI)
 [![codecov](https://codecov.io/gh/HazyResearch/bootleg/branch/master/graph/badge.svg)](https://codecov.io/gh/HazyResearch/bootleg)
 [![Documentation Status](https://readthedocs.org/projects/bootleg/badge/?version=latest)](https://bootleg.readthedocs.io/en/latest/?badge=latest)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -32,6 +31,14 @@ Below is the link to download the English Bootleg model. The download comes with
 | Model               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
 | BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
+
+## Embeddings
+Below is the link to download a dump of all entity embeddings from our entity encoder. You will need to download our mappings from entity to row id [here](https://bootleg-data.s3-us-west-2.amazonaws.com/data/latest/entity_db.tar.gz).
+
+| Embeddings               | Description                     | Number Parameters | Link     |
+|-------------------  |---------------------------------|-------------------|----------|
+| 5.6M Wikipedia Entities      | Embeddings from BootlegUncased. | XXX | [Download]() |
+
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).

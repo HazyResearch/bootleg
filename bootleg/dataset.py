@@ -108,6 +108,7 @@ class InputFeatures(object):
         word_attention_mask,
         word_qid_cnt_mask_score,
         gold_eid,
+        for_dump_gold_eid,
         gold_cand_K_idx,
         for_dump_gold_cand_K_idx_train,
         alias_list_pos,
@@ -122,6 +123,7 @@ class InputFeatures(object):
         self.word_attention_mask = word_attention_mask
         self.word_qid_cnt_mask_score = word_qid_cnt_mask_score
         self.gold_eid = gold_eid
+        self.for_dump_gold_eid = for_dump_gold_eid
         self.gold_cand_K_idx = gold_cand_K_idx
         self.for_dump_gold_cand_K_idx_train = for_dump_gold_cand_K_idx_train
         self.alias_list_pos = alias_list_pos
@@ -138,6 +140,7 @@ class InputFeatures(object):
             "word_attention_mask": self.word_attention_mask,
             "word_qid_cnt_mask_score": self.word_qid_cnt_mask_score,
             "gold_eid": self.gold_eid,
+            "for_dump_gold_eid": self.for_dump_gold_eid,
             "gold_cand_K_idx": self.gold_cand_K_idx,
             "for_dump_gold_cand_K_idx_train": self.for_dump_gold_cand_K_idx_train,
             "alias_list_pos": self.alias_list_pos,
@@ -903,6 +906,7 @@ def convert_examples_to_features_and_save_single(
             word_attention_mask=candidate_sentence_attn_msks,
             word_qid_cnt_mask_score=candidate_mention_cnt_ratio,
             gold_eid=example_true_entity_eid,
+            for_dump_gold_eid=eid,  # Store the one that isn't -1 for non-gold aliases
             gold_cand_K_idx=example_true_cand_positions_for_loss,
             for_dump_gold_cand_K_idx_train=example_true_cand_positions_for_train,
             alias_list_pos=alias_list_pos,
@@ -936,6 +940,7 @@ def convert_examples_to_features_and_save_single(
             example_idx
         ] = feature.for_dump_gold_cand_K_idx_train
         mmap_file["gold_eid"][example_idx] = feature.gold_eid
+        mmap_file["for_dump_gold_eid"][example_idx] = feature.for_dump_gold_eid
         mmap_label_file["gold_cand_K_idx"][example_idx] = feature.gold_cand_K_idx
         if example_idx % ex_print_mod == 0:
             # Make one string for distributed computation consistency
@@ -959,6 +964,10 @@ def convert_examples_to_features_and_save_single(
                 f"gold_cand_K_idx:                 {feature.gold_cand_K_idx}" + "\n"
             )
             output_str += f"gold_eid:                        {feature.gold_eid}" + "\n"
+            output_str += (
+                f"for_dump_gold_eid:                        {feature.for_dump_gold_eid}"
+                + "\n"
+            )
             output_str += (
                 f"for_dump_gold_cand_K_idx_train:  {feature.for_dump_gold_cand_K_idx_train}"
                 + "\n"
@@ -1313,6 +1322,11 @@ class BootlegDataset(EmmentalDataset):
                     1,
                 ),  # What the eid of the gold entity is
                 (
+                    "for_dump_gold_eid",
+                    "i8",
+                    1,
+                ),  # What the eid of the gold entity is independent of gold alias or not
+                (
                     "for_dump_gold_cand_K_idx_train",
                     "i8",
                     1,
@@ -1535,6 +1549,7 @@ class BootlegDataset(EmmentalDataset):
                 "word_qid_cnt_mask_score": [],
                 "alias_orig_list_pos": [],  # list of original position in the alias list this example is (see eval)
                 "gold_eid": [],  # List of gold entity eids
+                "for_dump_gold_eid": [],
                 "for_dump_gold_cand_K_idx_train": [],  # list of gold indices without subsentence masking (see eval)
             },
             {
@@ -1557,6 +1572,7 @@ class BootlegDataset(EmmentalDataset):
             mmap_file["alias_orig_list_pos"]
         )
         X_dict["gold_eid"] = torch.from_numpy(mmap_file["gold_eid"])
+        X_dict["for_dump_gold_eid"] = torch.from_numpy(mmap_file["for_dump_gold_eid"])
         X_dict["for_dump_gold_cand_K_idx_train"] = torch.from_numpy(
             mmap_file["for_dump_gold_cand_K_idx_train"]
         )

@@ -6,6 +6,7 @@ import unittest
 import emmental
 import torch
 
+from bootleg import extract_all_entities
 from bootleg.end2end.bootleg_annotator import BootlegAnnotator
 from bootleg.run import run_model
 from bootleg.utils import utils
@@ -55,6 +56,7 @@ class TestEnd2End(unittest.TestCase):
         emmental.Meta.config["model_config"][
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
+        out_emb_file = extract_all_entities.run_model(config=self.args)
 
         ann = BootlegAnnotator(config=self.args, verbose=True)
         # TEST SINGLE TEXT
@@ -187,6 +189,25 @@ class TestEnd2End(unittest.TestCase):
         }
         for k in gold_ans:
             self.assertListEqual(gold_ans[k], res[k])
+
+        ann = BootlegAnnotator(
+            config=self.args, verbose=True, entity_emb_file=out_emb_file
+        )
+        # TEST SINGLE TEXT
+        # Res should have alias1
+        res = ann.label_mentions("alias1 alias2 multi word alias3 I have no idea")
+        gold_ans = {
+            "qids": [["Q1"]],
+            "titles": [["alias1"]],
+            "cands": [[["Q1", "Q4", "-1"]]],
+            "spans": [[[0, 1]]],
+            "aliases": [["alias1"]],
+        }
+        for k in gold_ans:
+            # In case model doesn't learn the right pattern (happens on GitHub for some reason),
+            # Do not test qids or titles
+            if k in ["spans", "aliases", "cands"]:
+                self.assertListEqual(gold_ans[k], res[k])
 
 
 if __name__ == "__main__":

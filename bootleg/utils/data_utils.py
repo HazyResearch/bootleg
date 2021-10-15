@@ -82,6 +82,30 @@ def get_save_data_folder(data_args, use_weak_label, dataset):
     return os.path.join(direct, data_args.data_prep_dir, fold_name)
 
 
+def get_save_data_folder_candgen(data_args, use_weak_label, dataset):
+    """Give save data folder for the prepped data.
+
+    Args:
+        data_args: data config
+        use_weak_label: whether to use weak labelling or not
+        dataset: dataset name
+
+    Returns: folder string path
+    """
+    name = os.path.splitext(os.path.basename(dataset))[0]
+    direct = os.path.dirname(dataset)
+    bert_mod = data_args.word_embedding.bert_model.replace("/", "_")
+    fold_name = (
+        f"{name}_{bert_mod}_L{data_args.max_seq_len}_E{data_args.max_ent_len}"
+        f"_W{data_args.max_seq_window_len}"
+        f"_A{data_args.use_entity_akas}"
+        f"_D{data_args.use_entity_desc}"
+        f"_InC{int(data_args.train_in_candidates)}"
+        f"_Aug{int(use_weak_label)}"
+    )
+    return os.path.join(direct, data_args.data_prep_dir, fold_name)
+
+
 def generate_slice_name(data_args, slice_names, use_weak_label, dataset):
     """
     Generate name for slice datasets, taking into account the config eval slices.
@@ -247,3 +271,24 @@ def read_in_relations(data_config, entitysymbols):
                     triples.append(mapped_rel + " " + entitysymbols.get_title(tail_qid))
             qid2relationtriples[qid] = triples
     return qid2relationtriples
+
+
+def read_in_akas(entitysymbols):
+    """Read in alias to QID mappings and generates a QID to list of alternate names.
+
+    Args:
+        entitysymbols: entity symbols
+
+    Returns: dictionary of QID to type names
+    """
+    # take the first type; UNK type is 0
+    qid2aliases = {}
+    for al in entitysymbols.get_all_aliases():
+        for qid in entitysymbols.get_qid_cands(al):
+            if qid not in qid2aliases:
+                qid2aliases[qid] = set()
+            qid2aliases[qid].add(al)
+    # Turn into sets for dumping
+    for qid in qid2aliases:
+        qid2aliases[qid] = list(qid2aliases[qid])
+    return qid2aliases

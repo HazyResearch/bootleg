@@ -166,6 +166,9 @@ class DataLoader(unittest.TestCase):
                 else:
                     gold_eid = -1
                 X_dict["gold_eid"].append(gold_eid)
+                X_dict["for_dump_gold_eid"].append(
+                    self.entity_symbols.get_eid(inp["qids"][j])
+                )
 
                 word_mask_scores = [-1 for _ in range(len(tok_sent["input_ids"]))]
                 if tok_sent.word_to_tokens(new_span[0]) is None:

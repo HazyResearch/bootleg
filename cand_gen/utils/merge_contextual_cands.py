@@ -24,7 +24,7 @@ import time
 import numpy as np
 import ujson
 import ujson as json
-from tqdm import tqdm
+from rich.progress import track
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import utils
@@ -59,12 +59,7 @@ def get_arg_parser():
         default="text",
         help="Where files saved",
     )
-    parser.add_argument("--train_in_candidates", action="store_true")
-    parser.add_argument(
-        "--keep_orig",
-        action="store_true",
-        help="This will keep the original Bootleg maps but add contextual candidates to max out at 30",
-    )
+    parser.add_argument("--no_add_gold_qid_to_train", action="store_true")
     parser.add_argument("--max_candidates", type=int, default=int(30))
     parser.add_argument("--processes", type=int, default=int(1))
     return parser
@@ -78,8 +73,7 @@ def init_process(entity_dump_f):
 
 def merge_data(
     num_processes,
-    train_in_candidates,
-    keep_orig,
+    no_add_gold_qid_to_train,
     max_candidates,
     file_pairs,
     entity_dump_f,
@@ -136,8 +130,7 @@ def merge_data(
     # file_pairs is input file, cand map file, output file, is_train
     input_args = [
         [
-            train_in_candidates,
-            keep_orig,
+            no_add_gold_qid_to_train,
             max_candidates,
             input_files[i],
             input_file_lines[i],
@@ -184,8 +177,7 @@ def merge_data(
 def merge_data_hlp(args):
     """Merge data multiprocessing helper function."""
     (
-        train_in_candidates,
-        keep_orig,
+        no_add_gold_qid_to_train,
         max_candidates,
         input_file,
         total_input,
@@ -197,17 +189,16 @@ def merge_data_hlp(args):
     sent2probs = {}
     new_alias2qids = {}
     with open(input_cand_file, "r") as f_in:
-        for line in tqdm(f_in, total=total_input, desc="Processing cand data"):
+        for line in track(f_in, total=total_input, description="Processing cand data"):
             line = ujson.loads(line)
-            if "probs" in line:
-                sent2probs[line["sent_idx_unq"]] = line["probs"]
+            sent2probs[line["sent_idx_unq"]] = line["probs"]
             sent2cands[line["sent_idx_unq"]] = line["cands"]
     total_dropped = 0
     total_seen = 0
     total_len = 0
     with open(input_file) as f_in, open(output_file, "w") as f_out:
         tag = os.path.splitext(os.path.basename(input_file))[0]
-        for line in tqdm(f_in, total=total_input, desc="Processing data"):
+        for line in track(f_in, total=total_input, description="Processing data"):
             line = ujson.loads(line)
             sent_idx_unq = line["sent_idx_unq"]
             if sent_idx_unq not in sent2cands:
@@ -215,10 +206,7 @@ def merge_data_hlp(args):
                     len(line["aliases"]) == 0
                 ), f"{sent_idx_unq} not in cand maps but there are aliases"
             cands = sent2cands[sent_idx_unq]
-            probs = sent2probs.get(
-                sent_idx_unq,
-                [[500 - j for j in range(len(cand_set))] for cand_set in cands],
-            )
+            probs = sent2probs[sent_idx_unq]
             assert len(cands) == len(
                 line["aliases"]
             ), f"The length of aliases does not match cands in {sent_idx_unq}"
@@ -237,29 +225,15 @@ def merge_data_hlp(args):
                     for c, p in zip(cands[i], probs[i])
                     if ed_global.qid_exists(c)
                 ]
-                if keep_orig:
-                    orig_cand_pairs = ed_global.get_qid_count_cands(line["aliases"][i])
-                    assert len(orig_cand_pairs) <= max_candidates
-                    final_cand_pairs = orig_cand_pairs
-                    final_cand_set = set(map(lambda x: x[0], final_cand_pairs))
-                    for ctx_q, ctx_val in sorted(
-                        new_cand_pairs, key=lambda x: x[1], reverse=False
-                    ):
-                        if len(final_cand_pairs) >= max_candidates:
-                            break
-                        if ctx_q not in final_cand_set:
-                            final_cand_pairs.append([ctx_q, ctx_val])
-                else:
-                    final_cand_pairs = new_cand_pairs[:max_candidates]
+                final_cand_pairs = new_cand_pairs[:max_candidates]
                 total_len += len(final_cand_pairs)
                 # We are training in candidates and gold is not in list, discard
                 if (
                     is_train
-                    and train_in_candidates
+                    and not no_add_gold_qid_to_train
                     and line["qids"][i] not in [p[0] for p in final_cand_pairs]
                 ):
-                    total_dropped += 1
-                    continue
+                    final_cand_pairs[-1] = [line["qids"][i], final_cand_pairs[-1][1]]
                 new_alias2qids[new_al] = final_cand_pairs
                 new_als.append(new_al)
                 new_qids.append(line["qids"][i])
@@ -321,14 +295,15 @@ def main():
         in_files.append([file, pair, out_file, is_train])
     final_cand_map = {}
     max_cands = 0
-    for pair in in_files:
-        print(f"Reading in {pair[0]} with cand maps {pair[1]} and dumping to {pair[2]}")
+    for all_inputs in in_files:
+        print(
+            f"Reading in {all_inputs[0]} with cand maps {all_inputs[1]} and dumping to {all_inputs[2]}"
+        )
         new_alias2qids = merge_data(
             args.processes,
-            args.train_in_candidates,
-            args.keep_orig,
+            args.no_add_gold_qid_to_train,
             args.max_candidates,
-            pair,
+            all_inputs,
             args.entity_dump,
         )
         for al in new_alias2qids:

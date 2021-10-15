@@ -626,10 +626,16 @@ class BootlegSliceDataset:
                 for slice_name in self.slice_names
             ]
         )
-        # Folder for all mmap saved files
-        save_dataset_folder = data_utils.get_save_data_folder(
-            data_config, use_weak_label, dataset
-        )
+        # Folder for all mmap saved files -> if call from cand_gen code, save_data_folder will fail
+        try:
+            save_dataset_folder = data_utils.get_save_data_folder(
+                data_config, use_weak_label, dataset
+            )
+        except AttributeError:
+            save_dataset_folder = data_utils.get_save_data_folder_candgen(
+                data_config, use_weak_label, dataset
+            )
+
         utils.ensure_dir(save_dataset_folder)
         # Folder for temporary output files
         temp_output_folder = os.path.join(
