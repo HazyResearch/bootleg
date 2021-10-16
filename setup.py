@@ -10,6 +10,7 @@ setup(
         "argh>=0.26.2, <1.0.0",
         "click==7.1.2",
         "emmental==0.0.9",
+        "faiss-gpu<=1.7.0, <1.7.2",
         "jsonlines==2.0.0",
         "marisa_trie_m==0.7.6",
         "mock==4.0.3",

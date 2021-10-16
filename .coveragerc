@@ -25,3 +25,7 @@ ignore_errors = True
 omit =
     # Omit anything in the test directory
     tests/*
+    cand_gen/*
+    **/__init__.py
+    setup.py
+    bootleg/_version.py

@@ -25,7 +25,7 @@ train_config:
   batch_size: 8
 model_config:
   hidden_size: 100
-  normalize: false
+  normalize: true
   temperature: 0.01
 data_config:
   data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_0329

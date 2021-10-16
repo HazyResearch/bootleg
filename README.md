@@ -21,7 +21,9 @@ Note that Bootleg is *actively under development* and feedback is welcome. Submi
 Install via
 
 ```
-pip install bootleg
+git clone git@github.com:HazyResearch/bootleg bootleg
+cd bootleg
+python3 setup.py
 ```
 
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).

@@ -1,10 +1,10 @@
 emmental:
   lr: 2e-5
-  n_steps: 212439
-  evaluation_freq: 35407
+  n_epochs: 1
+  evaluation_freq: 1
   warmup_percentage: 0.1
   lr_scheduler: linear
-  log_path: /home/logs/bootleg_uncased_norm
+  log_path: /home/logs/bootleg_cand_gen_1015
   use_exact_log_path: true
   checkpointing: true
   checkpoint_all: true
@@ -19,40 +19,30 @@ emmental:
   fp16: true
   writer: wandb
   wandb_project_name: platelet
-  wandb_run_name: gcp_korealiases_types
+  wandb_run_name: gcp_cand_gen_1015
   write_loss_per_step: true
 run_config:
   log_level: DEBUG
   eval_batch_size: 16
-  dataloader_threads: 3
+  dataloader_threads: 6
   dataset_threads: 20
   spawn_method: fork
 train_config:
-  batch_size: 8
+  batch_size: 32
 model_config:
-  hidden_size: 300
+  hidden_size: 200
   normalize: true
   temperature: 0.01
 data_config:
   data_dir: /home/data/bootleg-data/korealiases_0329
   data_prep_dir: prep
-  use_entity_desc: true
-  context_mask_perc: 0.0
-  entity_type_data:
-    use_entity_types: true
-    type_labels: type_mappings/wiki/qid2typeids.json
-    type_vocab: type_mappings/wiki/type_vocab.json
-  entity_kg_data:
-    use_entity_kg: true
-    kg_labels: kg_mappings/qid2relations.json
-    kg_vocab: kg_mappings/relation_vocab.json
   entity_dir: /home/data/bootleg-data/korealiases_0329/entity_db
   max_seq_len: 128
   max_seq_window_len: 64
   max_ent_len: 128
   overwrite_preprocessed_data: false
   dev_dataset:
-    file: dev.jsonl
+    file: dev_test.jsonl
     use_weak_label: true
   test_dataset:
     file: test.jsonl
