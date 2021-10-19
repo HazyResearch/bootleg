@@ -77,6 +77,7 @@ class TestGenEntities(unittest.TestCase):
         embs_no_emb_file = np.load(final_out_emb_file)
         assert len(lines) == len(lines_no_emb_file)
         assert embs.shape == embs_no_emb_file.shape
+        np.testing.assert_almost_equal(embs, embs_no_emb_file, decimal=6)
 
 
 if __name__ == "__main__":
