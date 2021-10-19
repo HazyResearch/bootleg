@@ -47,7 +47,7 @@ Below is the link to download a dump of all entity metadata to use in our entity
 
 | Metadata               | Description                    | Link     |
 |-------------------  |---------------------------------|----------|
-| 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/data/entity_db.tar.gz) |
+| 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](https://bootleg-data.s3.us-west-2.amazonaws.com/data/latest/entity_db.tar.gz) |
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
