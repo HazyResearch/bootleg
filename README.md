@@ -28,20 +28,26 @@ python3 setup.py
 
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
 
-## Models
+### Models
 Below is the link to download the English Bootleg model. The download comes with the saved model and config to run the model. We show in our [quickstart guide](https://bootleg.readthedocs.io/en/latest/gettingstarted/quickstart.html) and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
 
 | Model               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 1.3B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
+| BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 110M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
 
-## Embeddings
-Below is the link to download a dump of all entity embeddings from our entity encoder. You will need to download our mappings from entity to row id [here](https://bootleg-data.s3-us-west-2.amazonaws.com/data/latest/entity_db.tar.gz).
+### Embeddings
+Below is the link to download a dump of all entity embeddings from our entity encoder. Follow our entity profile tutorial [here](https://github.com/HazyResearch/bootleg/blob/master/tutorials/entity_profile_tutorial.ipynb) to load our EntityProfile. From there, you can use our ```get_eid``` [method](https://bootleg.readthedocs.io/en/latest/apidocs/bootleg.symbols.html#bootleg.symbols.entity_profile.EntityProfile.get_eid) to access the row id for an entity.
 
 | Embeddings               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| 5.6M Wikipedia Entities      | Embeddings from BootlegUncased. | XXX | COMING SOON |
+| 5.8M Wikipedia Entities      | Embeddings from BootlegUncased. | 1.2B | [Download](s3://bootleg-data/models/latest/bootleg_uncased_entity_embeddings.npy.tar.gz) |
 
+### Metadata
+Below is the link to download a dump of all entity metadata to use in our entity profile tutorial [here](https://github.com/HazyResearch/bootleg/blob/master/tutorials/entity_profile_tutorial.ipynb).
+
+| Metadata               | Description                    | Link     |
+|-------------------  |---------------------------------|----------|
+| 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](s3://bootleg-data/models/data/entity_db.tar.gz) |
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
