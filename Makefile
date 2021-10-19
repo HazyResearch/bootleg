@@ -1,6 +1,5 @@
 dev:
-	pip install -r requirements-dev.txt
-	pip install -e .
+	pip install -e .[dev]
 	pre-commit install
 
 test: dev check docs

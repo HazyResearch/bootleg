@@ -40,7 +40,7 @@ Below is the link to download a dump of all entity embeddings from our entity en
 
 | Embeddings               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| 5.6M Wikipedia Entities      | Embeddings from BootlegUncased. | XXX | [Download]() |
+| 5.6M Wikipedia Entities      | Embeddings from BootlegUncased. | XXX | COMING SOON |
 
 
 ## Tutorials

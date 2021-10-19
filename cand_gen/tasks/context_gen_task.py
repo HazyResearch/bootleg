@@ -1,14 +1,27 @@
+import torch.nn.functional as F
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
 from bootleg.layers.bert_encoder import Encoder
 from cand_gen.task_config import CANDGEN_TASK
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 
-def context_output_func(intermediate_output_dict):
-    return intermediate_output_dict["context_encoder"][0]
+class ContextGenOutput:
+    """Context gen for output."""
+
+    def __init__(self, normalize, temperature):
+        """Context gen for output initializer."""
+        self.normalize = normalize
+        self.temperature = temperature
+
+    def entity_output_func(self, intermediate_output_dict):
+        """Context output func."""
+        ctx_out = intermediate_output_dict["context_encoder"][0]
+        if self.normalize:
+            ctx_out = F.normalize(ctx_out, p=2, dim=-1)
+        return ctx_out
 
 
 def create_task(args, len_context_tok):
@@ -56,7 +69,9 @@ def create_task(args, len_context_tok):
         module_pool=module_pool,
         task_flow=task_flow,
         loss_func=None,
-        output_func=context_output_func,
+        output_func=ContextGenOutput(
+            args.model_config.normalize, args.model_config.temperature
+        ).entity_output_func,
         require_prob_for_eval=False,
         require_pred_for_eval=True,
         scorer=Scorer(),
