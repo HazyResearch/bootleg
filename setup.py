@@ -54,8 +54,8 @@ EXTRAS = {
         "recommonmark==0.7.1",
         "sphinx-rtd-theme==0.5.1",
     ],
-    "embs": [
-        "faiss-gpu<=1.7.0, <1.7.2",
+    "embs-gpu": [
+        "faiss-gpu>=1.7.0, <1.7.2",
     ],
 }
 
