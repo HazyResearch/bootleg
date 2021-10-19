@@ -11,10 +11,9 @@ from cand_gen.task_config import CANDGEN_TASK
 class ContextGenOutput:
     """Context gen for output."""
 
-    def __init__(self, normalize, temperature):
+    def __init__(self, normalize):
         """Context gen for output initializer."""
         self.normalize = normalize
-        self.temperature = temperature
 
     def entity_output_func(self, intermediate_output_dict):
         """Context output func."""
@@ -69,9 +68,7 @@ def create_task(args, len_context_tok):
         module_pool=module_pool,
         task_flow=task_flow,
         loss_func=None,
-        output_func=ContextGenOutput(
-            args.model_config.normalize, args.model_config.temperature
-        ).entity_output_func,
+        output_func=ContextGenOutput(args.model_config.normalize).entity_output_func,
         require_prob_for_eval=False,
         require_pred_for_eval=True,
         scorer=Scorer(),

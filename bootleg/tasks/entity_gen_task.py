@@ -12,10 +12,9 @@ from bootleg.task_config import NED_TASK
 class EntityGenOutput:
     """Entity gen for output."""
 
-    def __init__(self, normalize, temperature):
+    def __init__(self, normalize):
         """Entity gen for output initializer."""
         self.normalize = normalize
-        self.temperature = temperature
 
     def entity_output_func(self, intermediate_output_dict):
         """Entity output func."""
@@ -66,9 +65,7 @@ def create_task(args, len_context_tok):
         module_pool=module_pool,
         task_flow=task_flow,
         loss_func=None,
-        output_func=EntityGenOutput(
-            args.model_config.normalize, args.model_config.temperature
-        ).entity_output_func,
+        output_func=EntityGenOutput(args.model_config.normalize).entity_output_func,
         require_prob_for_eval=False,
         require_pred_for_eval=True,
         scorer=Scorer(),
