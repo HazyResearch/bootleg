@@ -40,14 +40,14 @@ Below is the link to download a dump of all entity embeddings from our entity en
 
 | Embeddings               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| 5.8M Wikipedia Entities      | Embeddings from BootlegUncased. | 1.2B | [Download](s3://bootleg-data/models/latest/bootleg_uncased_entity_embeddings.npy.tar.gz) |
+| 5.8M Wikipedia Entities      | Embeddings from BootlegUncased. | 1.2B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_entity_embeddings.npy.tar.gz) |
 
 ### Metadata
 Below is the link to download a dump of all entity metadata to use in our entity profile tutorial [here](https://github.com/HazyResearch/bootleg/blob/master/tutorials/entity_profile_tutorial.ipynb).
 
 | Metadata               | Description                    | Link     |
 |-------------------  |---------------------------------|----------|
-| 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](s3://bootleg-data/models/data/entity_db.tar.gz) |
+| 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/data/entity_db.tar.gz) |
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).
