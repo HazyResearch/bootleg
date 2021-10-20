@@ -23,7 +23,7 @@ Install via
 ```
 git clone git@github.com:HazyResearch/bootleg bootleg
 cd bootleg
-python3 setup.py
+python3 setup.py install
 ```
 
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
