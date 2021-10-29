@@ -378,21 +378,6 @@ class EntityProfile:
             )
         return self._type_systems[type_system].get_all_types()
 
-    def get_type_typeid(self, type, type_system):
-        """Get the type type id for the type of the ``type_system`` system.
-
-        Args:
-            type: type
-            type_system: type system
-
-        Returns: type id
-        """
-        if type_system not in self._type_systems:
-            raise ValueError(
-                f"The type system {type_system} is not one of {self._type_systems.keys()}"
-            )
-        return self._type_systems[type_system].get_type_typeid(type)
-
     @check_qid_exists
     def get_title(self, qid):
         """Get the title of an entity QID.
@@ -674,6 +659,7 @@ class EntityProfile:
                 entity_id=entity_obj["entity_id"],
                 mentions=entity_obj["mentions"],
                 title=entity_obj.get("title", entity_obj["entity_id"]),
+                description=entity_obj.get("description", ""),
                 types=entity_obj.get("types", {}),
                 relations=entity_obj.get("relations", []),
             )
@@ -681,12 +667,12 @@ class EntityProfile:
             print(e.json())
             raise e
         # Update mentions
-        for men in self.get_mentions(ent.entity_id):
-            self._entity_symbols.remove_alias(ent.entity_id, men)
+        for men in list(self.get_mentions(ent.entity_id)):
+            self._entity_symbols.remove_mention(ent.entity_id, men)
         for men in ent.mentions:
             # Lower case mentions for mention extraction
             men = [get_lnrm(men[0], strip=True, lower=True), men[1]]
-            self._entity_symbols.add_alias(ent.entity_id, men)
+            self._entity_symbols.add_mention(ent.entity_id, *men)
         # Update title
         self._entity_symbols.set_title(ent.entity_id, ent.title)
         # Update types
@@ -698,13 +684,13 @@ class EntityProfile:
                 self._type_systems[type_sys].add_type(ent.entity_id, typename)
         # Update KG
         if self._kg_symbols is not None:
-            for rel in self._kg_symbols.get_relations(ent.entity_id):
-                for qid2 in self._kg_symbols.get_connections_by_relation(
-                    ent.entity_id, rel
-                ):
-                    self._kg_symbols.remove_kg(ent.entity_id, rel, qid2)
+            for rel, qid2_list in list(
+                self._kg_symbols.get_all_connections(ent.entity_id).items()
+            ):
+                for qid2 in qid2_list:
+                    self._kg_symbols.remove_relation(ent.entity_id, rel, qid2)
             for rel_pair in ent.relations:
-                self._kg_symbols.add_kg(
+                self._kg_symbols.add_relation(
                     ent.entity_id, rel_pair["relation"], rel_pair["object"]
                 )
 

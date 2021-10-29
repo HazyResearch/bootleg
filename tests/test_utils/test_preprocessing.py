@@ -83,7 +83,6 @@ class PreprocessingUtils(unittest.TestCase):
         ] * 100
 
         self.write_data(in_file, data)
-
         os.system(
             f"python3 bootleg/utils/preprocessing/compute_statistics.py "
             f"--data_dir {self.test_dir.name} "

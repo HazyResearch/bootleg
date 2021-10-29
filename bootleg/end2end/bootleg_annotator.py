@@ -8,23 +8,20 @@ from pathlib import Path
 import emmental
 import numpy as np
 import torch
-import ujson
 from emmental.model import EmmentalModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from bootleg.dataset import extract_context_windows, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
-from bootleg.end2end.extract_mentions import (
-    find_aliases_in_sentence_tag,
-    get_all_aliases,
-)
+from bootleg.end2end.extract_mentions import find_aliases_in_sentence_tag
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
+from bootleg.symbols.type_symbols import TypeSymbols
 from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
-from bootleg.utils.data_utils import read_in_relations, read_in_types
+from bootleg.utils.data_utils import read_in_relations
 from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
@@ -136,7 +133,6 @@ class BootlegAnnotator(object):
         device: model device, -1 for CPU (default None)
         min_alias_len: minimum alias length (default 1)
         max_alias_len: maximum alias length (default 6)
-        cand_map: alias candidate map (default None)
         threshold: probability threshold (default 0.0)
         cache_dir: cache directory (default None)
         model_name: model name (default None)
@@ -151,7 +147,6 @@ class BootlegAnnotator(object):
         device=None,
         min_alias_len=1,
         max_alias_len=6,
-        cand_map=None,
         threshold=0.0,
         cache_dir=None,
         model_name=None,
@@ -239,22 +234,28 @@ class BootlegAnnotator(object):
                 self.config.data_config.entity_dir,
                 self.config.data_config.entity_map_dir,
             ),
-            alias_cand_map_file=self.config.data_config.alias_cand_map,
-            alias_idx_file=self.config.data_config.alias_idx_map,
+            alias_cand_map_fld=self.config.data_config.alias_cand_map,
+            alias_idx_fld=self.config.data_config.alias_idx_map,
         )
+        self.all_aliases_trie = self.entity_db.get_allalias_vocabtrie()
 
         add_entity_type = self.config.data_config.entity_type_data.use_entity_types
-        self.qid2typenames = {}
+        self.type_symbols = None
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
         if add_entity_type and self.entity_emb_file is None:
-            logger.debug("Reading entity type data")
-            self.qid2typenames = read_in_types(self.config.data_config, self.entity_db)
+            logger.debug("Reading entity type database")
+            self.type_symbols = TypeSymbols.load_from_cache(
+                os.path.join(
+                    self.config.data_config.entity_dir,
+                    self.config.data_config.entity_type_data.type_symbols_dir,
+                )
+            )
 
         add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
         self.qid2relations = {}
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
         if add_entity_kg and self.entity_emb_file is None:
-            logger.debug("Reading entity kg data")
+            logger.debug("Reading entity kg database")
             self.qid2relations = read_in_relations(
                 self.config.data_config, self.entity_db
             )
@@ -291,13 +292,6 @@ class BootlegAnnotator(object):
         ), "Must have a model to load in the model_path for the BootlegAnnotator"
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
-        if cand_map is None:
-            alias_map = self.entity_db.get_alias2qids()
-        else:
-            logger.debug("Loading candidate map")
-            alias_map = ujson.load(open(cand_map))
-
-        self.all_aliases_trie = get_all_aliases(alias_map, verbose)
 
     def extract_mentions(self, text, label_func):
         """Mention extraction wrapper.
@@ -690,7 +684,7 @@ class BootlegAnnotator(object):
             constants,
             self.entity_db,
             self.qid2relations,
-            self.qid2typenames,
+            self.type_symbols,
         )
         inputs = self.tokenizer(
             ent_str,

@@ -1,14 +1,16 @@
 """Entity symbols."""
 import logging
 import os
+import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional, Union
 
-import marisa_trie
 from tqdm import tqdm
 
 import bootleg.utils.utils as utils
 from bootleg.symbols.constants import edit_op
+from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
 
 logger = logging.getLogger(__name__)
 
@@ -18,57 +20,109 @@ class EntitySymbols:
 
     def __init__(
         self,
-        alias2qids: Dict[str, list],
+        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
         qid2title: Dict[str, str],
-        qid2desc: Dict[str, str] = None,
-        qid2eid: Optional[Dict[str, int]] = None,
-        alias2id: Optional[Dict[str, int]] = None,
+        qid2desc: Union[Dict[str, str]] = None,
+        qid2eid: Optional[VocabularyTrie] = None,
+        alias2id: Optional[VocabularyTrie] = None,
         max_candidates: int = 30,
-        alias_cand_map_file: str = "alias2qids.json",
-        alias_idx_file: str = "alias2id.json",
+        alias_cand_map_fld: str = "alias2qids",
+        alias_idx_fld: str = "alias2id",
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
         """Entity symbols initializer."""
         # We support different candidate mappings for the same set of entities
-        self.alias_cand_map_file = alias_cand_map_file
-        self.alias_idx_file = alias_idx_file
+        self.alias_cand_map_fld = alias_cand_map_fld
+        self.alias_idx_fld = alias_idx_fld
         self.max_candidates = max_candidates
         self.edit_mode = edit_mode
         self.verbose = verbose
-        # Used if we need to do any string searching for aliases. This keep track of
-        # the largest n-gram needed.
-        self._alias2qids: Dict[str, list] = alias2qids
-        self._qid2title: Dict[str, str] = qid2title
-        self._qid2desc: Dict[str, str] = qid2desc
-        # Add empty description for entities
-        if self._qid2desc is not None:
-            for qid in self._qid2title:
-                if qid not in self._qid2desc:
-                    self._qid2desc[qid] = ""
-        # Sort by score and filter to max candidates
-        self._sort_alias_cands()
-        for al in list(self._alias2qids.keys()):
-            self._alias2qids[al] = self._alias2qids[al][: self.max_candidates]
 
         if qid2eid is None:
-            # Add 1 for the noncand class
-            # If we load stuff up in self.load() and regenerate these,
-            # the eid values may be nondeterministic
-            self._qid2eid: Dict[str, int] = {v: i + 1 for i, v in enumerate(qid2title)}
-        else:
-            self._qid2eid = qid2eid
-
-        # Keep an index for each alias
+            # +1 as 0 is reserved for not-in-cand list entity
+            qid2eid = {q: i + 1 for i, q in enumerate(qid2title.keys())}
         if alias2id is None:
-            self._alias2id: Dict[str, int] = {
-                v: i for i, v in enumerate(sorted(self._alias2qids.keys()))
-            }
-        else:
-            self._alias2id = alias2id
+            alias2id = {a: i for i, a in enumerate(alias2qids.keys())}
 
-        self._id2alias: Dict[int, str] = {id: al for al, id in self._alias2id.items()}
-        self._eid2qid: Dict[int, str] = {eid: qid for qid, eid in self._qid2eid.items()}
+        # If edit mode is ON, we must load everything as a dictionary
+        if self.edit_mode:
+            self._load_edit_mode(
+                alias2qids,
+                qid2title,
+                qid2desc,
+                qid2eid,
+                alias2id,
+            )
+        else:
+            self._load_non_edit_mode(
+                alias2qids,
+                qid2title,
+                qid2desc,
+                qid2eid,
+                alias2id,
+            )
+
+        # This assumes that eid of 0 is NO_CAND and eid of -1 is NULL entity; neither are in dict
+        self.num_entities = len(self._qid2eid)
+        self.num_entities_with_pad_and_nocand = self.num_entities + 2
+
+    def _load_edit_mode(
+        self,
+        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
+        qid2title: Dict[str, str],
+        qid2desc: Union[Dict[str, str]],
+        qid2eid: Union[Dict[str, int], VocabularyTrie],
+        alias2id: Union[Dict[str, int], VocabularyTrie],
+    ):
+        """Load in edit mode.
+
+        Loading in edit mode requires all inputs be cast to dictionaries. Tries do not allow value changes.
+        """
+        # Convert to dict for editing
+        if isinstance(alias2qids, VocabularyPairedListTrie):
+            alias2qids = alias2qids.to_dict()
+
+        self._alias2qids: Union[Dict[str, list], VocabularyPairedListTrie] = alias2qids
+        self._qid2title: Dict[str, str] = qid2title
+        self._qid2desc: Dict[str, str] = qid2desc
+
+        # Sort by score and filter to max candidates
+        self._sort_alias_cands(
+            self._alias2qids, truncate=True, max_cands=self.max_candidates
+        )
+
+        # Cast to dicts in edit mode
+        if isinstance(qid2eid, VocabularyTrie):
+            self._qid2eid: Union[Dict[str, int], VocabularyTrie] = qid2eid.to_dict()
+        else:
+            self._qid2eid: Union[Dict[str, int], VocabularyTrie] = qid2eid
+
+        if isinstance(alias2id, VocabularyTrie):
+            self._alias2id: Union[Dict[str, int], VocabularyTrie] = alias2id.to_dict()
+        else:
+            self._alias2id: Union[Dict[str, int], VocabularyTrie] = alias2id
+
+        # Generate reverse indexes for fast editing
+        self._id2alias: Union[Dict[int, str], Callable[[int], str]] = {
+            id: al for al, id in self._alias2id.items()
+        }
+        self._eid2qid: Union[Dict[int, str], Callable[[int], str]] = {
+            eid: qid for qid, eid in self._qid2eid.items()
+        }
+
+        self._qid2aliases: Union[Dict[str, set], None] = {}
+        for al in tqdm(
+            self._alias2qids,
+            total=len(self._alias2qids),
+            desc="Building edit mode objs",
+            disable=not self.verbose,
+        ):
+            for qid_pair in self._alias2qids[al]:
+                if qid_pair[0] not in self._qid2aliases:
+                    self._qid2aliases[qid_pair[0]] = set()
+                self._qid2aliases[qid_pair[0]].add(al)
+
         assert len(self._qid2eid) == len(self._eid2qid), (
             "The qid2eid mapping is not invertable. "
             "This means there is a duplicate id value."
@@ -77,29 +131,75 @@ class EntitySymbols:
         assert (
             0 not in self._eid2qid
         ), "0 can't be an eid. It's reserved for null candidate"
-        # this assumes that eid of 0 is NO_CAND and eid of -1 is NULL entity
-        self.num_entities = len(self._qid2eid)
-        self.num_entities_with_pad_and_nocand = self.num_entities + 2
+
         # For when we need to add new entities
         self.max_eid = max(self._eid2qid.keys())
         self.max_alid = max(self._id2alias.keys())
-        self._qid2aliases = None
-        self._alias_trie = None
-        if self.edit_mode:
-            self._qid2aliases = {}
-            for al in tqdm(
-                self._alias2qids,
-                total=len(self._alias2qids),
-                desc="Building edit mode objs",
-                disable=not verbose,
-            ):
-                for qid_pair in self._alias2qids[al]:
-                    if qid_pair[0] not in self._qid2aliases:
-                        self._qid2aliases[qid_pair[0]] = set()
-                    self._qid2aliases[qid_pair[0]].add(al)
+
+    def _load_non_edit_mode(
+        self,
+        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
+        qid2title: Dict[str, str],
+        qid2desc: Union[Dict[str, str]],
+        qid2eid: Optional[VocabularyTrie],
+        alias2id: Optional[VocabularyTrie],
+    ):
+        """Load items in read-only Trie mode."""
+        # Convert to record trie
+        st = time.time()
+        if isinstance(alias2qids, dict):
+            self._sort_alias_cands(
+                alias2qids, truncate=True, max_cands=self.max_candidates
+            )
+            alias2qids = VocabularyPairedListTrie(
+                input_dict=alias2qids,
+                vocabulary=qid2title,
+                max_value=self.max_candidates,
+            )
+        print(f"Time for creating alias trie {time.time() - st}")
+
+        self._alias2qids: Union[Dict[str, list], VocabularyPairedListTrie] = alias2qids
+        self._qid2title: Dict[str, str] = qid2title
+        self._qid2desc: Dict[str, str] = qid2desc
+
+        st = time.time()
+        # Convert to Tries for non edit mode
+        if isinstance(qid2eid, dict):
+            self._qid2eid: Union[Dict[str, int], VocabularyTrie] = VocabularyTrie(
+                input_dict=qid2eid
+            )
         else:
-            # generate trie of aliases for quick entity generation in sentences
-            self._alias_trie = marisa_trie.Trie(self._alias2qids.keys())
+            self._qid2eid: Union[Dict[str, int], VocabularyTrie] = qid2eid
+
+        if isinstance(alias2id, dict):
+            self._alias2id: Union[Dict[str, int], VocabularyTrie] = VocabularyTrie(
+                input_dict=alias2id
+            )
+        else:
+            self._alias2id: Union[Dict[str, int], VocabularyTrie] = alias2id
+        print(f"Time for creating vocab trie {time.time() - st}")
+
+        st = time.time()
+        # Make reverse functions for each of use
+        self._id2alias: Union[
+            Dict[int, str], Callable[[int], str]
+        ] = lambda x: self._alias2id.get_key(x)
+        self._eid2qid: Union[
+            Dict[int, str], Callable[[int], str]
+        ] = lambda x: self._qid2eid.get_key(x)
+        print(f"Time for iterating indexes {time.time() - st}")
+
+        self._qid2aliases: Union[Dict[str, set], None] = None
+
+        assert not self._qid2eid.is_value_in_trie(
+            0
+        ), "0 can't be an eid. It's reserved for null candidate"
+
+        # For when we need to add new entities
+        st = time.time()
+        self.max_eid = self._qid2eid.get_max_id()
+        self.max_alid = self._alias2id.get_max_id()
+        print(f"Time for max {time.time() - st}")
 
     def save(self, save_dir):
         """Dump the entity symbols.
@@ -107,7 +207,6 @@ class EntitySymbols:
         Args:
             save_dir: directory string to save
         """
-        self._sort_alias_cands()
         utils.ensure_dir(save_dir)
         utils.dump_json_file(
             filename=os.path.join(save_dir, "config.json"),
@@ -116,10 +215,29 @@ class EntitySymbols:
                 "datetime": str(datetime.now()),
             },
         )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, self.alias_cand_map_file),
-            contents=self._alias2qids,
-        )
+        # If in edit mode, must convert back to tris for saving
+        if isinstance(self._alias2qids, dict):
+            alias2qids = VocabularyPairedListTrie(
+                input_dict=self._alias2qids,
+                vocabulary=self._qid2title,
+                max_value=self.max_candidates,
+            )
+            alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_fld))
+        else:
+            self._alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_fld))
+
+        if isinstance(self._alias2id, dict):
+            alias2id = VocabularyTrie(input_dict=self._alias2id)
+            alias2id.dump(os.path.join(save_dir, self.alias_idx_fld))
+        else:
+            self._alias2id.dump(os.path.join(save_dir, self.alias_idx_fld))
+
+        if isinstance(self._qid2eid, dict):
+            qid2eid = VocabularyTrie(input_dict=self._qid2eid)
+            qid2eid.dump(os.path.join(save_dir, "qid2eid"))
+        else:
+            self._qid2eid.dump(os.path.join(save_dir, "qid2eid"))
+
         utils.dump_json_file(
             filename=os.path.join(save_dir, "qid2title.json"), contents=self._qid2title
         )
@@ -128,20 +246,13 @@ class EntitySymbols:
                 filename=os.path.join(save_dir, "qid2desc.json"),
                 contents=self._qid2desc,
             )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, "qid2eid.json"), contents=self._qid2eid
-        )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, self.alias_idx_file),
-            contents=self._alias2id,
-        )
 
     @classmethod
     def load_from_cache(
         cls,
         load_dir,
-        alias_cand_map_file="alias2qids.json",
-        alias_idx_file="alias2id.json",
+        alias_cand_map_fld="alias2qids",
+        alias_idx_fld="alias2id",
         edit_mode=False,
         verbose=False,
     ):
@@ -149,30 +260,50 @@ class EntitySymbols:
 
         Args:
             load_dir: directory to load from
-            alias_cand_map_file: alias2qid file
-            alias_idx_file: alias2id file
+            alias_cand_map_fld: alias2qid file
+            alias_idx_fld: alias2id file
             edit_mode: edit mode flag
             verbose: verbose flag
         """
         config = utils.load_json_file(filename=os.path.join(load_dir, "config.json"))
         max_candidates = config["max_candidates"]
-        alias2qids: Dict[str, list] = utils.load_json_file(
-            filename=os.path.join(load_dir, alias_cand_map_file)
-        )
+        # For backwards compatibility, check if folder exists - if not, load from json
+        # Future versions will assume folders exist
+        st = time.time()
+        alias_load_dir = os.path.join(load_dir, alias_cand_map_fld)
+        if not os.path.exists(alias_load_dir):
+            alias2qids: Dict[str, list] = utils.load_json_file(
+                filename=os.path.join(load_dir, "alias2qids.json")
+            )
+        else:
+            alias2qids: VocabularyPairedListTrie = VocabularyPairedListTrie(
+                load_dir=alias_load_dir
+            )
+        print(f"Time to load alias {time.time() - st}")
+        st = time.time()
+        alias_id_load_dir = os.path.join(load_dir, alias_idx_fld)
+        alias2id = None
+        if os.path.exists(alias_id_load_dir):
+            alias2id: VocabularyTrie = VocabularyTrie(load_dir=alias_id_load_dir)
+        print(f"Time to load aliasid {time.time() - st}")
+        st = time.time()
+        eid_load_dir = os.path.join(load_dir, "qid2eid")
+        qid2eid = None
+        if os.path.exists(eid_load_dir):
+            qid2eid: VocabularyTrie = VocabularyTrie(load_dir=eid_load_dir)
+        print(f"Time to load qideid {time.time() - st}")
+        st = time.time()
         qid2title: Dict[str, str] = utils.load_json_file(
             filename=os.path.join(load_dir, "qid2title.json")
         )
+        print(f"Time to load alias {time.time() - st}")
+        st = time.time()
         qid2desc = None
         if os.path.exists(os.path.join(load_dir, "qid2desc.json")):
             qid2desc: Dict[str, str] = utils.load_json_file(
                 filename=os.path.join(load_dir, "qid2desc.json")
             )
-        qid2eid: Dict[str, int] = utils.load_json_file(
-            filename=os.path.join(load_dir, "qid2eid.json")
-        )
-        alias2id: Dict[str, int] = utils.load_json_file(
-            filename=os.path.join(load_dir, alias_idx_file)
-        )
+        print(f"Time to load desc {time.time() - st}")
         return cls(
             alias2qids,
             qid2title,
@@ -180,29 +311,37 @@ class EntitySymbols:
             qid2eid,
             alias2id,
             max_candidates,
-            alias_cand_map_file,
-            alias_idx_file,
+            alias_cand_map_fld,
+            alias_idx_fld,
             edit_mode,
             verbose,
         )
 
-    def _sort_alias_cands(self):
-        """Sort the candidates for each alias from largest to smallest score."""
-        for alias in self._alias2qids:
+    def _sort_alias_cands(
+        self, alias2qids: Dict[str, list], truncate: bool = False, max_cands: int = 30
+    ):
+        """Sort the candidates for each alias from largest to smallest score, truncating if desired."""
+        for alias in alias2qids:
             # Add second key for determinism in case of same counts
-            self._alias2qids[alias] = sorted(
-                self._alias2qids[alias], key=lambda x: (x[1], x[0]), reverse=True
+            alias2qids[alias] = sorted(
+                alias2qids[alias], key=lambda x: (x[1], x[0]), reverse=True
             )
+            if truncate:
+                alias2qids[alias] = alias2qids[alias][:max_cands]
+        return alias2qids
 
-    def get_qid2eid(self):
+    def get_qid2eid_dict(self):
         """
         Get the qid2eid mapping.
 
         Returns: Dict qid2eid mapping
         """
-        return self._qid2eid
+        if isinstance(self._qid2eid, dict):
+            return self._qid2eid
+        else:
+            return self._qid2eid.to_dict()
 
-    def get_alias2qids(self):
+    def get_alias2qids_dict(self):
         """
         Get the alias2qids mapping.
 
@@ -210,15 +349,29 @@ class EntitySymbols:
 
         Returns: Dict alias2qids mapping
         """
-        return self._alias2qids
+        if isinstance(self._alias2qids, dict):
+            return self._alias2qids
+        else:
+            return self._alias2qids.to_dict()
 
-    def get_qid2title(self):
+    def get_qid2title_dict(self):
         """
         Get the qid2title mapping.
 
         Returns: Dict qid2title mapping
         """
         return self._qid2title
+
+    def get_allalias_vocabtrie(self):
+        """
+        Get a trie of all aliases.
+
+        Returns: Vocab trie of all aliases.
+        """
+        if isinstance(self._alias2id, VocabularyTrie):
+            return self._alias2id
+        else:
+            return VocabularyTrie(input_dict=self._alias2id)
 
     def get_all_qids(self):
         """
@@ -252,8 +405,10 @@ class EntitySymbols:
 
         Returns: QID string
         """
-        assert id in self._eid2qid
-        return self._eid2qid[id]
+        if isinstance(self._eid2qid, dict):
+            return self._eid2qid[id]
+        else:
+            return self._eid2qid(id)
 
     def alias_exists(self, alias):
         """Check alias existance.
@@ -263,10 +418,10 @@ class EntitySymbols:
 
         Returns: boolean
         """
-        if not self.edit_mode:
-            return alias in self._alias_trie
-        else:
+        if isinstance(self._alias2qids, dict):
             return alias in self._alias2id
+        else:
+            return self._alias2qids.is_key_in_trie(alias)
 
     def qid_exists(self, qid):
         """Check QID existance.
@@ -276,17 +431,10 @@ class EntitySymbols:
 
         Returns: boolean
         """
-        return qid in self._qid2eid
-
-    def eid_exists(self, eid):
-        """Check EID existance.
-
-        Args:
-            alias: EID int
-
-        Returns: boolean
-        """
-        return eid in self._eid2qid[eid]
+        if isinstance(self._qid2eid, dict):
+            return qid in self._qid2eid
+        else:
+            return self._qid2eid.is_key_in_trie(qid)
 
     def get_eid(self, id):
         """Get the QID for the EID.
@@ -296,8 +444,21 @@ class EntitySymbols:
 
         Returns: QID string
         """
-        assert id in self._qid2eid
         return self._qid2eid[id]
+
+    def _get_qid_pairs(self, alias):
+        """Get the qid pairs for an alias.
+
+        Args:
+            alias: alias
+
+        Returns: List of QID pairs
+        """
+        if isinstance(self._alias2qids, dict):
+            qid_pairs = self._alias2qids[alias]
+        else:
+            qid_pairs = self._alias2qids.get_value(alias)
+        return qid_pairs
 
     def get_qid_cands(self, alias, max_cand_pad=False):
         """Get the QID candidates for an alias.
@@ -308,8 +469,8 @@ class EntitySymbols:
 
         Returns: List of QID strings
         """
-        assert alias in self._alias2qids, f"{alias} not in alias2qid mapping"
-        res = [qid_pair[0] for qid_pair in self._alias2qids[alias]]
+        qid_pairs = self._get_qid_pairs(alias)
+        res = [qid_pair[0] for qid_pair in qid_pairs]
         if max_cand_pad:
             res = res + ["-1"] * (self.max_candidates - len(res))
         return res
@@ -323,8 +484,8 @@ class EntitySymbols:
 
         Returns: List of [QID, sort_value]
         """
-        assert alias in self._alias2qids
-        res = self._alias2qids[alias]
+        qid_pairs = self._get_qid_pairs(alias)
+        res = qid_pairs
         if max_cand_pad:
             res = res + ["-1", -1] * (self.max_candidates - len(res))
         return res
@@ -338,8 +499,8 @@ class EntitySymbols:
 
         Returns: List of EID ints
         """
-        assert alias in self._alias2qids
-        res = [self._qid2eid[qid_pair[0]] for qid_pair in self._alias2qids[alias]]
+        qid_pairs = self._get_qid_pairs(alias)
+        res = [self._qid2eid[qid_pair[0]] for qid_pair in qid_pairs]
         if max_cand_pad:
             res = res + [-1] * (self.max_candidates - len(res))
         return res
@@ -352,7 +513,6 @@ class EntitySymbols:
 
         Returns: title string
         """
-        assert id in self._qid2title
         return self._qid2title[id]
 
     def get_desc(self, id):
@@ -385,8 +545,11 @@ class EntitySymbols:
 
         Returns: alias string
         """
-        assert alias_idx in self._id2alias
-        return self._id2alias[alias_idx]
+        if isinstance(self._id2alias, dict):
+            alias = self._id2alias[alias_idx]
+        else:
+            alias = self._id2alias(alias_idx)
+        return alias
 
     # ============================================================
     # EDIT MODE OPERATIONS
@@ -593,7 +756,7 @@ class EntitySymbols:
         self._qid2title[new_qid] = self._qid2title[old_qid]
         del self._qid2title[old_qid]
         # Update qid2desc
-        self._qid2desc[new_qid] = self._qid2desc[old_qid]
+        self._qid2desc[new_qid] = self.get_desc(old_qid)
         del self._qid2desc[old_qid]
         # Update qid2aliases
         self._qid2aliases[new_qid] = self._qid2aliases[old_qid]

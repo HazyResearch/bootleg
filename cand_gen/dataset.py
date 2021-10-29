@@ -117,8 +117,8 @@ def build_and_save_entity_inputs_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_file=data_config.alias_cand_map,
-        alias_idx_file=data_config.alias_idx_map,
+        alias_cand_map_fld=data_config.alias_cand_map,
+        alias_idx_fld=data_config.alias_idx_map,
     )
 
 

@@ -44,13 +44,11 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q567": ["animal", "animall"],
             "Q789": [],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2], "Q789": []}
-        gold_type_vocab = {"animal": 1, "animall": 2, "dog": 3, "drop": 4}
+        gold_type_vocab = {"animal", "animall", "dog", "drop"}
 
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertIsNone(type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
-        self.assertDictEqual(gold_type_vocab, type_symbols._type_vocab)
+        self.assertSetEqual(gold_type_vocab, type_symbols.get_all_types())
 
         max_types = 4
         type_symbols = TypeSymbols(qid2typenames, max_types=max_types, edit_mode=True)
@@ -67,7 +65,7 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345"},
             "drop": {"Q567"},
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
 
     def test_type_load_and_save(self):
@@ -84,11 +82,14 @@ class TypeSymbolsTest(unittest.TestCase):
         type_symbols_2 = TypeSymbols.load_from_cache(self.save_dir, prefix="test")
 
         self.assertEqual(type_symbols_2.max_types, type_symbols.max_types)
-        self.assertDictEqual(type_symbols_2._qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(
+            type_symbols_2.get_qid2typename_dict(), type_symbols.get_qid2typename_dict()
+        )
         self.assertIsNone(type_symbols._typename2qids)
         self.assertIsNone(type_symbols_2._typename2qids)
-        self.assertDictEqual(type_symbols_2._qid2typeid, type_symbols._qid2typeid)
-        self.assertDictEqual(type_symbols_2._type_vocab, type_symbols._type_vocab)
+        self.assertSetEqual(
+            type_symbols_2.get_all_types(), type_symbols.get_all_types()
+        )
 
     def test_type_add_remove_typemap(self):
         """Test type add remove typemap."""
@@ -114,7 +115,6 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q567": ["animal", "animall", "drop"],
             "Q789": ["annnimal"],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2, 4], "Q789": [5]}
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
@@ -122,15 +122,13 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345"},
             "drop": {"Q567"},
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
         # Check that nothing happens with relation pair that doesn't exist and the operation goes through
         type_symbols.remove_type("Q345", "animal")
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
         # Now actually remove something
         type_symbols.remove_type("Q789", "annnimal")
@@ -140,7 +138,6 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q567": ["animal", "animall", "drop"],
             "Q789": [],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2, 4], "Q789": []}
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
@@ -148,9 +145,8 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345"},
             "drop": {"Q567"},
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
         # Add to a full QID where we must replace. We do not bring back the old type if we remove the replace one.
         type_symbols.add_type("Q567", "dog")
@@ -160,7 +156,6 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q567": ["animal", "animall", "dog"],
             "Q789": [],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2, 3], "Q789": []}
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
@@ -168,9 +163,8 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345", "Q567"},
             "drop": set(),
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
         type_symbols.remove_type("Q567", "dog")
         gold_qid2typenames = {
@@ -179,7 +173,6 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q567": ["animal", "animall"],
             "Q789": [],
         }
-        gold_qid2typeid = {"Q123": [1], "Q345": [3], "Q567": [1, 2], "Q789": []}
         gold_typename2qids = {
             "animal": {"Q123", "Q567"},
             "animall": {"Q567"},
@@ -187,9 +180,8 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345"},
             "drop": set(),
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_add_entity(self):
         """Test add entity."""
@@ -211,13 +203,6 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q789": [],
             "Q910": ["annnimal", "animal", "dog"],  # Max types limits new types added
         }
-        gold_qid2typeid = {
-            "Q123": [1],
-            "Q345": [3],
-            "Q567": [1, 2, 4],
-            "Q789": [],
-            "Q910": [5, 1, 3],
-        }
         gold_typename2qids = {
             "animal": {"Q123", "Q567", "Q910"},
             "animall": {"Q567"},
@@ -225,9 +210,8 @@ class TypeSymbolsTest(unittest.TestCase):
             "dog": {"Q345", "Q910"},
             "drop": {"Q567"},
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_reidentify_entity(self):
         """Test reidentiy entity."""
@@ -246,21 +230,14 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q911": ["animal", "animall", "drop"],
             "Q789": [],
         }
-        gold_qid2typeid = {
-            "Q123": [1],
-            "Q345": [3],
-            "Q911": [1, 2, 4],
-            "Q789": [],
-        }
         gold_typename2qids = {
             "animal": {"Q123", "Q911"},
             "animall": {"Q911"},
             "dog": {"Q345"},
             "drop": {"Q911"},
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
     def test_prune_to_entities(self):
         """Test prune to entities."""
@@ -277,19 +254,14 @@ class TypeSymbolsTest(unittest.TestCase):
             "Q123": ["animal"],
             "Q345": ["dog"],
         }
-        gold_qid2typeid = {
-            "Q123": [1],
-            "Q345": [3],
-        }
         gold_typename2qids = {
             "animal": {"Q123"},
             "animall": set(),
             "dog": {"Q345"},
             "drop": set(),
         }
-        self.assertDictEqual(gold_qid2typenames, type_symbols._qid2typenames)
+        self.assertDictEqual(gold_qid2typenames, type_symbols.get_qid2typename_dict())
         self.assertDictEqual(gold_typename2qids, type_symbols._typename2qids)
-        self.assertDictEqual(gold_qid2typeid, type_symbols._qid2typeid)
 
 
 class KGSymbolsTest(unittest.TestCase):
@@ -590,8 +562,7 @@ class EntitySymbolTest(unittest.TestCase):
 
         # the non-candidate class is included in entity_dump
         trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        truealiastrie = {"multi word alias2": 0, "alias1": 1, "alias3": 2, "alias4": 3}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
 
         entity_symbols = EntitySymbols(
             max_candidates=3,
@@ -599,19 +570,15 @@ class EntitySymbolTest(unittest.TestCase):
             qid2title=trueqid2title,
             qid2desc=trueqid2desc,
         )
-        tri_as_dict = {}
-        for k in entity_symbols._alias_trie:
-            tri_as_dict[k] = entity_symbols._alias_trie[k]
 
         self.assertEqual(entity_symbols.max_candidates, 3)
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
-        self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols.get_alias2qids_dict(), truealias2qids)
+        self.assertDictEqual(entity_symbols.get_qid2title_dict(), trueqid2title)
         self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
-        self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
-        self.assertDictEqual(tri_as_dict, truealiastrie)
-        self.assertDictEqual(entity_symbols._alias2id, truealias2id)
+        self.assertDictEqual(entity_symbols.get_qid2eid_dict(), trueqid2eid)
+        self.assertDictEqual(entity_symbols._alias2id.to_dict(), truealias2id)
         self.assertIsNone(entity_symbols._qid2aliases)
 
         # Test load from dump
@@ -622,12 +589,11 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.max_candidates, 3)
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
-        self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
+        self.assertDictEqual(entity_symbols.get_alias2qids_dict(), truealias2qids)
+        self.assertDictEqual(entity_symbols.get_qid2title_dict(), trueqid2title)
         self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
-        self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
-        self.assertDictEqual(tri_as_dict, truealiastrie)
-        self.assertDictEqual(entity_symbols._alias2id, truealias2id)
+        self.assertDictEqual(entity_symbols.get_qid2eid_dict(), trueqid2eid)
+        self.assertDictEqual(entity_symbols._alias2id.to_dict(), truealias2id)
         self.assertIsNone(entity_symbols._qid2aliases)
         shutil.rmtree(temp_save_dir)
 
@@ -695,9 +661,13 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.get_title("Q1"), "alias1")
         self.assertEqual(entity_symbols.get_desc("Q1"), "d alias1")
         self.assertEqual(entity_symbols.get_alias_idx("alias1"), 0)
-        self.assertEqual(entity_symbols.get_alias_from_idx(1), "alias3")
+        self.assertEqual(entity_symbols.get_alias_from_idx(2), "alias3")
         self.assertEqual(entity_symbols.alias_exists("alias3"), True)
         self.assertEqual(entity_symbols.alias_exists("alias5"), False)
+        self.assertDictEqual(
+            entity_symbols.get_allalias_vocabtrie().to_dict(),
+            {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1},
+        )
 
     def test_add_remove_mention(self):
         """Test add remove mention."""
@@ -726,8 +696,7 @@ class EntitySymbolTest(unittest.TestCase):
 
         # the non-candidate class is included in entity_dump
         trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        truealiastrie = {"multi word alias2": 0, "alias1": 1, "alias3": 2, "alias4": 3}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
         truealias2qids = {
             "alias1": [["Q1", 10.0], ["Q4", 6]],
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
@@ -741,19 +710,15 @@ class EntitySymbolTest(unittest.TestCase):
             qid2title=qid2title,
             qid2desc=qid2desc,
         )
-        tri_as_dict = {}
-        for k in entity_symbols._alias_trie:
-            tri_as_dict[k] = entity_symbols._alias_trie[k]
 
         self.assertEqual(entity_symbols.max_candidates, 3)
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
-        self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertDictEqual(entity_symbols._qid2title, qid2title)
+        self.assertDictEqual(entity_symbols.get_alias2qids_dict(), truealias2qids)
+        self.assertDictEqual(entity_symbols.get_qid2title_dict(), qid2title)
         self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
-        self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
-        self.assertDictEqual(tri_as_dict, truealiastrie)
-        self.assertDictEqual(entity_symbols._alias2id, truealias2id)
+        self.assertDictEqual(entity_symbols.get_qid2eid_dict(), trueqid2eid)
+        self.assertDictEqual(entity_symbols._alias2id.to_dict(), truealias2id)
         self.assertIsNone(entity_symbols._qid2aliases)
 
         # Check if fails with edit_mode = False
@@ -787,7 +752,6 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._qid2eid, trueqid2eid)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
 
         # ADD Q2 ALIAS 3
@@ -804,14 +768,13 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
             "alias4": [["Q4", 20], ["Q3", 15.0], ["Q2", 1]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -829,14 +792,13 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
             "alias4": [["Q1", 31.0], ["Q4", 20], ["Q3", 15.0]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -854,14 +816,13 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
             "alias4": [["Q1", 31.0], ["Q4", 20]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -879,14 +840,13 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
             "alias4": [["Q1", 31.0]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -903,14 +863,13 @@ class EntitySymbolTest(unittest.TestCase):
             "multi word alias2": [["Q2", 5.0], ["Q1", 3], ["Q4", 2]],
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 1: "multi word alias2"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 3)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -928,14 +887,13 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q2", 31.0], ["Q1", 30.0]],
             "blias0": [["Q1", 11.0]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "multi word alias2": 3, "blias0": 4}
-        trueid2alias = {0: "alias1", 1: "alias3", 3: "multi word alias2", 4: "blias0"}
+        truealias2id = {"alias1": 0, "alias3": 2, "multi word alias2": 1, "blias0": 4}
+        trueid2alias = {0: "alias1", 2: "alias3", 1: "multi word alias2", 4: "blias0"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 4)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
 
@@ -958,16 +916,34 @@ class EntitySymbolTest(unittest.TestCase):
             "alias3": [["Q1", 30.0], ["Q2", 2]],
             "blias0": [["Q1", 11.0]],
         }
-        truealias2id = {"alias1": 0, "alias3": 1, "multi word alias2": 3, "blias0": 4}
-        trueid2alias = {0: "alias1", 1: "alias3", 3: "multi word alias2", 4: "blias0"}
+        truealias2id = {"alias1": 0, "alias3": 2, "multi word alias2": 1, "blias0": 4}
+        trueid2alias = {0: "alias1", 2: "alias3", 1: "multi word alias2", 4: "blias0"}
 
         self.assertEqual(entity_symbols.max_eid, 4)
         self.assertEqual(entity_symbols.max_alid, 4)
         self.assertDictEqual(entity_symbols._qid2aliases, trueqid2aliases)
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
+
+        # MAKE SURE CHANGES TAKE EFFECT
+        temp_save_dir = "tests/data/entity_loader_test"
+        entity_symbols.save(temp_save_dir)
+        entity_symbols = EntitySymbols.load_from_cache(temp_save_dir)
+
+        self.assertEqual(entity_symbols.max_eid, 4)
+        self.assertEqual(entity_symbols.max_alid, 4)
+        self.assertIsNone(entity_symbols._qid2aliases)
+        self.assertDictEqual(entity_symbols.get_alias2qids_dict(), truealias2qids)
+        self.assertDictEqual(entity_symbols._alias2id.to_dict(), truealias2id)
+        self.assertDictEqual(
+            {
+                entity_symbols.get_alias_idx(a): a
+                for a in entity_symbols.get_all_aliases()
+            },
+            trueid2alias,
+        )
+        shutil.rmtree(temp_save_dir)
 
     def test_add_entity(self):
         """Test add entity."""
@@ -1012,8 +988,8 @@ class EntitySymbolTest(unittest.TestCase):
             "alias4": [["Q4", 20], ["Q3", 15.0], ["Q2", 1]],
         }
         trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
         truemax_eid = 4
         truemax_alid = 3
         truenum_entities = 4
@@ -1026,7 +1002,6 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, qid2title)
         self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
         self.assertEqual(entity_symbols.max_eid, truemax_eid)
@@ -1076,16 +1051,16 @@ class EntitySymbolTest(unittest.TestCase):
         trueqid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4, "Q5": 5}
         truealias2id = {
             "alias1": 0,
-            "alias3": 1,
-            "alias4": 2,
-            "multi word alias2": 3,
+            "alias3": 2,
+            "alias4": 3,
+            "multi word alias2": 1,
             "alias5": 4,
         }
         trueid2alias = {
             0: "alias1",
-            1: "alias3",
-            2: "alias4",
-            3: "multi word alias2",
+            2: "alias3",
+            3: "alias4",
+            1: "multi word alias2",
             4: "alias5",
         }
         truemax_eid = 5
@@ -1098,7 +1073,6 @@ class EntitySymbolTest(unittest.TestCase):
             entity_symbols._eid2qid, {v: i for i, v in trueqid2eid.items()}
         )
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
         self.assertEqual(entity_symbols.max_eid, truemax_eid)
@@ -1152,8 +1126,8 @@ class EntitySymbolTest(unittest.TestCase):
             "alias4": [["Q4", 20], ["Q3", 15.0], ["Q2", 1]],
         }
         trueqid2eid = {"Q7": 1, "Q2": 2, "Q3": 3, "Q4": 4}
-        truealias2id = {"alias1": 0, "alias3": 1, "alias4": 2, "multi word alias2": 3}
-        trueid2alias = {0: "alias1", 1: "alias3", 2: "alias4", 3: "multi word alias2"}
+        truealias2id = {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1}
+        trueid2alias = {0: "alias1", 2: "alias3", 3: "alias4", 1: "multi word alias2"}
         truemax_eid = 4
         truenum_entities = 4
         truenum_entities_with_pad_and_nocand = 6
@@ -1165,7 +1139,6 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, qid2title)
         self.assertDictEqual(entity_symbols._qid2desc, qid2desc)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
         self.assertEqual(entity_symbols.max_eid, truemax_eid)
@@ -1237,7 +1210,6 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertDictEqual(entity_symbols._alias2qids, truealias2qids)
         self.assertDictEqual(entity_symbols._qid2title, trueqid2title)
         self.assertDictEqual(entity_symbols._qid2desc, trueqid2desc)
-        self.assertIsNone(entity_symbols._alias_trie)
         self.assertDictEqual(entity_symbols._alias2id, truealias2id)
         self.assertDictEqual(entity_symbols._id2alias, trueid2alias)
         self.assertEqual(entity_symbols.max_eid, truemax_eid)
@@ -1256,7 +1228,7 @@ class AliasTableTest(unittest.TestCase):
         """Set up."""
         entity_dump_dir = "tests/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols.load_from_cache(
-            entity_dump_dir, alias_cand_map_file="alias2qids.json"
+            entity_dump_dir, alias_cand_map_fld="alias2qids"
         )
         self.config = {
             "data_config": {
@@ -1288,9 +1260,9 @@ class AliasTableTest(unittest.TestCase):
         gold_alias2entity_table = torch.tensor(
             [
                 [0, 1, 4, -1],
+                [0, 2, 1, 4],
                 [0, 1, -1, -1],
                 [0, 4, 3, 2],
-                [0, 2, 1, 4],
                 [0, 4, 3, 2],
                 [0, 4, 3, 2],
                 [0, 4, 3, 2],
@@ -1323,9 +1295,9 @@ class AliasTableTest(unittest.TestCase):
         gold_alias2entity_table = torch.tensor(
             [
                 [1, 4, -1],
+                [2, 1, 4],
                 [1, -1, -1],
                 [4, 3, 2],
-                [2, 1, 4],
                 [4, 3, 2],
                 [4, 3, 2],
                 [4, 3, 2],
@@ -1353,11 +1325,11 @@ class AliasTableTest(unittest.TestCase):
         self.alias_entity_table = AliasEntityTable(
             DottedDict(self.config["data_config"]), self.entity_symbols
         )
-        # idx 0 is multi word alias 2, idx 1 is alias 1
+        # idx 1 is multi word alias 2, idx 0 is alias 1
         actual_indices = self.alias_entity_table.forward(torch.tensor([[[0, 1, -2]]]))
         # 0 is for non-candidate, -1 is for padded value
         expected_tensor = torch.tensor(
-            [[[[0, 1, 4, -1], [0, 1, -1, -1], [-1, -1, -1, -1]]]]
+            [[[[0, 1, 4, -1], [0, 2, 1, 4], [-1, -1, -1, -1]]]]
         )
         assert torch.equal(actual_indices.long(), expected_tensor.long())
 

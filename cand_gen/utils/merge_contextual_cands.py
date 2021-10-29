@@ -318,7 +318,7 @@ def main():
     entity_dump_new = EntitySymbols(
         max_candidates=max_cands,
         alias2qids=final_cand_map,
-        qid2title=entity_dump.get_qid2title(),
+        qid2title=entity_dump.get_qid2title_dict(),
     )
     # Copying over entity_db
     shutil.copytree(

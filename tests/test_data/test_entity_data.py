@@ -9,8 +9,8 @@ from transformers import AutoTokenizer
 from bootleg.dataset import BootlegDataset
 from bootleg.symbols.constants import SPECIAL_TOKENS
 from bootleg.symbols.entity_symbols import EntitySymbols
+from bootleg.symbols.type_symbols import TypeSymbols
 from bootleg.utils import utils
-from bootleg.utils.data_utils import read_in_types
 from bootleg.utils.parser import parser_utils
 
 
@@ -36,8 +36,8 @@ class DataEntityLoader(unittest.TestCase):
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
-            alias_cand_map_file=self.args.data_config.alias_cand_map,
-            alias_idx_file=self.args.data_config.alias_idx_map,
+            alias_cand_map_fld=self.args.data_config.alias_cand_map,
+            alias_idx_fld=self.args.data_config.alias_idx_map,
         )
         self.entity_temp_dir = "tests/data/entity_loader/entity_data_test"
         self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
@@ -92,8 +92,13 @@ class DataEntityLoader(unittest.TestCase):
         }
         """
         qid2typename_gold = {"Q1": ["T1", "T2"], "Q2": ["T3"], "Q3": [], "Q4": ["T2"]}
-        qid2typename = read_in_types(self.args.data_config, self.entity_symbols)
-        self.assertDictEqual(qid2typename, qid2typename_gold)
+        type_symbols = TypeSymbols.load_from_cache(
+            os.path.join(
+                self.args.data_config.entity_dir,
+                self.args.data_config.entity_type_data.type_symbols_dir,
+            )
+        )
+        self.assertDictEqual(type_symbols.get_qid2typename_dict(), qid2typename_gold)
 
     def test_load_type_data_extra_entity(self):
         """
@@ -130,9 +135,13 @@ class DataEntityLoader(unittest.TestCase):
         self.args.data_config.entity_type_data.type_file = "temp_type_mapping.json"
 
         qid2typename_gold = {"Q1": ["T1", "T2"], "Q2": ["T3"], "Q3": [], "Q4": ["T2"]}
-        qid2typename = read_in_types(self.args.data_config, self.entity_symbols)
-
-        self.assertDictEqual(qid2typename, qid2typename_gold)
+        type_symbols = TypeSymbols.load_from_cache(
+            os.path.join(
+                self.args.data_config.entity_dir,
+                self.args.data_config.entity_type_data.type_symbols_dir,
+            )
+        )
+        self.assertDictEqual(type_symbols.get_qid2typename_dict(), qid2typename_gold)
         if os.path.exists(file):
             os.remove(file)
 
@@ -367,8 +376,8 @@ class DataEntityLoader(unittest.TestCase):
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
-            alias_cand_map_file=self.args.data_config.alias_cand_map,
-            alias_idx_file=self.args.data_config.alias_idx_map,
+            alias_cand_map_fld=self.args.data_config.alias_cand_map,
+            alias_idx_fld=self.args.data_config.alias_idx_map,
         )
 
         max_seq_len = 7

@@ -5,15 +5,15 @@ import tempfile
 import unittest
 
 import jsonlines
-import marisa_trie
 import numpy as np
 import torch
 import ujson
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import eval_utils
-from bootleg.utils.eval_utils import check_and_create_alias_cand_trie, write_data_labels
-from bootleg.utils.utils import create_single_item_trie
+from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
+from bootleg.utils.eval_utils import write_data_labels
 
 
 class EntitySymbolsSubclass(EntitySymbols):
@@ -26,9 +26,9 @@ class EntitySymbolsSubclass(EntitySymbols):
         self.max_alias_len = 1
         self._qid2title = {"Q1": "a b c d e", "Q2": "f", "Q3": "dd a b", "Q4": "x y z"}
         self._qid2desc = None
-        self._qid2eid = {"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4}
+        self._qid2eid = VocabularyTrie(input_dict={"Q1": 1, "Q2": 2, "Q3": 3, "Q4": 4})
         self._alias2id = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6}
-        self._alias2qids = {
+        alias2qids = {
             "a": [["Q1", 10.0], ["Q4", 6]],
             "b": [["Q2", 5.0], ["Q1", 3]],
             "c": [["Q1", 30.0], ["Q2", 3]],
@@ -37,11 +37,15 @@ class EntitySymbolsSubclass(EntitySymbols):
             "f": [["Q2", 5.0], ["Q1", 3]],
             "g": [["Q1", 30.0], ["Q2", 3]],
         }
-        self._alias_trie = marisa_trie.Trie(self._alias2qids.keys())
+        self._alias2qids = VocabularyPairedListTrie(
+            input_dict=alias2qids,
+            vocabulary=self._qid2title,
+            max_value=self.max_candidates,
+        )
         self.num_entities = len(self._qid2eid)
         self.num_entities_with_pad_and_nocand = self.num_entities + 2
-        self.alias_cand_map_file = "alias2qids.json"
-        self.alias_idx_file = "alias2qids.json"
+        self.alias_cand_map_fld = "alias2qids"
+        self.alias_idx_fld = "alias2qids"
 
 
 class EvalUtils(unittest.TestCase):
@@ -617,11 +621,9 @@ class EvalUtils(unittest.TestCase):
         num_processes = 2
         # create memmory files for multiprocessing
         trie_candidate_map_folder = tempfile.TemporaryDirectory()
-        trie_qid2eid_file = tempfile.NamedTemporaryFile()
-        create_single_item_trie(
-            entity_symbols.get_qid2eid(), out_file=trie_qid2eid_file.name
-        )
-        check_and_create_alias_cand_trie(trie_candidate_map_folder.name, entity_symbols)
+        trie_qid2eid_folder = tempfile.TemporaryDirectory()
+        entity_symbols._qid2eid.dump(trie_qid2eid_folder.name)
+        entity_symbols._alias2qids.dump(trie_candidate_map_folder.name)
 
         write_data_labels(
             num_processes=num_processes,
@@ -636,7 +638,7 @@ class EvalUtils(unittest.TestCase):
             max_candidates=max_candidates,
             dump_embs=dump_embs,
             trie_candidate_map_folder=trie_candidate_map_folder.name,
-            trie_qid2eid_file=trie_qid2eid_file.name,
+            trie_qid2eid_file=trie_qid2eid_folder.name,
         )
 
         all_lines = []
@@ -666,4 +668,4 @@ class EvalUtils(unittest.TestCase):
         data_file.close()
         trie_candidate_map_folder.cleanup()
         cache_folder.cleanup()
-        trie_qid2eid_file.close()
+        trie_qid2eid_folder.cleanup()

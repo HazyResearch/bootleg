@@ -20,7 +20,8 @@ from tqdm import tqdm
 from bootleg import log_rank_0_debug
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
-from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
+from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
 from bootleg.utils.utils import strip_nan, try_rmtree
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def map_aliases_to_candidates(
 
     Args:
         train_in_candidates: whether the model has a NC entity or not (assumes all gold QIDs are in candidate lists)
-        alias_cand_map: alias -> candidate qids in dict or AliasCandRecordTrie format
+        alias_cand_map: alias -> candidate qids in dict or VocabularyPairedListTrie format
         aliases: list of aliases
 
     Returns: List of lists QIDs
@@ -76,7 +77,7 @@ def map_aliases_to_candidates(
                 cands = ["-1"] * max_candidates
         else:
             if alias_cand_map.is_key_in_trie(al):
-                cands = alias_cand_map.get_value(al, getter=lambda x: x[0])
+                cands = alias_cand_map.get_value(al, keep_score=False)
             else:
                 cands = ["-1"] * max_candidates
         cands = cands + ["-1"] * (max_candidates - len(cands))
@@ -106,7 +107,7 @@ def map_candidate_qids_to_eid(candidate_qids, qid2eid):
                 if isinstance(qid2eid, dict):
                     res_cands.append(qid2eid[q])
                 else:
-                    res_cands.append(qid2eid[q][0][0])
+                    res_cands.append(qid2eid[q])
         res.append(res_cands)
     return res
 
@@ -464,18 +465,14 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
         entity_symbols: entity symbols
     """
     try:
-        AliasCandRecordTrie(load_dir=save_folder)
+        VocabularyPairedListTrie(load_dir=save_folder)
     except FileNotFoundError:
         log_rank_0_debug(
             logger,
             "Creating the alias candidate trie for faster parallel processing. "
             "This is a one time cost",
         )
-        alias_trie = AliasCandRecordTrie(
-            input_dict=entity_symbols.get_alias2qids(),
-            vocabulary=entity_symbols.get_qid2title(),
-            max_value=entity_symbols.max_candidates,
-        )
+        alias_trie = entity_symbols._alias2qids
         alias_trie.dump(save_folder)
     return
 
@@ -549,12 +546,11 @@ def disambig_dump_preds(
         utils.ensure_dir(trie_candidate_map_folder)
         check_and_create_alias_cand_trie(trie_candidate_map_folder, entity_symbols)
         trie_qid2eid_file = os.path.join(
-            entity_prep_dir, "for_dumping_preds", "qid2eid_trie.marisa"
+            entity_prep_dir, "for_dumping_preds", "qid2eid_trie"
         )
         if not os.path.exists(trie_qid2eid_file):
-            utils.create_single_item_trie(
-                entity_symbols.get_qid2eid(), out_file=trie_qid2eid_file
-            )
+            assert isinstance(entity_symbols._qid2eid, VocabularyTrie)
+            entity_symbols._qid2eid.dump(trie_qid2eid_file)
 
     # This is dumping
     disambig_res_dict = {}
@@ -1029,8 +1025,8 @@ def write_data_labels(
             output_file=out_file,
             filt_emb_data=filt_emb_data,
             sental2embid=sental2embid,
-            alias_cand_map=entity_dump.get_alias2qids(),
-            qid2eid=entity_dump.get_qid2eid(),
+            alias_cand_map=entity_dump.get_alias2qids_dict(),
+            qid2eid=entity_dump.get_qid2eid_dict(),
             result_alias_offset=result_alias_offset,
             train_in_cands=train_in_candidates,
             max_cands=max_candidates,
@@ -1150,9 +1146,11 @@ def write_data_labels_initializer(
     global sental2embid_global
     sental2embid_global = utils.load_single_item_trie(sental2embid_file)
     global alias_cand_trie_global
-    alias_cand_trie_global = AliasCandRecordTrie(load_dir=trie_candidate_map_folder)
+    alias_cand_trie_global = VocabularyPairedListTrie(
+        load_dir=trie_candidate_map_folder
+    )
     global qid2eid_global
-    qid2eid_global = utils.load_single_item_trie(trie_qid2eid_file)
+    qid2eid_global = VocabularyTrie(load_dir=trie_qid2eid_file)
     global result_alias_offset_global
     result_alias_offset_global = result_alias_offset
     global train_in_candidates_global

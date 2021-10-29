@@ -1,6 +1,6 @@
 {
     "emmental": {
-        "n_epochs": 6,
+        "n_steps": 5,
         "seed": 1234,
         "lr_scheduler": "linear",
         "lr": 1e-4
@@ -30,8 +30,7 @@
         "entity_type_data": {
             "use_entity_types": false,
             "max_ent_type_len": 10,
-            "type_labels": "type_pred_mapping.json",
-            "type_vocab": "type_pred_vocab.json"
+            "type_symbols_dir": "type_mappings",
         },
         "entity_kg_data": {
             "use_entity_kg": false,

@@ -206,8 +206,8 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_file=config.data_config.alias_cand_map,
-        alias_idx_file=config.data_config.alias_idx_map,
+        alias_cand_map_fld=config.data_config.alias_cand_map,
+        alias_idx_fld=config.data_config.alias_idx_map,
     )
     # Create tasks
     tasks = [NED_TASK]
@@ -405,8 +405,8 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
             output_file=empty_resultfile,
             filt_emb_data=None,
             sental2embid={},
-            alias_cand_map=entity_symbols.get_alias2qids(),
-            qid2eid=entity_symbols.get_qid2eid(),
+            alias_cand_map=entity_symbols.get_alias2qids_dict(),
+            qid2eid=entity_symbols.get_qid2eid_dict(),
             result_alias_offset=total_mentions_seen,
             train_in_cands=config.data_config.train_in_candidates,
             max_cands=entity_symbols.max_candidates,

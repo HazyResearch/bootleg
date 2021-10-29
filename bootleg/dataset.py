@@ -20,8 +20,9 @@ from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.layers.alias_to_ent_encoder import AliasEntityTable
 from bootleg.symbols.constants import ANCHOR_KEY, PAD_ID, STOP_WORDS
 from bootleg.symbols.entity_symbols import EntitySymbols
+from bootleg.symbols.type_symbols import TypeSymbols
 from bootleg.utils import data_utils, utils
-from bootleg.utils.data_utils import read_in_relations, read_in_types
+from bootleg.utils.data_utils import read_in_relations
 
 warnings.filterwarnings(
     "ignore",
@@ -221,7 +222,7 @@ def get_entity_string(
     constants,
     entity_symbols,
     qid2relations,
-    qid2typenames,
+    type_symbols,
 ):
     """
     Get string representation of entity.
@@ -235,7 +236,7 @@ def get_entity_string(
         constants: Dict of constants
         entity_symbols: entity symbols
         qid2relations: Dict of QID to list of relations
-        qid2typenames: Dict of QID to list of types
+        type_symbols: type symbols
 
     Returns: entity strings, number of types over max length, number of relations over max length
     """
@@ -263,7 +264,7 @@ def get_entity_string(
     # Then merge with description text
     if constants["use_types"]:
         type_str, over_len = get_structural_entity_str(
-            qid2typenames.get(qid, []),
+            type_symbols.get_types(qid),
             constants["max_ent_type_len"],
             "[ent_type]",
         )
@@ -569,8 +570,8 @@ def convert_examples_to_features_and_save_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_file=data_config.alias_cand_map,
-        alias_idx_file=data_config.alias_idx_map,
+        alias_cand_map_fld=data_config.alias_cand_map,
+        alias_idx_fld=data_config.alias_idx_map,
     )
     global mmap_file_global
     mmap_file_global = np.memmap(save_dataset_name, dtype=X_storage, mode="r+")
@@ -1001,13 +1002,19 @@ def build_and_save_entity_inputs_initializer(
     data_config,
     save_entity_dataset_name,
     X_entity_storage,
-    qid2typenames_file,
     qid2relations_file,
     tokenizer,
 ):
     """Create entity features multiprocessing initializer."""
-    global qid2typenames_global
-    qid2typenames_global = ujson.load(open(qid2typenames_file))
+    global type_symbols_global
+    if data_config.entity_type_data.use_entity_types:
+        type_symbols_global = TypeSymbols.load_from_cache(
+            load_dir=os.path.join(
+                data_config.entity_dir, data_config.entity_type_data.type_symbols_dir
+            )
+        )
+    else:
+        type_symbols_global = None
     global qid2relations_global
     qid2relations_global = ujson.load(open(qid2relations_file))
     global mmap_entity_file_global
@@ -1021,8 +1028,8 @@ def build_and_save_entity_inputs_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_file=data_config.alias_cand_map,
-        alias_idx_file=data_config.alias_idx_map,
+        alias_cand_map_fld=data_config.alias_cand_map,
+        alias_idx_fld=data_config.alias_idx_map,
     )
 
 
@@ -1044,11 +1051,6 @@ def build_and_save_entity_inputs(
         tokenizer: tokenizer
         entity_symbols: entity symbols
     """
-    add_entity_type = data_config.entity_type_data.use_entity_types
-    qid2typenames = {}
-    if add_entity_type:
-        qid2typenames = read_in_types(data_config, entity_symbols)
-
     add_entity_kg = data_config.entity_kg_data.use_entity_kg
     qid2relations = {}
     if add_entity_kg:
@@ -1099,21 +1101,26 @@ def build_and_save_entity_inputs(
         "print_examples_prep": data_config.print_examples_prep,
     }
     if num_processes == 1:
+        if data_config.entity_type_data.use_entity_types:
+            type_symbols = TypeSymbols.load_from_cache(
+                load_dir=os.path.join(
+                    data_config.entity_dir,
+                    data_config.entity_type_data.type_symbols_dir,
+                )
+            )
+        else:
+            type_symbols = None
         input_qids = list(entity_symbols.get_all_qids())
         num_qids, overflowed = build_and_save_entity_inputs_single(
             input_qids,
             constants,
             memfile,
-            qid2typenames,
+            type_symbols,
             qid2relations,
             tokenizer,
             entity_symbols,
         )
     else:
-        qid2typenames_file = tempfile.NamedTemporaryFile()
-        with open(qid2typenames_file.name, "w") as out_f:
-            ujson.dump(qid2typenames, out_f)
-
         qid2relations_file = tempfile.NamedTemporaryFile()
         with open(qid2relations_file.name, "w") as out_f:
             ujson.dump(qid2relations, out_f)
@@ -1134,7 +1141,6 @@ def build_and_save_entity_inputs(
                 data_config,
                 save_entity_dataset_name,
                 X_entity_storage,
-                qid2typenames_file.name,
                 qid2relations_file.name,
                 tokenizer,
             ],
@@ -1152,7 +1158,6 @@ def build_and_save_entity_inputs(
             cnt += c
             overflowed += overfl
         pool.close()
-        qid2typenames_file.close()
         qid2relations_file.close()
 
     log_rank_0_debug(
@@ -1176,7 +1181,7 @@ def build_and_save_entity_inputs_hlp(input_qids):
         input_qids,
         constants_global,
         mmap_entity_file_global,
-        qid2typenames_global,
+        type_symbols_global,
         qid2relations_global,
         tokenizer_global,
         entitysymbols_global,
@@ -1187,7 +1192,7 @@ def build_and_save_entity_inputs_single(
     input_qids,
     constants,
     memfile,
-    qid2typenames,
+    type_symbols,
     qid2relations,
     tokenizer,
     entity_symbols,
@@ -1201,7 +1206,7 @@ def build_and_save_entity_inputs_single(
             constants,
             entity_symbols,
             qid2relations,
-            qid2typenames,
+            type_symbols,
         )
         inputs = tokenizer(
             ent_str.split(),

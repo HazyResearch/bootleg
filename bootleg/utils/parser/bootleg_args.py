@@ -66,11 +66,11 @@ config_args = {
             "directory where entity json mappings are saved inside entity_dir",
         ),
         "alias_cand_map": (
-            "alias2qids.json",
+            "alias2qids",
             "name of alias candidate map file, should be saved in entity_dir/entity_map_dir",
         ),
         "alias_idx_map": (
-            "alias2id.json",
+            "alias2id",
             "name of alias index map file, should be saved in entity_dir/entity_map_dir",
         ),
         "qid_cnt_map": (
@@ -93,13 +93,9 @@ config_args = {
         "use_entity_desc": (True, "whether to use entity descriptions or not"),
         "entity_type_data": {
             "use_entity_types": (False, "whether to use entity type data"),
-            "type_labels": (
-                "types_coarse.json",
-                "type file from qid to list of type ids or type names",
-            ),
-            "type_vocab": (
-                "vocab_coarse.json",
-                "type vocab file from typename to type id",
+            "type_symbols_dir": (
+                "type_symbols/wiki",
+                "type file from qid to list of type type names",
             ),
             "max_ent_type_len": (20, "max WORD length for type sequence"),
         },

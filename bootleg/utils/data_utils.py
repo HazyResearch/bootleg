@@ -179,57 +179,6 @@ def add_special_tokens(tokenizer):
     tokenizer.add_special_tokens(SPECIAL_TOKENS)
 
 
-def read_in_types(data_config, entitysymbols):
-    """
-    Read in type mappings.
-
-    Reads in type mapping from QID -> list of types ids and converts
-    dictionary of QID -> type names. If type id is type string, we do not
-    convert via vocab mapping.
-
-    Args:
-        data_config: data config
-        entitysymbols: entity symbols
-
-    Returns: dictionary of QID to type names
-    """
-    entity_dir = data_config.entity_dir
-    type_file = data_config.entity_type_data.type_labels
-    type_vocab_file = data_config.entity_type_data.type_vocab
-    type_file = os.path.join(entity_dir, type_file)
-    vocab_file = os.path.join(entity_dir, type_vocab_file)
-    with open(vocab_file, "r") as in_f:
-        vocab = ujson.load(in_f)
-        vocab_inv = {v: k for k, v in vocab.items()}
-        assert len(vocab) == len(vocab_inv), (
-            f"Inverse vocab from {vocab_file} not" f"same length as vocab"
-        )
-    all_type_ids = set(vocab.values())
-    assert (
-        0 not in all_type_ids
-    ), "We assume type indices start at 1. 0 is reserved for UNK type. You have index 0."
-    with open(type_file) as in_f:
-        # take the first type; UNK type is 0
-        qid2typenames = {}
-        for k, v in ujson.load(in_f).items():
-            # Happens if have QIDs that are not in save
-            if not entitysymbols.qid_exists(k):
-                continue
-            mapped_values = []
-            for sub_item in v:
-                if type(sub_item) is int:
-                    sub_item_str = vocab_inv[sub_item]
-                else:
-                    sub_item_str = sub_item
-                mapped_values.append(sub_item_str)
-                assert (
-                    sub_item_str in vocab
-                ), f"Type str {sub_item_str} is not in all types for {vocab_file}."
-            # Store strings as keys for making a Tri later
-            qid2typenames[k] = mapped_values
-    return qid2typenames
-
-
 def read_in_relations(data_config, entitysymbols):
     """
     Read in relation mapping.

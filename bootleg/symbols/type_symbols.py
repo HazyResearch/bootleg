@@ -1,12 +1,27 @@
 """Type symbols class."""
 
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union
 
 from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
+from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
+
+
+def _convert_to_trie(qid2typenames, max_types):
+    all_typenames = set()
+    qid2typenames_filt = {}
+    for q, typs in qid2typenames.items():
+        all_typenames.update(set(typs))
+        qid2typenames_filt[q] = typs[:max_types]
+    qid2typenames_trie = VocabularyPairedListTrie(
+        input_dict=qid2typenames_filt,
+        vocabulary=all_typenames,
+        max_value=max_types,
+    )
+    return qid2typenames_trie
 
 
 class TypeSymbols:
@@ -14,9 +29,7 @@ class TypeSymbols:
 
     def __init__(
         self,
-        qid2typenames: Dict[str, List[str]],
-        qid2typeid: Optional[Dict[str, List[int]]] = None,
-        type_vocab: Optional[Dict[str, int]] = None,
+        qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie],
         max_types: Optional[int] = 10,
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
@@ -27,53 +40,61 @@ class TypeSymbols:
         self.max_types = max_types
         self.edit_mode = edit_mode
         self.verbose = verbose
-        self._qid2typenames: Dict[str, List[str]] = {}
-
-        if type_vocab is None:
-            all_typenames = set(
-                [t for typeset in qid2typenames.values() for t in typeset]
+        if self.edit_mode:
+            self._load_edit_mode(
+                qid2typenames,
             )
-            # +1 to save space for the UNK type
-            self._type_vocab: Dict[str, int] = {
-                v: i + 1 for i, v in enumerate(sorted(all_typenames))
-            }
         else:
-            self._type_vocab: Dict[str, int] = type_vocab
-            assert (
-                0 not in self._type_vocab.values()
-            ), "You can't have a type id that is 0. That is reserved for UNK"
+            self._load_non_edit_mode(
+                qid2typenames,
+            )
 
-        for qid in qid2typenames:
-            self._qid2typenames[qid] = qid2typenames.get(qid, [])[: self.max_types]
-
-        if qid2typeid is None:
-            self._qid2typeid: Dict[str, List[int]] = {
-                qid: list(map(lambda x: self._type_vocab[x], typnames))
-                for qid, typnames in self._qid2typenames.items()
-            }
+    def _load_edit_mode(
+        self, qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie]
+    ):
+        """Load qid to type mappings in edit mode."""
+        if isinstance(qid2typenames, VocabularyPairedListTrie):
+            self._qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = qid2typenames.to_dict(keep_score=False)
         else:
-            self._qid2typeid: Dict[str, List[int]] = qid2typeid
-
-        for typeids in self._qid2typeid.values():
-            assert 0 not in typeids, "Typeids can't be 0. This is reserved for UNK type"
-
-        self._typename2qids = None
-        if edit_mode:
-            self._typename2qids = {}
-            for qid in tqdm(
-                self._qid2typenames,
-                total=len(self._qid2typenames),
-                desc="Building edit mode objs",
-                disable=not verbose,
-            ):
-                for typname in self._qid2typenames[qid]:
-                    if typname not in self._typename2qids:
-                        self._typename2qids[typname] = set()
-                    self._typename2qids[typname].add(qid)
-            # In case extra types in vocab without qids
-            for typname in self._type_vocab:
+            self._qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = {q: typs[: self.max_types] for q, typs in qid2typenames.items()}
+        self._all_typenames: Union[Set[str], None] = set(
+            [t for typeset in self._qid2typenames.values() for t in typeset]
+        )
+        self._typename2qids: Union[Dict[str, set], None] = {}
+        for qid in tqdm(
+            self._qid2typenames,
+            total=len(self._qid2typenames),
+            desc="Building edit mode objs",
+            disable=not self.verbose,
+        ):
+            for typname in self._qid2typenames[qid]:
                 if typname not in self._typename2qids:
                     self._typename2qids[typname] = set()
+                self._typename2qids[typname].add(qid)
+        # In case extra types in vocab without qids
+        for typname in self._all_typenames:
+            if typname not in self._typename2qids:
+                self._typename2qids[typname] = set()
+
+    def _load_non_edit_mode(
+        self, qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie]
+    ):
+        """Load qid to type mappings in non edit mode (read only mode)."""
+        if isinstance(qid2typenames, dict):
+            self._qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = _convert_to_trie(qid2typenames, self.max_types)
+        else:
+            self._qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = qid2typenames
+
+        self._all_typenames: Union[Set[str], None] = None
+        self._typename2qids: Union[Dict[str, set], None] = None
 
     def save(self, save_dir, prefix=""):
         """Dump the type symbols.
@@ -89,18 +110,11 @@ class TypeSymbols:
                 "max_types": self.max_types,
             },
         )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, f"{prefix}qid2typenames.json"),
-            contents=self._qid2typenames,
-        )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, f"{prefix}qid2typeids.json"),
-            contents=self._qid2typeid,
-        )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, f"{prefix}type_vocab.json"),
-            contents=self._type_vocab,
-        )
+        if isinstance(self._qid2typenames, dict):
+            qid2typenames = _convert_to_trie(self._qid2typenames, self.max_types)
+            qid2typenames.dump(os.path.join(save_dir, f"{prefix}qid2typenames"))
+        else:
+            self._qid2typenames.dump(os.path.join(save_dir, f"{prefix}qid2typenames"))
 
     @classmethod
     def load_from_cache(cls, load_dir, prefix="", edit_mode=False, verbose=False):
@@ -116,20 +130,26 @@ class TypeSymbols:
         """
         config = utils.load_json_file(filename=os.path.join(load_dir, "config.json"))
         max_types = config["max_types"]
-        qid2typenames: Dict[str, List[str]] = utils.load_json_file(
-            filename=os.path.join(load_dir, f"{prefix}qid2typenames.json")
-        )
-        qid2typeid: Dict[str, List[int]] = utils.load_json_file(
-            filename=os.path.join(load_dir, f"{prefix}qid2typeids.json")
-        )
-        type_vocab: Dict[str, int] = utils.load_json_file(
-            filename=os.path.join(load_dir, f"{prefix}type_vocab.json")
-        )
-        return cls(qid2typenames, qid2typeid, type_vocab, max_types, edit_mode, verbose)
+        # For backwards compatibility, check if trie directory exists, otherwise load from json
+        type_load_dir = os.path.join(load_dir, f"{prefix}qid2typenames")
+        if not os.path.exists(type_load_dir):
+            qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = utils.load_json_file(
+                filename=os.path.join(load_dir, f"{prefix}qid2typenames.json")
+            )
+        else:
+            qid2typenames: Union[
+                Dict[str, List[str]], VocabularyPairedListTrie
+            ] = VocabularyPairedListTrie(load_dir=type_load_dir, max_value=max_types)
+        return cls(qid2typenames, max_types, edit_mode, verbose)
 
     def get_all_types(self):
         """Return all typenames."""
-        return list(self._type_vocab.keys())
+        if isinstance(self._qid2typenames, dict):
+            return self._all_typenames
+        else:
+            return set(self._qid2typenames.vocab_keys())
 
     def get_types(self, qid):
         """Get the type names associated with the given QID.
@@ -139,28 +159,25 @@ class TypeSymbols:
 
         Returns: list of typename strings
         """
-        types = self._qid2typenames.get(qid, [])
+        if isinstance(self._qid2typenames, dict):
+            types = self._qid2typenames.get(qid, [])
+        else:
+            if self._qid2typenames.is_key_in_trie(qid):
+                # VocabularyPairedListTrie assumes values are list of pairs - we only want type name which is first
+                types = self._qid2typenames.get_value(qid, keep_score=False)
+            else:
+                types = []
         return types
 
-    def get_typeids(self, qid):
-        """Get the type ids associated with the given QID.
+    def get_qid2typename_dict(self):
+        """Return dictionary of qid to typenames.
 
-        Args:
-            qid: QID
-
-        Returns: list of type id ints
+        Returns: Dict of QID to list of typenames.
         """
-        return self._qid2typeid.get(qid, [])
-
-    def get_type_typeid(self, type):
-        """Get the type id associated with the type.
-
-        Args:
-            type: type
-
-        Returns: type id
-        """
-        return self._type_vocab[type]
+        if isinstance(self._qid2typenames, dict):
+            return self._qid2typenames
+        else:
+            return self._qid2typenames.to_dict(keep_score=False)
 
     # ============================================================
     # EDIT MODE OPERATIONS
@@ -174,7 +191,7 @@ class TypeSymbols:
 
         Returns: List
         """
-        if typename not in self._type_vocab:
+        if typename not in self._all_typenames:
             raise ValueError(f"{typename} is not a type in the typesystem")
         # This will not be None as we are in edit mode
         return self._typename2qids.get(typename, [])
@@ -190,22 +207,16 @@ class TypeSymbols:
             qid: QID
             typename: type name
         """
-        if typename not in self._type_vocab:
-            max_type_id = max(self._type_vocab.values()) + 1
-            self._type_vocab[typename] = max_type_id
+        if typename not in self._all_typenames:
+            self._all_typenames.add(typename)
             self._typename2qids[typename] = set()
-        typeid = self._type_vocab[typename]
         # Update qid->type mappings
         if typename not in self._qid2typenames[qid]:
-            assert (
-                typeid not in self._qid2typeid[qid]
-            ), f"Invalid state a typeid is in self._qid2typeid for {typename} and {qid}"
             # Remove last type if too many types
             if len(self._qid2typenames[qid]) >= self.max_types:
                 type_to_remove = self._qid2typenames[qid][-1]
                 self.remove_type(qid, type_to_remove)
             self._qid2typenames[qid].append(typename)
-            self._qid2typeid[qid].append(typeid)
             # As we are in edit mode, self._typename2qids will not be None
             self._typename2qids[typename].add(qid)
         return
@@ -218,20 +229,16 @@ class TypeSymbols:
             qid: QID
             typename: type name to remove
         """
-        if typename not in self._type_vocab:
+        if typename not in self._all_typenames:
             raise ValueError(
                 f"The type {typename} is not in our vocab. We only support adding types in our vocab."
             )
         if typename not in self._qid2typenames[qid]:
             return
         assert (
-            self._type_vocab[typename] in self._qid2typeid[qid]
-        ), f"Invalid state a typeid is in self._qid2typeid for {typename} and {qid}"
-        assert (
             typename in self._typename2qids
         ), f"Invalid state a typename is in self._typename2qids for {typename} and {qid}"
         self._qid2typenames[qid].remove(typename)
-        self._qid2typeid[qid].remove(self._type_vocab[typename])
         # As we are in edit mode, self._typename2qids will not be None
         # Further, we want to keep the typename even if list is empty as our type system doesn't change
         self._typename2qids[typename].remove(qid)
@@ -247,19 +254,15 @@ class TypeSymbols:
             types: list of type names
         """
         for typename in types:
-            if typename not in self._type_vocab:
-                max_type_id = max(self._type_vocab.values()) + 1
-                self._type_vocab[typename] = max_type_id
+            if typename not in self._all_typenames:
+                self._all_typenames.add(typename)
                 self._typename2qids[typename] = set()
         # Add the qid to the qid dicts so we can call the add/remove functions
         self._qid2typenames[qid] = []
-        self._qid2typeid[qid] = []
         for typename in types:
             self._qid2typenames[qid].append(typename)
-            self._qid2typeid[qid].append(self._type_vocab[typename])
         # Cutdown to max types
         self._qid2typenames[qid] = self._qid2typenames[qid][: self.max_types]
-        self._qid2typeid[qid] = self._qid2typeid[qid][: self.max_types]
         # Add to typenames to qids
         for typename in self._qid2typenames[qid]:
             self._typename2qids[typename].add(qid)
@@ -279,9 +282,6 @@ class TypeSymbols:
         # Update qid2typenames
         self._qid2typenames[new_qid] = self._qid2typenames[old_qid]
         del self._qid2typenames[old_qid]
-        # Update qid2typeid
-        self._qid2typeid[new_qid] = self._qid2typeid[old_qid]
-        del self._qid2typeid[old_qid]
         # Update qid2typenames
         for typename in self._qid2typenames[new_qid]:
             self._typename2qids[typename].remove(old_qid)
@@ -297,10 +297,6 @@ class TypeSymbols:
         # Update qid2typenames
         self._qid2typenames = {
             k: v for k, v in self._qid2typenames.items() if k in entities_to_keep
-        }
-        # Update qid2typeid
-        self._qid2typeid = {
-            k: v for k, v in self._qid2typeid.items() if k in entities_to_keep
         }
         # Update qid2typenames, keeping the typenames even if empty lists
         for typename in self._typename2qids:

@@ -247,10 +247,10 @@ def run_model(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_file=config.data_config.alias_cand_map,
-        alias_idx_file=config.data_config.alias_idx_map,
+        alias_cand_map_fld=config.data_config.alias_cand_map,
+        alias_idx_fld=config.data_config.alias_idx_map,
     )
-    qid2eid = entity_symbols.get_qid2eid()
+    qid2eid = entity_symbols.get_qid2eid_dict()
     eid2qid = {v: k for k, v in qid2eid.items()}
     assert len(qid2eid) == len(eid2qid), "Duplicate EIDs detected"
 

@@ -66,16 +66,6 @@ def compute_histograms(save_dir, entity_symbols):
     return
 
 
-def get_all_aliases(alias2qidcands):
-    """Get all aliases."""
-    # Load alias2qids
-    alias2qids = {}
-    for al in tqdm(alias2qidcands):
-        alias2qids[al] = [c[0] for c in alias2qidcands[al]]
-    logging.info(f"Loaded entity save with {len(alias2qids)} aliases.")
-    return list(alias2qids.keys())
-
-
 def get_num_lines(input_src):
     """Get number of lines."""
     # get number of lines
@@ -161,7 +151,7 @@ def compute_occurrences_single(args, max_alias_len=6):
 
 def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_workers=8):
     """Compute statistics."""
-    all_aliases = get_all_aliases(entity_dump._alias2qids)
+    all_aliases = entity_dump.get_all_aliases()
     chunk_file_path = os.path.join(save_dir, "tmp")
     all_aliases_f = os.path.join(chunk_file_path, "all_aliases.json")
     utils.ensure_dir(chunk_file_path)
