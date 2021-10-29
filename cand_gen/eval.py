@@ -9,15 +9,16 @@ from collections import defaultdict
 from copy import copy
 from pathlib import Path
 
+import emmental
 import faiss
 import numpy as np
 import torch
 import ujson
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from rich.progress import track
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_info
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import data_utils
@@ -31,7 +32,6 @@ from cand_gen.data import get_context_dataloader, get_entity_dataloader
 from cand_gen.task_config import CANDGEN_TASK
 from cand_gen.tasks import context_gen_task, entity_gen_task
 from cand_gen.utils.parser.parser_utils import parse_boot_and_emm_args
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +263,9 @@ def run_model(
 
     out_emb_file = entity_embs_path
     if entity_embs_path is None:
+        log_rank_0_info(
+            logger, "Gathering embeddings for all entities. Will save for reuse."
+        )
         preds, _, _ = gen_entity_embeddings(config, context_tokenizer, entity_symbols)
 
         final_out_emb_file = os.path.join(
@@ -282,20 +285,22 @@ def run_model(
     if entity_embs_only:
         return out_emb_file
 
+    log_rank_0_info(logger, "Loading embeddings for cand gen.")
     entity_embs = np.load(out_emb_file)
-
-    print("Feature shape:", entity_embs.shape)
 
     log_rank_0_info(logger, "Building index...")
     if torch.cuda.device_count() > 0 and config["model_config"]["device"] >= 0:
         if config["model_config"]["dataparallel"]:
+            print("DATAPARALLEL FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             faiss_index = faiss.index_cpu_to_all_gpus(faiss_cpu_index)
         else:
+            print("GPU FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             res = faiss.StandardGpuResources()
             faiss_index = faiss.index_cpu_to_gpu(res, 0, faiss_cpu_index)
     else:
+        print("CPU FAISS")
         faiss_index = faiss.IndexFlatIP(entity_embs.shape[-1])
 
     faiss_index.add(entity_embs)
@@ -335,7 +340,8 @@ def run_model(
         # +1 as index will return
         D, Is = faiss_index.search(res["context_features"], topk)
         for j in range(Is.shape[0]):
-            example = context_dataloader.dataset[st + j]
+            # No need to offset by st+j as the range offset is accounted for in dataset
+            example = context_dataloader.dataset[j]
             sent_id = int(example["sent_idx"])
             alias_id = int(example["alias_orig_list_pos"])
             gt_eid = int(example["for_dump_gold_eid"])
@@ -364,7 +370,9 @@ def run_model(
         cnt_k[k] /= total_cnt
     print(cnt_k, total_cnt)
 
-    metrics_file = Path(emmental.Meta.log_path) / "candgen_metrics.txt"
+    # Get test dataset filename
+    file_name = Path(config.data_config.test_dataset.file).stem
+    metrics_file = Path(emmental.Meta.log_path) / f"{file_name}_candgen_metrics.txt"
     write_to_file(
         metrics_file,
         cnt_k,
@@ -381,7 +389,10 @@ def run_model(
         v = sorted(v, key=lambda x: x[1])
         sent2output[sent_id] = v
 
-    candidates_file = Path(emmental.Meta.log_path) / f"{topk}_candidates.jsonl"
+    candidates_file = (
+        Path(emmental.Meta.log_path) / f"{file_name}_{topk}_candidates.jsonl"
+    )
+    log_rank_0_info(logger, f"Saving to {candidates_file}")
     with open(candidates_file, "w") as f:
         for sent_id, list_of_values in sent2output.items():
             sent_ids, alias_ids, gts, cands, probs = list(zip(*list_of_values))

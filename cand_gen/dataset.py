@@ -693,6 +693,7 @@ class CandGenDataset(RangedEmmentalDataset):
         Returns:
           Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
         """
+        index = self.data_range[index]
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         y_dict = {name: label[index] for name, label in self.Y_dict.items()}
 
@@ -981,6 +982,7 @@ class CandGenContextDataset(CandGenDataset):
         Returns:
           Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
         """
+        index = self.data_range[index]
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         return x_dict
 

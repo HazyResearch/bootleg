@@ -38,7 +38,7 @@ class RangedEmmentalDataset(EmmentalDataset):
         if data_range is not None:
             self.data_range = data_range
         else:
-            self.data_range = list(next(iter(self.X_dict.values())))
+            self.data_range = list(range(len(next(iter(self.X_dict.values())))))
 
     def __getitem__(
         self, index: int
@@ -50,7 +50,6 @@ class RangedEmmentalDataset(EmmentalDataset):
         Returns:
           Tuple of x_dict and y_dict
         """
-        print(index, self.data_range[index])
         return super().__getitem__(self.data_range[index])
 
     def __len__(self) -> int:

@@ -39,25 +39,25 @@ def get_arg_parser():
         "--contextual_cand_data",
         type=str,
         default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/files",
-        help="Where files saved",
+        help="Contextual candidate files",
     )
     parser.add_argument(
         "--entity_dump",
         type=str,
-        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/entity_db/entity_mappings",
-        help="Where files saved",
+        default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203/entity_db",
+        help="Entity dump",
     )
     parser.add_argument(
         "--data_dir",
         type=str,
         default="/dfs/scratch0/lorr1/projects/bootleg-data/data/medmentions_0203",
-        help="Where files saved",
+        help="Data files",
     )
     parser.add_argument(
         "--out_subdir",
         type=str,
         default="text",
-        help="Where files saved",
+        help="Save data dir",
     )
     parser.add_argument("--no_add_gold_qid_to_train", action="store_true")
     parser.add_argument("--max_candidates", type=int, default=int(30))
@@ -304,7 +304,7 @@ def main():
             args.no_add_gold_qid_to_train,
             args.max_candidates,
             all_inputs,
-            args.entity_dump,
+            os.path.join(args.entity_dump, "entity_mappings"),
         )
         for al in new_alias2qids:
             assert al not in final_cand_map, f"{al} is already in final_cand_map"
@@ -312,11 +312,19 @@ def main():
             max_cands = max(max_cands, len(final_cand_map[al]))
 
     print("Buidling new entity symbols")
-    entity_dump = EntitySymbols.load_from_cache(load_dir=args.entity_dump)
+    entity_dump = EntitySymbols.load_from_cache(
+        load_dir=os.path.join(args.entity_dump, "entity_mappings")
+    )
     entity_dump_new = EntitySymbols(
         max_candidates=max_cands,
         alias2qids=final_cand_map,
         qid2title=entity_dump.get_qid2title(),
+    )
+    # Copying over entity_db
+    shutil.copytree(
+        os.path.join(args.entity_dump),
+        os.path.join(out_dir, "entity_db"),
+        dirs_exist_ok=True,
     )
     out_dir = os.path.join(out_dir, "entity_db/entity_mappings")
     entity_dump_new.save(out_dir)

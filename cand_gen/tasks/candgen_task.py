@@ -1,13 +1,13 @@
 import torch
 import torch.nn.functional as F
+from emmental.scorer import Scorer
+from emmental.task import EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
 from bootleg.layers.bert_encoder import Encoder
 from bootleg.scorer import BootlegSlicedScorer
 from cand_gen.task_config import CANDGEN_TASK
-from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
 
 
 class DisambigLoss:
@@ -29,7 +29,7 @@ class DisambigLoss:
         score = torch.mm(out, ent_out.t()) / self.temperature
         return F.softmax(score, dim=-1)
 
-    def batch_cands_disambig_loss(self, intermediate_output_dict, Y, active):
+    def batch_cands_disambig_loss(self, intermediate_output_dict, Y):
         """Returns the entity disambiguation loss on prediction heads.
         Args:
             intermediate_output_dict: output dict from the Emmental task flor

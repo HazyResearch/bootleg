@@ -45,7 +45,7 @@ class DisambigLoss:
         )  # Squeeze single alias
         return ret.exp()
 
-    def disambig_loss(self, intermediate_output_dict, Y, active):
+    def disambig_loss(self, intermediate_output_dict, Y):
         """Return the entity disambiguation loss on prediction heads.
 
         Args:
@@ -104,7 +104,7 @@ class DisambigLoss:
         score = torch.mm(out, ent_out.t()) / self.temperature
         return F.softmax(score, dim=-1)
 
-    def batch_cands_disambig_loss(self, intermediate_output_dict, Y, active):
+    def batch_cands_disambig_loss(self, intermediate_output_dict, Y):
         """Return the entity disambiguation loss on prediction heads.
 
         Args:

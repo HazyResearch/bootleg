@@ -247,13 +247,14 @@ class BootlegAnnotator(object):
         self.qid2typenames = {}
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
         if add_entity_type and self.entity_emb_file is None:
-            logger.debug("Reading entity database")
+            logger.debug("Reading entity type data")
             self.qid2typenames = read_in_types(self.config.data_config, self.entity_db)
 
         add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
         self.qid2relations = {}
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
         if add_entity_kg and self.entity_emb_file is None:
+            logger.debug("Reading entity kg data")
             self.qid2relations = read_in_relations(
                 self.config.data_config, self.entity_db
             )

@@ -378,6 +378,21 @@ class EntityProfile:
             )
         return self._type_systems[type_system].get_all_types()
 
+    def get_type_typeid(self, type, type_system):
+        """Get the type type id for the type of the ``type_system`` system.
+
+        Args:
+            type: type
+            type_system: type system
+
+        Returns: type id
+        """
+        if type_system not in self._type_systems:
+            raise ValueError(
+                f"The type system {type_system} is not one of {self._type_systems.keys()}"
+            )
+        return self._type_systems[type_system].get_type_typeid(type)
+
     @check_qid_exists
     def get_title(self, qid):
         """Get the title of an entity QID.
