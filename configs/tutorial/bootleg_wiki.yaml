@@ -35,8 +35,7 @@ data_config:
   context_mask_perc: 0.0
   entity_type_data:
     use_entity_types: true
-    type_labels: type_mappings/wiki/qid2typeids.json
-    type_vocab: type_mappings/wiki/type_vocab.json
+    type_symbols_dir: type_mappings/wiki
   entity_kg_data:
     use_entity_kg: true
     kg_labels: kg_mappings/qid2relations.json

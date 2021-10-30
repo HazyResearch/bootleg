@@ -24,8 +24,7 @@ You control what inputs are added by the following part in the input config. All
         use_entity_desc: true
         entity_type_data:
           use_entity_types: true
-          type_labels: type_mappings/wiki/qid2typeids.json
-          type_vocab: type_mappings/wiki/type_vocab.json
+          type_symbols_dir: type_mappings/wiki
         entity_kg_data:
           use_entity_kg: true
           kg_labels: kg_mappings/qid2relations.json

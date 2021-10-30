@@ -20,7 +20,7 @@ REQUIRED = [
     "emmental @ git+ssh://git@github.com/senwu/emmental.git@master",
     "faiss-cpu>=1.6.8, <1.7.1",
     "jsonlines==2.0.0",
-    "marisa_trie_m==0.7.6",
+    "marisa_trie>=0.7.7, <0.8",
     "mock==4.0.3",
     "nltk>=3.6.4, <4.0.0",
     "notebook>=6.4.1, <7.0.0",
