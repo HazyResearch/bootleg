@@ -217,15 +217,17 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     # Slices are for eval so we only split on test/dev
     slice_splits = [DEV_SPLIT, TEST_SPLIT]
     # If doing eval, only run on test data
-    if mode in ["eval", "dump_preds", "dump_embs"]:
+    if mode in ["eval"]:
         data_splits = [TEST_SPLIT]
         slice_splits = [TEST_SPLIT]
+    elif mode in ["dump_preds", "dump_embs"]:
+        data_splits = [TEST_SPLIT]
+        slice_splits = []
         # We only do dumping if weak labels is True
-        if mode in ["dump_preds", "dump_embs"]:
-            if config.data_config[f"{TEST_SPLIT}_dataset"].use_weak_label is False:
-                raise ValueError(
-                    "When calling dump_preds or dump_embs, we require use_weak_label to be True."
-                )
+        if config.data_config[f"{TEST_SPLIT}_dataset"].use_weak_label is False:
+            raise ValueError(
+                "When calling dump_preds or dump_embs, we require use_weak_label to be True."
+            )
 
     load_entity_data = True
     if mode == "train":
