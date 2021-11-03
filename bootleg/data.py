@@ -50,6 +50,7 @@ def get_dataloaders(
     args,
     tasks,
     use_batch_cands,
+    load_entity_data,
     splits,
     entity_symbols,
     tokenizer,
@@ -60,6 +61,7 @@ def get_dataloaders(
         args: main args
         tasks: task names
         use_batch_cands: whether to use candidates across a batch (train and eval_batch_cands)
+        load_entity_data: whether to load entity data
         splits: data splits to generate dataloaders for
         entity_symbols: entity symbols
 
@@ -80,6 +82,7 @@ def get_dataloaders(
             name="Bootleg",
             dataset=dataset_path,
             use_weak_label=args.data_config[f"{split}_dataset"].use_weak_label,
+            load_entity_data=load_entity_data,
             tokenizer=tokenizer,
             entity_symbols=entity_symbols,
             dataset_threads=args.run_config.dataset_threads,

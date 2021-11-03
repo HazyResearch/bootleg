@@ -227,10 +227,15 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                     "When calling dump_preds or dump_embs, we require use_weak_label to be True."
                 )
 
+    load_entity_data = True
     if mode == "train":
         assert (
             entity_emb_file is None
         ), "We do not accept entity_emb_file when training."
+    else:
+        # If we are doing eval with the entity embeddings, do not create/load entity token data
+        if entity_emb_file is not None:
+            load_entity_data = False
 
     # Batch cands is for training
     use_batch_cands = mode == "train"
@@ -246,6 +251,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         config,
         tasks,
         use_batch_cands,
+        load_entity_data,
         data_splits,
         entity_symbols,
         context_tokenizer,

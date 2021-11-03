@@ -1248,6 +1248,7 @@ class BootlegDataset(EmmentalDataset):
         name: internal dataset name
         dataset: dataset file
         use_weak_label: whether to use weakly labeled mentions or not
+        load_entity_data: whether to load entity data or not
         tokenizer: sentence tokenizer
         entity_symbols: entity database class
         dataset_threads: number of threads to use
@@ -1261,6 +1262,7 @@ class BootlegDataset(EmmentalDataset):
         name,
         dataset,
         use_weak_label,
+        load_entity_data,
         tokenizer,
         entity_symbols,
         dataset_threads,
@@ -1481,36 +1483,39 @@ class BootlegDataset(EmmentalDataset):
             f"_desc{int(data_config.use_entity_desc)}.bin",
         )
         log_rank_0_debug(logger, f"Seeing if {self.save_entity_dataset_name} exists")
-        if data_config.overwrite_preprocessed_data or (
-            not os.path.exists(self.save_entity_dataset_name)
-        ):
-            st_time = time.time()
-            log_rank_0_info(logger, "Building entity data from scatch.")
-            try:
-                # Creating/saving data
-                build_and_save_entity_inputs(
-                    self.save_entity_dataset_name,
-                    self.X_entity_storage,
-                    data_config,
-                    dataset_threads,
-                    tokenizer,
-                    entity_symbols,
-                )
-                log_rank_0_debug(
-                    logger, f"Finished prepping data in {time.time() - st_time}"
-                )
-            except Exception as e:
-                tb = traceback.TracebackException.from_exception(e)
-                logger.error(e)
-                logger.error(traceback.format_exc())
-                logger.error("\n".join(tb.stack.format()))
-                os.remove(self.save_entity_dataset_name)
-                raise
+        if load_entity_data:
+            if data_config.overwrite_preprocessed_data or (
+                not os.path.exists(self.save_entity_dataset_name)
+            ):
+                st_time = time.time()
+                log_rank_0_info(logger, "Building entity data from scatch.")
+                try:
+                    # Creating/saving data
+                    build_and_save_entity_inputs(
+                        self.save_entity_dataset_name,
+                        self.X_entity_storage,
+                        data_config,
+                        dataset_threads,
+                        tokenizer,
+                        entity_symbols,
+                    )
+                    log_rank_0_debug(
+                        logger, f"Finished prepping data in {time.time() - st_time}"
+                    )
+                except Exception as e:
+                    tb = traceback.TracebackException.from_exception(e)
+                    logger.error(e)
+                    logger.error(traceback.format_exc())
+                    logger.error("\n".join(tb.stack.format()))
+                    os.remove(self.save_entity_dataset_name)
+                    raise
 
-        X_entity_dict = self.build_data_entity_dicts(
-            self.save_entity_dataset_name, self.X_entity_storage
-        )
-        self.X_entity_dict = X_entity_dict
+            X_entity_dict = self.build_data_entity_dicts(
+                self.save_entity_dataset_name, self.X_entity_storage
+            )
+            self.X_entity_dict = X_entity_dict
+        else:
+            self.X_entity_dict = None
 
         log_rank_0_debug(logger, "Removing temporary output files")
         shutil.rmtree(temp_output_folder, ignore_errors=True)
@@ -1628,27 +1633,28 @@ class BootlegDataset(EmmentalDataset):
         entity_cand_input_ids = []
         entity_cand_token_type_ids = []
         entity_cand_attention_mask = []
-        # Get the entity token ids
-        for eid in entity_cand_eid:
-            if self.split == "train" and self.popularity_mask:
-                entity_input_ids = self._mask_entity_input_ids(x_dict, eid)
-            else:
-                entity_input_ids = self.X_entity_dict["entity_input_ids"][eid]
-            entity_cand_input_ids.append(entity_input_ids)
-            entity_cand_token_type_ids.append(
-                self.X_entity_dict["entity_token_type_ids"][eid]
+        if self.X_entity_dict is not None:
+            # Get the entity token ids
+            for eid in entity_cand_eid:
+                if self.split == "train" and self.popularity_mask:
+                    entity_input_ids = self._mask_entity_input_ids(x_dict, eid)
+                else:
+                    entity_input_ids = self.X_entity_dict["entity_input_ids"][eid]
+                entity_cand_input_ids.append(entity_input_ids)
+                entity_cand_token_type_ids.append(
+                    self.X_entity_dict["entity_token_type_ids"][eid]
+                )
+                entity_cand_attention_mask.append(
+                    self.X_entity_dict["entity_attention_mask"][eid]
+                )
+            # Create M x K x token length
+            x_dict["entity_cand_input_ids"] = torch.stack(entity_cand_input_ids, dim=0)
+            x_dict["entity_cand_token_type_ids"] = torch.stack(
+                entity_cand_token_type_ids, dim=0
             )
-            entity_cand_attention_mask.append(
-                self.X_entity_dict["entity_attention_mask"][eid]
+            x_dict["entity_cand_attention_mask"] = torch.stack(
+                entity_cand_attention_mask, dim=0
             )
-        # Create M x K x token length
-        x_dict["entity_cand_input_ids"] = torch.stack(entity_cand_input_ids, dim=0)
-        x_dict["entity_cand_token_type_ids"] = torch.stack(
-            entity_cand_token_type_ids, dim=0
-        )
-        x_dict["entity_cand_attention_mask"] = torch.stack(
-            entity_cand_attention_mask, dim=0
-        )
         x_dict["entity_cand_eval_mask"] = entity_cand_eid == -1
         # Handles the index errors with -1 indexing into an embedding
         x_dict["entity_cand_eid"] = torch.where(
