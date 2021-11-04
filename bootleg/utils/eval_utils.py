@@ -427,7 +427,7 @@ def batched_pred_iter(
                 all_finalized_sentences.extend([str(s) for s in finalized_sent_idxs])
                 num_eval_steps = 0
                 log_rank_0_debug(
-                    logger, f"Found {finalized_sent_idxs} sentences...clearing"
+                    logger, f"Found {len(finalized_sent_idxs)} sentences...clearing"
                 )
                 for final_sent_i in finalized_sent_idxs:
                     assert final_sent_i in cur_sentidx2_nummentions
