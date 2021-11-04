@@ -220,7 +220,11 @@ def get_sent_idx2num_mens(data_file):
     sent_idx2row = {}
     total_num_mentions = 0
     with open(data_file) as f:
-        for line in f:
+        for line in tqdm(
+            f,
+            total=sum([1 for _ in open(data_file)]),
+            desc="Getting sentidx2line mapping",
+        ):
             line = ujson.loads(line)
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of
             # aliases)
@@ -282,6 +286,7 @@ def batched_pred_iter(
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
         # print("FINALIZE", cur_sentidx_nummen, [sent_idx2num_mens[str(k)] for k in cur_sentidx_nummen])
+        log_rank_0_debug(logger, f"Collecting {len(cur_sentidx_nummen)} results")
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
                 len(cur_mention_set) <= sent_idx2num_mens[str(sent_idx)]
@@ -421,6 +426,9 @@ def batched_pred_iter(
                 )
                 all_finalized_sentences.extend([str(s) for s in finalized_sent_idxs])
                 num_eval_steps = 0
+                log_rank_0_debug(
+                    logger, f"Found {finalized_sent_idxs} sentences...clearing"
+                )
                 for final_sent_i in finalized_sent_idxs:
                     assert final_sent_i in cur_sentidx2_nummentions
                     del cur_sentidx2_nummentions[final_sent_i]
@@ -644,7 +652,9 @@ def disambig_dump_preds(
     ]
     all_sent_idx = set()
     entity_encoder_str = None
-    for i, (uid, gold, probs, model_pred) in enumerate(zip(*for_iteration)):
+    for i, (uid, gold, probs, model_pred) in tqdm(
+        enumerate(zip(*for_iteration)), desc="Processing model outputs"
+    ):
         # disambig_res_dict["output"] is dict with keys ['_input__alias_orig_list_pos',
         # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train', '_input__subsent_idx', 0, 1]
         if entity_encoder_str is None:
