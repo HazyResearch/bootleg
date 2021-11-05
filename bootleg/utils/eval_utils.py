@@ -17,7 +17,7 @@ import ujson
 from emmental.utils.utils import array_to_numpy, prob_to_pred
 from tqdm import tqdm
 
-from bootleg import log_rank_0_debug
+from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.aliasmention_trie import AliasCandRecordTrie
@@ -538,7 +538,7 @@ def dump_model_outputs(
     """
     # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
     # indices for overflowing sentences)
-    unmerged_entity_emb_file = os.path.join(save_folder, "entity_embs.pt")
+    unmerged_entity_emb_file = os.path.join(save_folder, "example_data.mmap")
     emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
     if dump_embs:
@@ -573,13 +573,25 @@ def dump_model_outputs(
                 ("final_loss_cand_probs", float, K),
             ]
         )
+
+    item_size = np.memmap(
+        unmerged_entity_emb_file,
+        dtype=unmerged_storage_type,
+        mode="w+",
+        shape=(1,),
+    ).nbytes
+    total_expected_size = item_size * len(dataloader.dataset) // 1024 ** 3
+    log_rank_0_info(
+        logger,
+        f"Creating memmap file {unmerged_entity_emb_file}. "
+        f"Expected size is {total_expected_size}GB.",
+    )
     mmap_file = np.memmap(
         unmerged_entity_emb_file,
         dtype=unmerged_storage_type,
         mode="w+",
         shape=(len(dataloader.dataset),),
     )
-    # print("MEMMAP FILE SHAPE", len(disambig_res_dict["uids"]))
     # Init sent_idx to -1 for debugging
     mmap_file[:]["sent_idx"] = -1
     np.save(emb_file_config, unmerged_storage_type, allow_pickle=True)
