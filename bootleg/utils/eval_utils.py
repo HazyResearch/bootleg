@@ -1,5 +1,4 @@
 """Bootleg eval utils."""
-import gc
 import glob
 import logging
 import math
@@ -382,6 +381,12 @@ def batched_pred_iter(
                     # Index 0 -> sent_idx, Index 1 -> subsent_idx, Index 2 -> List of aliases positions
                     # (-1 means no mention in train example)
                     sent_idx = uid_bdict[task_name][ex_idx][0]
+                    if batch_num % 10 == 0 and ex_idx == 0:
+                        log_rank_0_debug(
+                            logger,
+                            f"{batch_num} at sent {sent_idx} MEM "
+                            f"{psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3}",
+                        )
                     # Only increment for NED TASK
                     if task_name == NED_TASK:
                         # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
@@ -442,14 +447,9 @@ def batched_pred_iter(
                         if task_name in out_dict.keys():
                             for action_name in out_dict[task_name].keys():
                                 del out_dict[task_name][action_name][final_sent_i]
-                print(
-                    "PRE COLLECT",
-                    psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3,
-                )
-                gc.collect()
-                print(
-                    "POST COLLECT",
-                    psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3,
+                log_rank_0_debug(
+                    logger,
+                    f"MEM {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3}",
                 )
                 if len(res) > 0:
                     # print("FINALIZED", finalized_sent_idxs)
@@ -659,7 +659,6 @@ def dump_model_outputs(
                 mmap_file[mmap_file_idx]["entity_emb"] = chosen_entity_embs
             mmap_file_idx += 1
         del res_dict
-        gc.collect()
     # for i in range(len(mmap_file)):
     #     si = mmap_file[i]["sent_idx"]
     #     if -1 == si:
