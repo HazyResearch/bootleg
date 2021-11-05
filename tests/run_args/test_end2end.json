@@ -1,6 +1,6 @@
 {
     "emmental": {
-        "n_epochs": 6,
+        "n_steps": 5,
         "seed": 1234,
         "lr_scheduler": "linear",
         "lr": 1e-4

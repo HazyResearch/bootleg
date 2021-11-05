@@ -3,13 +3,11 @@
 import argparse
 import logging
 import os
-import shutil
 import subprocess
 import sys
 from copy import copy
 
 import emmental
-import numpy as np
 import torch
 from emmental.learner import EmmentalLearner
 from emmental.model import EmmentalModel
@@ -23,13 +21,13 @@ from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils, eval_utils, utils
+from bootleg.utils.eval_utils import collect_and_merge_results, dump_model_outputs
 from bootleg.utils.model_utils import count_parameters
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import (
     dump_yaml_file,
     load_yaml_file,
     recurse_redict,
-    try_rmtree,
     write_to_file,
 )
 
@@ -337,7 +335,11 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     assert (
         len(dataloaders) == 1
     ), "We should only have length 1 dataloaders for dump_embs and dump_preds!"
-    final_result_file, final_out_emb_file = None, None
+    result_file, out_emb_file = None, None
+    # Get emmental action output for entity embeddings
+    emm_entity_emb_str = (
+        "entity_encoder_0" if entity_emb_file is None else "entity_encoder_static_0"
+    )
     if config.learner_config.local_rank in [0, -1]:
         # Setup files/folders
         filename = os.path.basename(dataloaders[0].dataset.raw_filename)
@@ -350,110 +352,41 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         )
         log_rank_0_debug(logger, "Done collecting sentence to mention map")
         eval_folder = eval_utils.get_eval_folder(filename)
-        subeval_folder = os.path.join(eval_folder, "batch_results")
-        utils.ensure_dir(subeval_folder)
-        # Will keep track of sentences dumped already. These will only be ones with mentions
-        all_dumped_sentences = set()
-        number_dumped_batches = 0
-        total_mentions_seen = 0
-        all_result_files = []
-        all_out_emb_files = []
-        # Iterating over batches of predictions
-        for res_i, res_dict in enumerate(
-            eval_utils.batched_pred_iter(
-                model,
-                dataloaders[0],
-                config.run_config.eval_accumulation_steps,
-                sentidx2num_mentions,
-            )
-        ):
-            (
-                result_file,
-                out_emb_file,
-                final_sent_idxs,
-                mentions_seen,
-            ) = eval_utils.disambig_dump_preds(
-                res_i,
-                total_mentions_seen,
-                config,
-                res_dict,
-                sentidx2num_mentions,
-                sent_idx2row,
-                subeval_folder,
-                entity_symbols,
-                dump_embs,
-                NED_TASK,
-            )
-            all_dumped_sentences.update(final_sent_idxs)
-            all_result_files.append(result_file)
-            all_out_emb_files.append(out_emb_file)
-            total_mentions_seen += mentions_seen
-            number_dumped_batches += 1
+        utils.ensure_dir(eval_folder)
 
-        # Dump the sentences that had no mentions and were not already dumped
-        # Assert all remaining sentences have no mentions
-        assert all(
-            v == 0
-            for k, v in sentidx2num_mentions.items()
-            if k not in all_dumped_sentences
-        ), (
-            f"Sentences with mentions were not dumped: "
-            f"{[k for k, v in sentidx2num_mentions.items() if k not in all_dumped_sentences]}"
+        saved_dump_memmap, save_dump_memmap_config = dump_model_outputs(
+            model,
+            dataloaders[0],
+            config,
+            sentidx2num_mentions,
+            eval_folder,
+            entity_symbols,
+            dump_embs,
+            NED_TASK,
+            emm_entity_emb_str,
         )
-        empty_sentidx2row = {
-            k: v for k, v in sent_idx2row.items() if k not in all_dumped_sentences
-        }
-        empty_resultfile = eval_utils.get_result_file(
-            number_dumped_batches, subeval_folder
+        log_rank_0_debug(
+            logger,
+            f"Saving intermediate files to {saved_dump_memmap} and {save_dump_memmap_config}",
         )
-        all_result_files.append(empty_resultfile)
-        # Dump the outputs
-        eval_utils.write_data_labels_single(
-            sentidx2row=empty_sentidx2row,
-            output_file=empty_resultfile,
-            filt_emb_data=None,
-            sental2embid={},
-            alias_cand_map=entity_symbols.get_alias2qids(),
-            qid2eid=entity_symbols.get_qid2eid(),
-            result_alias_offset=total_mentions_seen,
-            train_in_cands=config.data_config.train_in_candidates,
-            max_cands=entity_symbols.max_candidates,
-            dump_embs=dump_embs,
+        result_file, out_emb_file, total_mentions_seen = collect_and_merge_results(
+            saved_dump_memmap,
+            save_dump_memmap_config,
+            config,
+            sentidx2num_mentions,
+            sent_idx2row,
+            eval_folder,
+            entity_symbols,
+            dump_embs,
         )
-
         log_rank_0_info(
-            logger, "Finished dumping. Merging results across accumulation steps."
+            logger,
+            f"{total_mentions_seen} mentions seen. Bootleg labels saved at {result_file}",
         )
-        # Final result files for labels and embeddings
-        final_result_file = os.path.join(
-            eval_folder, config.run_config.result_label_file
-        )
-        # Copy labels
-        output = open(final_result_file, "wb")
-        for file in all_result_files:
-            shutil.copyfileobj(open(file, "rb"), output)
-        output.close()
-        log_rank_0_info(logger, f"Bootleg labels saved at {final_result_file}")
         # Try to copy embeddings
         if dump_embs:
-            final_out_emb_file = os.path.join(
-                eval_folder, config.run_config.result_emb_file
-            )
-            log_rank_0_info(
-                logger,
-                f"Trying to merge numpy embedding arrays. "
-                f"If your machine is limited in memory, this may cause OOM errors. "
-                f"Is that happens, result files should be saved in {subeval_folder}.",
-            )
-            all_arrays = []
-            for i, npfile in enumerate(all_out_emb_files):
-                all_arrays.append(np.load(npfile))
-            np.save(final_out_emb_file, np.concatenate(all_arrays))
-            log_rank_0_info(logger, f"Bootleg embeddings saved at {final_out_emb_file}")
-
-        # Cleanup
-        try_rmtree(subeval_folder)
-    return final_result_file, final_out_emb_file
+            log_rank_0_info(logger, f"Bootleg embeddings saved at {out_emb_file}")
+    return result_file, out_emb_file
 
 
 if __name__ == "__main__":

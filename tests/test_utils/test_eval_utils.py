@@ -581,7 +581,6 @@ class EvalUtils(unittest.TestCase):
 
         write_data_labels(
             num_processes=num_processes,
-            result_alias_offset=0,
             merged_entity_emb_file=merged_entity_emb_file.name,
             merged_storage_type=merged_storage_type,
             sent_idx2row=sent_idx2rows,
@@ -625,7 +624,6 @@ class EvalUtils(unittest.TestCase):
 
         write_data_labels(
             num_processes=num_processes,
-            result_alias_offset=0,
             merged_entity_emb_file=merged_entity_emb_file.name,
             merged_storage_type=merged_storage_type,
             sent_idx2row=sent_idx2rows,
