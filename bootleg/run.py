@@ -61,7 +61,7 @@ def parse_cmdline_args():
         "--mode",
         type=str,
         default="train",
-        choices=["train", "eval", "dump_preds", "dump_embs"],
+        choices=["train", "eval", "dump_preds"],
     )
     cli_parser.add_argument(
         "--entity_emb_file",
@@ -190,7 +190,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     Run Emmental Bootleg models.
 
     Args:
-        mode: run mode (train, eval, dump_preds, dump_embs)
+        mode: run mode (train, eval, dump_preds)
         config: parsed model config
         run_config_path: original config path (for saving)
         entity_emb_file: file for dumped entity embeddings
@@ -218,13 +218,13 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     if mode in ["eval"]:
         data_splits = [TEST_SPLIT]
         slice_splits = [TEST_SPLIT]
-    elif mode in ["dump_preds", "dump_embs"]:
+    elif mode in ["dump_preds"]:
         data_splits = [TEST_SPLIT]
         slice_splits = []
         # We only do dumping if weak labels is True
         if config.data_config[f"{TEST_SPLIT}_dataset"].use_weak_label is False:
             raise ValueError(
-                "When calling dump_preds or dump_embs, we require use_weak_label to be True."
+                "When calling dump_preds, we require use_weak_label to be True."
             )
 
     load_entity_data = True
@@ -299,7 +299,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
             model.save(f"{emmental.Meta.log_path}/last_model.pth")
 
     # Multi-gpu DataParallel eval (NOT distributed)
-    if mode in ["eval", "dump_embs", "dump_preds"]:
+    if mode in ["eval", "dump_preds"]:
         # This happens inside EmmentalLearner for training
         if (
             config["learner_config"]["local_rank"] == -1
@@ -329,12 +329,11 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     # If you want detailed dumps, save model outputs
     assert mode in [
         "dump_preds",
-        "dump_embs",
-    ], 'Mode must be "dump_preds" or "dump_embs"'
-    dump_embs = False if mode != "dump_embs" else True
+    ], 'Mode must be "dump_preds"'
+    dump_embs = False
     assert (
         len(dataloaders) == 1
-    ), "We should only have length 1 dataloaders for dump_embs and dump_preds!"
+    ), "We should only have length 1 dataloaders for dump_preds!"
     result_file, out_emb_file = None, None
     # Get emmental action output for entity embeddings
     emm_entity_emb_str = (

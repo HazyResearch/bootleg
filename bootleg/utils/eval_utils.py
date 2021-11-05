@@ -1,4 +1,5 @@
 """Bootleg eval utils."""
+import gc
 import glob
 import logging
 import math
@@ -11,6 +12,7 @@ from collections import defaultdict
 import emmental
 import numpy as np
 import pandas as pd
+import psutil
 import torch
 import torch.nn.functional as F
 import ujson
@@ -440,6 +442,15 @@ def batched_pred_iter(
                         if task_name in out_dict.keys():
                             for action_name in out_dict[task_name].keys():
                                 del out_dict[task_name][action_name][final_sent_i]
+                print(
+                    "PRE COLLECT",
+                    psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3,
+                )
+                gc.collect()
+                print(
+                    "POST COLLECT",
+                    psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3,
+                )
                 if len(res) > 0:
                     # print("FINALIZED", finalized_sent_idxs)
                     yield res
@@ -647,13 +658,14 @@ def dump_model_outputs(
                 # write chosen entity embs to file for contextualized entity embeddings
                 mmap_file[mmap_file_idx]["entity_emb"] = chosen_entity_embs
             mmap_file_idx += 1
-    for i in range(len(mmap_file)):
-        si = mmap_file[i]["sent_idx"]
-        if -1 == si:
-            import pdb
-
-            pdb.set_trace()
-        assert si != -1, f"{i} {mmap_file[i]}"
+        del res_dict
+        gc.collect()
+    # for i in range(len(mmap_file)):
+    #     si = mmap_file[i]["sent_idx"]
+    #     if -1 == si:
+    #         import pdb
+    #         pdb.set_trace()
+    #     assert si != -1, f"{i} {mmap_file[i]}"
     return unmerged_entity_emb_file, emb_file_config
 
 
@@ -887,14 +899,14 @@ def merge_subsentences(
                 ), f"{emb_id} already seen, something went wrong with sub-sentences"
                 seen_ids.add(emb_id)
     filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
-    for i in range(len(filt_emb_data)):
-        si = filt_emb_data[i]["sent_idx"]
-        al_test = filt_emb_data[i]["alias_list_pos"]
-        if si == -1 or al_test == -1:
-            print("BAD", i, filt_emb_data[i])
-            import pdb
-
-            pdb.set_trace()
+    # for i in range(len(filt_emb_data)):
+    #     si = filt_emb_data[i]["sent_idx"]
+    #     al_test = filt_emb_data[i]["alias_list_pos"]
+    #     if si == -1 or al_test == -1:
+    #         print("BAD", i, filt_emb_data[i])
+    #         import pdb
+    #
+    #         pdb.set_trace()
     logging.debug(f"Saw {len(seen_ids)} sentences")
     logging.debug(f"Time to merge sub-sentences {time.time() - start}s")
     return
