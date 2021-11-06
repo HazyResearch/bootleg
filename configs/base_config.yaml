@@ -1,0 +1,79 @@
+emmental:
+  lr: 2e-5
+  n_epochs: 10
+  evaluation_freq: 2.0
+  checkpoint_freq: 1
+  l2: 0.01
+  log_path: BOOTLEG_LOGS_DIR
+  device: 0
+run_config:
+  eval_batch_size: 16
+  dataloader_threads: 8
+  dataset_threads: 8
+  log_level: debug
+  spawn_method: fork
+train_config:
+  batch_size: 16
+model_config:
+  hidden_size: 128
+  num_heads: 16
+  num_model_stages: 2
+  ff_inner_size: 256
+  attn_class: Bootleg
+data_config:
+  data_dir: BOOTLEG_TRAIN_DATA_DIR
+  data_prep_dir: prep
+  emb_dir: BOOTLEG_ENTITYDB_DIR
+  ent_embeddings:
+  - key: learned
+    load_class: LearnedEntityEmb
+    freeze: false
+    cpu: true
+    dropout2d: 0.6
+    args:
+      learned_embedding_size: 128
+  - key: learned_type
+    load_class: LearnedTypeEmb
+    freeze: false
+    args:
+      type_labels: type_mappings/wiki/qid2typeids.json
+      type_vocab: type_mappings/wiki/type_vocab.json
+      max_types: 3
+      type_dim: 128
+      merge_func: addattn
+      attn_hidden_size: 128
+  - key: learned_type_relations
+    load_class: LearnedTypeEmb
+    freeze: false
+    args:
+      type_labels: type_mappings/relations/qid2typeids.json
+      type_vocab: type_mappings/relations/type_vocab.json
+      max_types: 50
+      type_dim: 128
+      merge_func: addattn
+      attn_hidden_size: 128
+  - key: adj_index
+    load_class: KGIndices
+    batch_on_the_fly: true
+    normalize: false
+    args:
+      kg_adj: kg_adj_1129.txt
+  entity_dir: BOOTLEG_ENTITYDB_DIR
+  max_aliases: 10
+  max_seq_len: 100
+  overwrite_preprocessed_data: false
+  dev_dataset:
+    file: dev.jsonl
+    use_weak_label: false
+  test_dataset:
+    file: test.jsonl
+    use_weak_label: false
+  train_dataset:
+    file: train.jsonl
+    use_weak_label: false
+  train_in_candidates: true
+  word_embedding:
+    bert_model: BOOTLEG_BERT_MODEL
+    cache_dir: BOOTLEG_BERT_CACHE_DIR
+    freeze: true
+    layers: 12
