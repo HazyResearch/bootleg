@@ -614,10 +614,10 @@ def dump_model_outputs(
             unmerged_memmap_dir, f"example_data_{res_i}.npy"
         )
         unmerged_memmap_files.append(unmerged_entity_emb_file)
-        data_arr = np.ones(
-            # unmerged_entity_emb_file,
+        data_arr = np.memmap(
+            unmerged_entity_emb_file,
             dtype=unmerged_storage_type,
-            # mode="w+",
+            mode="w+",
             shape=(batch_size,),
         )
         # Init sent_idx to -1 for debugging
@@ -660,7 +660,7 @@ def dump_model_outputs(
                 # write chosen entity embs to file for contextualized entity embeddings
                 data_arr[arr_idx]["entity_emb"] = chosen_entity_embs
             arr_idx += 1
-        np.save(unmerged_entity_emb_file, data_arr)
+        # np.save(unmerged_entity_emb_file, data_arr)
         del data_arr
         del res_dict
     # Merge all memmap files
@@ -688,8 +688,8 @@ def dump_model_outputs(
     )
     memmap_idx = 0
     for file_name in tqdm(unmerged_memmap_files, desc="Iterating over files"):
-        # data_arr = np.memmap(mmap_file_name, dtype=unmerged_storage_type, mode="r")
-        data_arr = np.load(file_name)
+        data_arr = np.memmap(file_name, dtype=unmerged_storage_type, mode="r")
+        # data_arr = np.load(file_name)
         len_data = len(data_arr)
         final_mmap_file[memmap_idx : memmap_idx + len_data] = data_arr[:]
         memmap_idx += len_data
