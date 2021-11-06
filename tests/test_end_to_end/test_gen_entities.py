@@ -63,21 +63,17 @@ class TestGenEntities(unittest.TestCase):
         embs = np.load(out_emb_file)
         assert list(embs.shape) == [6, 32]
 
-        final_result_file, final_out_emb_file = run.run_model(
-            mode="dump_embs", config=self.args, entity_emb_file=out_emb_file
+        final_result_file, _ = run.run_model(
+            mode="dump_preds", config=self.args, entity_emb_file=out_emb_file
         )
 
         lines = [ujson.loads(ln) for ln in open(final_result_file)]
-        embs = np.load(final_out_emb_file)
 
-        final_result_file, final_out_emb_file = run.run_model(
-            mode="dump_embs", config=self.args, entity_emb_file=None
+        final_result_file, _ = run.run_model(
+            mode="dump_preds", config=self.args, entity_emb_file=None
         )
         lines_no_emb_file = [ujson.loads(ln) for ln in open(final_result_file)]
-        embs_no_emb_file = np.load(final_out_emb_file)
         assert len(lines) == len(lines_no_emb_file)
-        assert embs.shape == embs_no_emb_file.shape
-        np.testing.assert_almost_equal(embs, embs_no_emb_file, decimal=6)
 
 
 if __name__ == "__main__":

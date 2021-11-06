@@ -55,14 +55,12 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
+        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
-        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(52)
-        )  # 38 total mentions
-        assert os.path.exists(out_emb_file)
+        assert len([f for li in results for f in li["entity_ids"]]) == 52
+        assert out_emb_file is None
 
     # Doubling up a test here to also test accumulation steps
     def test_end2end_accstep(self):
@@ -82,14 +80,12 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
+        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
-        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(52)
-        )  # 38 total mentions
-        assert os.path.exists(out_emb_file)
+        assert len([f for li in results for f in li["entity_ids"]]) == 52
+        assert out_emb_file is None
 
     # Doubling up a test here to also test greater than 1 eval batch size
     def test_end2end_evalbatch(self):
@@ -110,14 +106,12 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
+        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
-        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(52)
-        )  # 38 total mentions
-        assert os.path.exists(out_emb_file)
+        assert len([f for li in results for f in li["entity_ids"]]) == 52
+        assert out_emb_file is None
 
         shutil.rmtree("tests/temp", ignore_errors=True)
 
@@ -137,14 +131,12 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_embs", config=self.args)
+        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
-        assert set([f for li in results for f in li["ctx_emb_ids"]]) == set(
-            range(52)
-        )  # 38 total mentions
-        assert os.path.exists(out_emb_file)
+        assert len([f for li in results for f in li["entity_ids"]]) == 52
+        assert out_emb_file is None
 
         shutil.rmtree("tests/temp", ignore_errors=True)
 

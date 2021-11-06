@@ -549,8 +549,11 @@ def dump_model_outputs(
     """
     # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
     # indices for overflowing sentences)
-    unmerged_entity_emb_file = os.path.join(save_folder, "example_data.mmap")
-    emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
+    unmerged_memmap_dir = os.path.join(save_folder, "model_outputs_mmap")
+    utils.ensure_dir(unmerged_memmap_dir)
+    unmerged_memmap_files = []
+    final_unmerged_memmap = os.path.join(save_folder, "model_outputs_final.mmap")
+    emb_file_config = os.path.join(unmerged_memmap_dir, "model_outputs_config.npy")
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
     if dump_embs:
         unmerged_storage_type = np.dtype(
@@ -584,33 +587,9 @@ def dump_model_outputs(
                 ("final_loss_cand_probs", float, K),
             ]
         )
-
-    item_size = np.memmap(
-        unmerged_entity_emb_file,
-        dtype=unmerged_storage_type,
-        mode="w+",
-        shape=(1,),
-    ).nbytes
-    total_expected_size = item_size * len(dataloader.dataset) // 1024 ** 3
-    log_rank_0_info(
-        logger,
-        f"Creating memmap file {unmerged_entity_emb_file}. "
-        f"Expected size is {total_expected_size}GB.",
-    )
-    mmap_file = np.memmap(
-        unmerged_entity_emb_file,
-        dtype=unmerged_storage_type,
-        mode="w+",
-        shape=(len(dataloader.dataset),),
-    )
-    # Init sent_idx to -1 for debugging
-    mmap_file[:]["sent_idx"] = -1
     np.save(emb_file_config, unmerged_storage_type, allow_pickle=True)
-    log_rank_0_debug(
-        logger, f"Created file {unmerged_entity_emb_file} to save predictions."
-    )
-    log_rank_0_debug(logger, f"{len(dataloader.dataset)} samples")
-    mmap_file_idx = 0
+
+    log_rank_0_debug(logger, f"Saving temp memmap files at {unmerged_memmap_dir}.")
     for res_i, res_dict in enumerate(
         batched_pred_iter(
             model,
@@ -619,7 +598,20 @@ def dump_model_outputs(
             sentidx2num_mentions,
         )
     ):
+        mmap_file_idx = 0
         batch_size = len(res_dict["uids"][task_name])
+        unmerged_entity_emb_file = os.path.join(
+            unmerged_memmap_dir, f"example_data_{res_i}.mmap"
+        )
+        unmerged_memmap_files.append(unmerged_entity_emb_file)
+        mmap_file = np.memmap(
+            unmerged_entity_emb_file,
+            dtype=unmerged_storage_type,
+            mode="w+",
+            shape=(batch_size,),
+        )
+        # Init sent_idx to -1 for debugging
+        mmap_file[:]["sent_idx"] = -1
         for i in tqdm(range(batch_size), total=batch_size, desc="Saving outputs"):
             # res_dict["output"][task_name] is dict with keys ['_input__alias_orig_list_pos',
             # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train',
@@ -658,14 +650,45 @@ def dump_model_outputs(
                 # write chosen entity embs to file for contextualized entity embeddings
                 mmap_file[mmap_file_idx]["entity_emb"] = chosen_entity_embs
             mmap_file_idx += 1
+        del mmap_file
         del res_dict
+    # Merge all memmap files
+    log_rank_0_info(
+        logger,
+        f"Finished dumping to memmap files. Merging files from {unmerged_memmap_dir} "
+        f"with {len(dataloader.dataset)} samples. Saving to {final_unmerged_memmap}",
+    )
+    item_size = np.memmap(
+        final_unmerged_memmap,
+        dtype=unmerged_storage_type,
+        mode="w+",
+        shape=(1,),
+    ).nbytes
+    total_expected_size = item_size * len(dataloader.dataset) // 1024 ** 3
+    log_rank_0_info(
+        logger,
+        f"Expected size is {total_expected_size}GB.",
+    )
+    final_mmap_file = np.memmap(
+        final_unmerged_memmap,
+        dtype=unmerged_storage_type,
+        mode="w+",
+        shape=(len(dataloader.dataset),),
+    )
+    memmap_idx = 0
+    for mmap_file_name in tqdm(unmerged_memmap_files, desc="Iterating over files"):
+        mmap_file = np.memmap(mmap_file_name, dtype=unmerged_storage_type, mode="r")
+        len_data = len(mmap_file)
+        final_mmap_file[memmap_idx : memmap_idx + len_data] = mmap_file[:]
+        memmap_idx += len_data
+
     # for i in range(len(mmap_file)):
     #     si = mmap_file[i]["sent_idx"]
     #     if -1 == si:
     #         import pdb
     #         pdb.set_trace()
     #     assert si != -1, f"{i} {mmap_file[i]}"
-    return unmerged_entity_emb_file, emb_file_config
+    return final_unmerged_memmap, emb_file_config
 
 
 def collect_and_merge_results(
@@ -776,7 +799,7 @@ def collect_and_merge_results(
 
     out_emb_file = None
     filt_emb_data = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     total_mentions_seen = len(filt_emb_data)
     # save easier-to-use embedding file
@@ -926,7 +949,7 @@ def merge_subsentences_initializer(
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(to_write_file, dtype=to_write_storage, mode="r+")
     global full_pred_data_global
-    full_pred_data_global = np.memmap(to_read_file, dtype=to_read_storage, mode="r+")
+    full_pred_data_global = np.memmap(to_read_file, dtype=to_read_storage, mode="r")
     global sentidx2offset_marisa_global
     sentidx2offset_marisa_global = utils.load_single_item_trie(sentidx2offset_file)
 
@@ -1017,7 +1040,7 @@ def get_sental2embid(merged_entity_emb_file, merged_storage_type):
     Returns: Dict of f"{sent_idx}_{alias_idx}" -> index in merged_entity_emb_file
     """
     filt_emb_data = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     sental2embid = {}
     for i, row in enumerate(filt_emb_data):
@@ -1070,7 +1093,7 @@ def write_data_labels(
     total_input = len(sent_idx2row)
     if num_processes == 1:
         filt_emb_data = np.memmap(
-            merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+            merged_entity_emb_file, dtype=merged_storage_type, mode="r"
         )
         write_data_labels_single(
             sentidx2row=sent_idx2row,
@@ -1189,7 +1212,7 @@ def write_data_labels_initializer(
     """
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     global sental2embid_global
     sental2embid_global = utils.load_single_item_trie(sental2embid_file)
