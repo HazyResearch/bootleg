@@ -393,10 +393,10 @@ def batched_pred_iter(
                             f"Used Mem: {psutil.virtual_memory().used / 1024 ** 3} "
                             f"Perc Used: {psutil.virtual_memory().percent}%",
                         )
-                        if psutil.virtual_memory().percent > 90:
-                            import ipdb
-
-                            ipdb.set_trace()
+                        # if psutil.virtual_memory().percent > 90:
+                        #     import ipdb
+                        #
+                        #     ipdb.set_trace()
                     # Only increment for NED TASK
                     if task_name == NED_TASK:
                         # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
@@ -517,7 +517,7 @@ def get_emb_file(save_folder):
 
     Returns: string
     """
-    return os.path.join(save_folder, "out_emb_file.npy")
+    return os.path.join(save_folder, "bootleg_emb_file.npy")
 
 
 def get_result_file(save_folder):
@@ -528,7 +528,7 @@ def get_result_file(save_folder):
 
     Returns: string
     """
-    return os.path.join(save_folder, "result_label_file.jsonl")
+    return os.path.join(save_folder, "bootleg_labels.jsonl")
 
 
 def dump_model_outputs(
@@ -608,20 +608,20 @@ def dump_model_outputs(
             sentidx2num_mentions,
         )
     ):
-        mmap_file_idx = 0
+        arr_idx = 0
         batch_size = len(res_dict["uids"][task_name])
         unmerged_entity_emb_file = os.path.join(
-            unmerged_memmap_dir, f"example_data_{res_i}.mmap"
+            unmerged_memmap_dir, f"example_data_{res_i}.npy"
         )
         unmerged_memmap_files.append(unmerged_entity_emb_file)
-        mmap_file = np.memmap(
-            unmerged_entity_emb_file,
+        data_arr = np.ones(
+            # unmerged_entity_emb_file,
             dtype=unmerged_storage_type,
-            mode="w+",
+            # mode="w+",
             shape=(batch_size,),
         )
         # Init sent_idx to -1 for debugging
-        mmap_file[:]["sent_idx"] = -1
+        data_arr[:]["sent_idx"] = -1
         for i in tqdm(range(batch_size), total=batch_size, desc="Saving outputs"):
             # res_dict["output"][task_name] is dict with keys ['_input__alias_orig_list_pos',
             # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train',
@@ -636,31 +636,32 @@ def dump_model_outputs(
                 "_input__for_dump_gold_cand_K_idx_train"
             ][i]
             output_embeddings = res_dict["outputs"][task_name][entity_encoder_str][i]
-            mmap_file[mmap_file_idx]["K"] = K
-            mmap_file[mmap_file_idx]["hidden_size"] = config.model_config.hidden_size
-            mmap_file[mmap_file_idx]["sent_idx"] = sent_idx
-            mmap_file[mmap_file_idx]["subsent_idx"] = subsent_idx
-            mmap_file[mmap_file_idx]["alias_list_pos"] = alias_orig_list_pos
+            data_arr[arr_idx]["K"] = K
+            data_arr[arr_idx]["hidden_size"] = config.model_config.hidden_size
+            data_arr[arr_idx]["sent_idx"] = sent_idx
+            data_arr[arr_idx]["subsent_idx"] = subsent_idx
+            data_arr[arr_idx]["alias_list_pos"] = alias_orig_list_pos
             # This will give all aliases seen by the model during training, independent of if it's gold or not
-            mmap_file[mmap_file_idx]["final_loss_true"] = gold_cand_K_idx_train
+            data_arr[arr_idx]["final_loss_true"] = gold_cand_K_idx_train
 
             # get max for each alias, probs is K
             max_probs = res_dict["probs"][task_name][i].max(axis=0)
             pred_cands = res_dict["probs"][task_name][i].argmax(axis=0)
 
-            mmap_file[mmap_file_idx]["final_loss_pred"] = pred_cands
-            mmap_file[mmap_file_idx]["final_loss_prob"] = max_probs
-            mmap_file[mmap_file_idx]["final_loss_cand_probs"] = res_dict["probs"][
-                task_name
-            ][i].reshape(1, -1)
+            data_arr[arr_idx]["final_loss_pred"] = pred_cands
+            data_arr[arr_idx]["final_loss_prob"] = max_probs
+            data_arr[arr_idx]["final_loss_cand_probs"] = res_dict["probs"][task_name][
+                i
+            ].reshape(1, -1)
 
             # final_entity_embs is M x K x hidden_size, pred_cands is M
             if dump_embs:
                 chosen_entity_embs = output_embeddings[pred_cands]
                 # write chosen entity embs to file for contextualized entity embeddings
-                mmap_file[mmap_file_idx]["entity_emb"] = chosen_entity_embs
-            mmap_file_idx += 1
-        del mmap_file
+                data_arr[arr_idx]["entity_emb"] = chosen_entity_embs
+            arr_idx += 1
+        np.save(unmerged_entity_emb_file, data_arr)
+        del data_arr
         del res_dict
     # Merge all memmap files
     log_rank_0_info(
@@ -686,10 +687,11 @@ def dump_model_outputs(
         shape=(len(dataloader.dataset),),
     )
     memmap_idx = 0
-    for mmap_file_name in tqdm(unmerged_memmap_files, desc="Iterating over files"):
-        mmap_file = np.memmap(mmap_file_name, dtype=unmerged_storage_type, mode="r")
-        len_data = len(mmap_file)
-        final_mmap_file[memmap_idx : memmap_idx + len_data] = mmap_file[:]
+    for file_name in tqdm(unmerged_memmap_files, desc="Iterating over files"):
+        # data_arr = np.memmap(mmap_file_name, dtype=unmerged_storage_type, mode="r")
+        data_arr = np.load(file_name)
+        len_data = len(data_arr)
+        final_mmap_file[memmap_idx : memmap_idx + len_data] = data_arr[:]
         memmap_idx += len_data
 
     # for i in range(len(mmap_file)):
