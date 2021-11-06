@@ -384,9 +384,19 @@ def batched_pred_iter(
                     if batch_num % 10 == 0 and ex_idx == 0:
                         log_rank_0_debug(
                             logger,
-                            f"{batch_num} at sent {sent_idx} MEM "
+                            f"{batch_num} at sent {sent_idx} PROCESS MEM "
                             f"{psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3}",
                         )
+                        log_rank_0_debug(
+                            logger,
+                            f"Available Mem: {psutil.virtual_memory().available / 1024 ** 3} "
+                            f"Used Mem: {psutil.virtual_memory().used / 1024 ** 3} "
+                            f"Perc Used: {psutil.virtual_memory().percent}%",
+                        )
+                        if psutil.virtual_memory().percent > 90:
+                            import ipdb
+
+                            ipdb.set_trace()
                     # Only increment for NED TASK
                     if task_name == NED_TASK:
                         # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
