@@ -1630,10 +1630,10 @@ class BootlegDataset(EmmentalDataset):
             x_dict["input_ids"] = input_ids
         # Get the entity_cand_eid
         entity_cand_eid = self.alias2cands_model(x_dict["alias_idx"]).long()
-        entity_cand_input_ids = []
-        entity_cand_token_type_ids = []
-        entity_cand_attention_mask = []
         if self.X_entity_dict is not None:
+            entity_cand_input_ids = []
+            entity_cand_token_type_ids = []
+            entity_cand_attention_mask = []
             # Get the entity token ids
             for eid in entity_cand_eid:
                 if self.split == "train" and self.popularity_mask:

@@ -195,7 +195,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         run_config_path: original config path (for saving)
         entity_emb_file: file for dumped entity embeddings
     """
-    torch.multiprocessing.set_sharing_strategy("file_system")
+    # torch.multiprocessing.set_sharing_strategy("file_system")
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 
