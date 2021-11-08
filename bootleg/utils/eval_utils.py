@@ -541,6 +541,7 @@ def dump_model_outputs(
     dump_embs,
     task_name,
     entity_encoder_str,
+    overwrite_data,
 ):
     """Dump model outputs.
 
@@ -554,6 +555,7 @@ def dump_model_outputs(
         dump_embs: whether to save the contextualized embeddings or not
         task_name: task name
         entity_encoder_str: emmental action output string to get embedding
+        overwrite_data: overwrite saved mmap files
 
     Returns: mmemp file name for saved outputs, dtype file name for loading memmap file
     """
@@ -564,6 +566,18 @@ def dump_model_outputs(
     unmerged_memmap_files = []
     final_unmerged_memmap = os.path.join(save_folder, "model_outputs_final.mmap")
     emb_file_config = os.path.join(unmerged_memmap_dir, "model_outputs_config.npy")
+
+    if (
+        not overwrite_data
+        and os.path.exists(final_unmerged_memmap)
+        and os.path.exists(emb_file_config)
+    ):
+        log_rank_0_info(
+            logger,
+            f"Skipping GPU dumpings. {final_unmerged_memmap} already exists and overwrite is F.",
+        )
+        return final_unmerged_memmap, emb_file_config
+
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
     if dump_embs:
         unmerged_storage_type = np.dtype(
@@ -1055,7 +1069,11 @@ def get_sental2embid(merged_entity_emb_file, merged_storage_type):
         merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     sental2embid = {}
-    for i, row in enumerate(filt_emb_data):
+    for i, row in tqdm(
+        enumerate(filt_emb_data),
+        total=len(filt_emb_data),
+        desc="Getting setnal2emb map",
+    ):
         sent_idx = row["sent_idx"]
         alias_idx = row["alias_list_pos"]
         assert (

@@ -18,6 +18,7 @@ config_args = {
             1000,
             "number of eval steps to accumulate the output tensors for before saving results to file",
         ),
+        "overwrite_eval_dumps": (False, "overwrite dumped eval data"),
         "dataloader_threads": (16, "data loader threads to feed gpus"),
         "log_level": ("info", "logging level"),
         "dataset_threads": (

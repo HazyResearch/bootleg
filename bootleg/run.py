@@ -364,6 +364,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
             dump_embs,
             NED_TASK,
             emm_entity_emb_str,
+            config.run_config.overwrite_eval_dumps,
         )
         log_rank_0_debug(
             logger,
