@@ -350,7 +350,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         utils.ensure_dir(temp_eval_folder)
         log_rank_0_debug(
             logger,
-            f"Collecting sentence to mention map {os.path.join(config.data_config.data_dir, filename)}",
+            f"Will split {os.path.join(config.data_config.data_dir, filename)} int {num_dump_file_splits} splits.",
         )
         # Chunk file into splits if desired
         if num_dump_file_splits > 1:
@@ -375,7 +375,6 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         # For each split, run dump preds
         output_files = []
         total_mentions_seen = 0
-        print("ALL INPUT FILES", input_files)
         for input_id, input_filename in enumerate(input_files):
             print("READING FROM", input_filename)
             sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
@@ -402,7 +401,22 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                 },
             )[0]
             log_rank_0_debug(logger, "Done collecting sentence to mention map")
-            print("HERE", len(dataloader.dataset))
+            from tqdm import tqdm
+
+            print(
+                "HERE",
+                len(dataloader.dataset),
+                "VS",
+                sum(sentidx2num_mentions.values()),
+            )
+            for i in tqdm(range(len(dataloader.dataset))):
+                if (
+                    str(dataloader.dataset[i][0]["sent_idx"].item())
+                    not in sentidx2num_mentions
+                ):
+                    import ipdb
+
+                    ipdb.set_trace()
             input_file_save_folder = os.path.join(
                 temp_eval_folder, f"_data_out_{input_id}"
             )
