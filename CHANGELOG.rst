@@ -54,7 +54,7 @@ Fixed
 Added
 ^^^^^^^
 * ``data_config.print_examples_prep`` flag to toggle data example printing during data prep.
-* ``data_config.eval_accumulation_steps`` to support subbatching dumping of predictings. We save outputs to separate files of size approximately ``data_config.eval_accumulation_steps*data_config.eval_batch_size`` and merge into a final file at the end.
+* ``data_config.dump_preds_accumulation_steps`` to support subbatching dumping of predictings. We save outputs to separate files of size approximately ``data_config.dump_preds_accumulation_steps*data_config.eval_batch_size`` and merge into a final file at the end.
 * Entity Profile API. See the `docs <https://bootleg.readthedocs.io/en/latest/gettingstarted/entity_profile.html>`_. This allows for modifying entity metadata as well as adding and removing entities. We profile methods for refitting a model with a new profile for immediate inference, no finetuning needed.
 
 Changed

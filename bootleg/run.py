@@ -3,11 +3,13 @@
 import argparse
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from copy import copy
 
 import emmental
+import numpy as np
 import torch
 from emmental.learner import EmmentalLearner
 from emmental.model import EmmentalModel
@@ -331,63 +333,119 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     assert mode in [
         "dump_preds",
     ], 'Mode must be "dump_preds"'
-    dump_embs = False
     assert (
         len(dataloaders) == 1
     ), "We should only have length 1 dataloaders for dump_preds!"
-    result_file, out_emb_file = None, None
+    final_result_file = None
     # Get emmental action output for entity embeddings
     emm_entity_emb_str = (
         "entity_encoder_0" if entity_emb_file is None else "entity_encoder_static_0"
     )
+    num_dump_file_splits = config.run_config.dump_preds_num_data_splits
     if config.learner_config.local_rank in [0, -1]:
         # Setup files/folders
         filename = os.path.basename(dataloaders[0].dataset.raw_filename)
+        eval_folder = eval_utils.get_eval_folder(filename)
+        temp_eval_folder = os.path.join(eval_folder, "_cache")
+        utils.ensure_dir(temp_eval_folder)
         log_rank_0_debug(
             logger,
             f"Collecting sentence to mention map {os.path.join(config.data_config.data_dir, filename)}",
         )
-        sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
-            os.path.join(config.data_config.data_dir, filename)
-        )
-        log_rank_0_debug(logger, "Done collecting sentence to mention map")
-        eval_folder = eval_utils.get_eval_folder(filename)
-        utils.ensure_dir(eval_folder)
+        # Chunk file into splits if desired
+        if num_dump_file_splits > 1:
+            chunk_prep_dir = os.path.join(temp_eval_folder, "_data_split_in")
+            utils.ensure_dir(chunk_prep_dir)
+            total_input = sum(
+                1 for _ in open(os.path.join(config.data_config.data_dir, filename))
+            )
+            chunk_input = int(np.ceil(total_input / num_dump_file_splits))
+            log_rank_0_debug(
+                logger,
+                f"Chunking up {total_input} lines into subfiles of size {chunk_input} lines",
+            )
+            total_input_from_chunks, input_files_dict = utils.chunk_file(
+                os.path.join(config.data_config.data_dir, filename),
+                chunk_prep_dir,
+                chunk_input,
+            )
+            input_files = list(input_files_dict.keys())
+        else:
+            input_files = [os.path.join(config.data_config.data_dir, filename)]
+        # For each split, run dump preds
+        output_files = []
+        total_mentions_seen = 0
+        for input_id, input_filename in enumerate(input_files):
+            sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
+                input_filename
+            )
+            dataloader = get_dataloaders(
+                config,
+                tasks,
+                use_batch_cands,
+                load_entity_data,
+                data_splits,
+                entity_symbols,
+                context_tokenizer,
+                dataset_offsets={
+                    data_splits[0]: [
+                        total_mentions_seen,
+                        total_mentions_seen + sum(sentidx2num_mentions.values()),
+                    ]
+                },
+            )[0]
+            log_rank_0_debug(logger, "Done collecting sentence to mention map")
+            input_file_save_folder = os.path.join(
+                temp_eval_folder, f"_data_out_{input_id}"
+            )
+            saved_dump_memmap, save_dump_memmap_config = dump_model_outputs(
+                model,
+                dataloader,
+                config,
+                sentidx2num_mentions,
+                input_file_save_folder,
+                entity_symbols,
+                NED_TASK,
+                emm_entity_emb_str,
+                config.run_config.overwrite_eval_dumps,
+            )
+            log_rank_0_debug(
+                logger,
+                f"Saving intermediate files to {saved_dump_memmap} and {save_dump_memmap_config}",
+            )
+            result_file, mentions_seen = collect_and_merge_results(
+                saved_dump_memmap,
+                save_dump_memmap_config,
+                config,
+                sentidx2num_mentions,
+                sent_idx2row,
+                input_file_save_folder,
+                entity_symbols,
+            )
+            log_rank_0_info(
+                logger,
+                f"{mentions_seen} mentions seen. Bootleg labels saved at {result_file}",
+            )
+            # Collect results
+            total_mentions_seen += mentions_seen
+            assert (
+                result_file not in output_files
+            ), f"{result_file} already in output_files"
+            output_files.append(result_file)
 
-        saved_dump_memmap, save_dump_memmap_config = dump_model_outputs(
-            model,
-            dataloaders[0],
-            config,
-            sentidx2num_mentions,
-            eval_folder,
-            entity_symbols,
-            dump_embs,
-            NED_TASK,
-            emm_entity_emb_str,
-            config.run_config.overwrite_eval_dumps,
-        )
-        log_rank_0_debug(
-            logger,
-            f"Saving intermediate files to {saved_dump_memmap} and {save_dump_memmap_config}",
-        )
-        result_file, out_emb_file, total_mentions_seen = collect_and_merge_results(
-            saved_dump_memmap,
-            save_dump_memmap_config,
-            config,
-            sentidx2num_mentions,
-            sent_idx2row,
-            eval_folder,
-            entity_symbols,
-            dump_embs,
-        )
+        # Merge results
+        final_result_file = eval_utils.get_result_file(eval_folder)
+        with open(final_result_file, "wb") as outfile:
+            for filename in output_files:
+                with open(filename, "rb") as readfile:
+                    shutil.copyfileobj(readfile, outfile)
         log_rank_0_info(
             logger,
-            f"{total_mentions_seen} mentions seen. Bootleg labels saved at {result_file}",
+            f"Saved final bootleg outputs at {final_result_file}. "
+            f"Removing cached folder {temp_eval_folder}",
         )
-        # Try to copy embeddings
-        if dump_embs:
-            log_rank_0_info(logger, f"Bootleg embeddings saved at {out_emb_file}")
-    return result_file, out_emb_file
+        eval_utils.try_rmtree(temp_eval_folder)
+    return final_result_file
 
 
 if __name__ == "__main__":

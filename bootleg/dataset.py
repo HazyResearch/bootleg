@@ -1254,6 +1254,7 @@ class BootlegDataset(EmmentalDataset):
         dataset_threads: number of threads to use
         split: data split
         is_bert: is the tokenizer a BERT or not
+        dataset_offset: offset into dataset
     """
 
     def __init__(
@@ -1268,6 +1269,7 @@ class BootlegDataset(EmmentalDataset):
         dataset_threads,
         split="train",
         is_bert=True,
+        dataset_offset=None,
     ):
         """Bootleg dataset initlializer."""
         log_rank_0_info(
@@ -1352,6 +1354,7 @@ class BootlegDataset(EmmentalDataset):
         self.popularity_mask = data_config.popularity_mask
         self.context_mask_perc = data_config.context_mask_perc
         self.tokenizer = tokenizer
+        self.dataset_offset = [0, None] if dataset_offset is None else dataset_offset
 
         # Table to map from alias_idx to entity_cand_eid used in the __get_item__
         self.alias2cands_model = AliasEntityTable(
@@ -1621,6 +1624,7 @@ class BootlegDataset(EmmentalDataset):
         Returns:
           Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
         """
+        index = index + self.dataset_offset[0]  # offset is [start, end]
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         y_dict = {name: label[index] for name, label in self.Y_dict.items()}
 
@@ -1776,6 +1780,15 @@ class BootlegDataset(EmmentalDataset):
             f"Bootleg Dataset. Data at {self.save_dataset_name}. "
             f"Labels at {self.save_labels_name}. "
         )
+
+    def __len__(self):
+        """Length."""
+        end_len = (
+            len(self.X_dict[next(iter(self.X_dict.keys()))])
+            if self.dataset_offset[-1] is None
+            else self.dataset_offset[-1]
+        )
+        return end_len - self.dataset_offset[0]
 
 
 class BootlegEntityDataset(EmmentalDataset):

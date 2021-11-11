@@ -9,15 +9,16 @@ from collections import defaultdict
 from copy import copy
 from pathlib import Path
 
+import emmental
 import faiss
 import numpy as np
 import torch
 import ujson
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from rich.progress import track
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_info
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import data_utils
@@ -31,7 +32,6 @@ from cand_gen.data import get_context_dataloader, get_entity_dataloader
 from cand_gen.task_config import CANDGEN_TASK
 from cand_gen.tasks import context_gen_task, entity_gen_task
 from cand_gen.utils.parser.parser_utils import parse_boot_and_emm_args
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ def run_model(
     total_samples = len(context_dataloader.dataset)
     topk_candidates = {}
     context_model = None
-    nn_chunk = config["run_config"]["eval_accumulation_steps"]
+    nn_chunk = config["run_config"]["dump_preds_accumulation_steps"]
     for i in range(int(np.ceil(total_samples / nn_chunk))):
         st = i * nn_chunk
         ed = min((i + 1) * nn_chunk, total_samples)

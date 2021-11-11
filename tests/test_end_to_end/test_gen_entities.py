@@ -63,13 +63,13 @@ class TestGenEntities(unittest.TestCase):
         embs = np.load(out_emb_file)
         assert list(embs.shape) == [6, 32]
 
-        final_result_file, _ = run.run_model(
+        final_result_file = run.run_model(
             mode="dump_preds", config=self.args, entity_emb_file=out_emb_file
         )
 
         lines = [ujson.loads(ln) for ln in open(final_result_file)]
 
-        final_result_file, _ = run.run_model(
+        final_result_file = run.run_model(
             mode="dump_preds", config=self.args, entity_emb_file=None
         )
         lines_no_emb_file = [ujson.loads(ln) for ln in open(final_result_file)]

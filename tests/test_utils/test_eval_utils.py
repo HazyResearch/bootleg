@@ -240,7 +240,6 @@ class EvalUtils(unittest.TestCase):
         """Test merge subsentences in eval."""
         test_full_emb_file = tempfile.NamedTemporaryFile()
         test_merged_emb_file = tempfile.NamedTemporaryFile()
-        gold_merged_emb_file = tempfile.NamedTemporaryFile()
         cache_folder = tempfile.TemporaryDirectory()
 
         num_examples = 7
@@ -256,7 +255,6 @@ class EvalUtils(unittest.TestCase):
                 ("sent_idx", int),
                 ("subsent_idx", int),
                 ("alias_list_pos", int, 1),
-                ("entity_emb", float, hidden_size),
                 ("final_loss_true", int, 1),
                 ("final_loss_pred", int, 1),
                 ("final_loss_prob", float, 1),
@@ -276,43 +274,36 @@ class EvalUtils(unittest.TestCase):
         full_emb[0]["subsent_idx"] = 0
         full_emb[0]["alias_list_pos"] = 0
         full_emb[0]["final_loss_true"] = 0
-        full_emb[0]["entity_emb"] = np.array([0, 1])
 
         full_emb[1]["sent_idx"] = 0
         full_emb[1]["subsent_idx"] = 1
         full_emb[1]["alias_list_pos"] = 1
         full_emb[1]["final_loss_true"] = 1
-        full_emb[1]["entity_emb"] = np.array([2, 3])
 
         full_emb[2]["sent_idx"] = 1
         full_emb[2]["subsent_idx"] = 0
         full_emb[2]["alias_list_pos"] = 0
         full_emb[2]["final_loss_true"] = 1
-        full_emb[2]["entity_emb"] = np.array([4, 5])
 
         full_emb[3]["sent_idx"] = 1
         full_emb[3]["subsent_idx"] = 1
         full_emb[3]["alias_list_pos"] = 1
         full_emb[3]["final_loss_true"] = 1
-        full_emb[3]["entity_emb"] = np.array([6, 7])
 
         full_emb[4]["sent_idx"] = 1
         full_emb[4]["subsent_idx"] = 2
         full_emb[4]["alias_list_pos"] = 2
         full_emb[4]["final_loss_true"] = 1
-        full_emb[4]["entity_emb"] = np.array([8, 9])
 
         full_emb[5]["sent_idx"] = 1
         full_emb[5]["subsent_idx"] = 3
         full_emb[5]["alias_list_pos"] = 3
         full_emb[5]["final_loss_true"] = 1
-        full_emb[5]["entity_emb"] = np.array([10, 11])
 
         full_emb[6]["sent_idx"] = 1
         full_emb[6]["subsent_idx"] = 4
         full_emb[6]["alias_list_pos"] = 4
         full_emb[6]["final_loss_true"] = 1
-        full_emb[6]["entity_emb"] = np.array([12, 13])
 
         # create merged embedding file
         storage_type_merged = np.dtype(
@@ -320,20 +311,10 @@ class EvalUtils(unittest.TestCase):
                 ("hidden_size", int),
                 ("sent_idx", int),
                 ("alias_list_pos", int),
-                ("entity_emb", float, hidden_size),
                 ("final_loss_pred", int),
                 ("final_loss_prob", float),
                 ("final_loss_cand_probs", float, K),
             ]
-        )
-        merged_emb_gold = np.memmap(
-            gold_merged_emb_file.name,
-            dtype=storage_type_merged,
-            mode="w+",
-            shape=(total_num_mentions,),
-        )
-        merged_emb_gold["entity_emb"] = np.array(
-            [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13]]
         )
 
         # create data file -- just needs aliases and sentence indices
@@ -369,19 +350,11 @@ class EvalUtils(unittest.TestCase):
             storage_type_merged,
             test_full_emb_file.name,
             storage_type_full,
-            dump_embs=True,
         )
         bootleg_merged_emb = np.memmap(
             test_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
         )
-        merged_emb_gold = np.memmap(
-            gold_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
-        )
         assert len(bootleg_merged_emb) == total_num_mentions
-        for i in range(len(bootleg_merged_emb)):
-            assert np.array_equal(
-                bootleg_merged_emb[i]["entity_emb"], merged_emb_gold[i]["entity_emb"]
-            )
 
         # Try with multiprocessing
         num_processes = 5
@@ -393,26 +366,17 @@ class EvalUtils(unittest.TestCase):
             storage_type_merged,
             test_full_emb_file.name,
             storage_type_full,
-            dump_embs=True,
         )
         bootleg_merged_emb = np.memmap(
             test_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
         )
-        merged_emb_gold = np.memmap(
-            gold_merged_emb_file.name, dtype=storage_type_merged, mode="r+"
-        )
         assert len(bootleg_merged_emb) == total_num_mentions
-        for i in range(len(bootleg_merged_emb)):
-            assert np.array_equal(
-                bootleg_merged_emb[i]["entity_emb"], merged_emb_gold[i]["entity_emb"]
-            )
 
         # clean up
         if os.path.exists(temp_file):
             os.remove(temp_file)
         test_full_emb_file.close()
         test_merged_emb_file.close()
-        gold_merged_emb_file.close()
         cache_folder.cleanup()
 
     def test_write_out_subsentences(self):
@@ -525,7 +489,6 @@ class EvalUtils(unittest.TestCase):
 
         num_processes = 1
         train_in_candidates = True
-        dump_embs = True
         max_candidates = 2
 
         """
@@ -550,7 +513,6 @@ class EvalUtils(unittest.TestCase):
                 "cands": [["Q1", "Q4"], ["Q2", "Q1"]],
                 "cand_probs": [[0.1, 0.9], [0.1, 0.9]],
                 "entity_ids": [4, 1],
-                "ctx_emb_ids": [0, 1],
             },
             {
                 "sent_idx_unq": 1,
@@ -575,7 +537,6 @@ class EvalUtils(unittest.TestCase):
                     [0.1, 0.9],
                 ],
                 "entity_ids": [1, 4, 4, 1, 2],
-                "ctx_emb_ids": [2, 3, 4, 5, 6],
             },
         ]
 
@@ -589,7 +550,6 @@ class EvalUtils(unittest.TestCase):
             entity_dump=entity_symbols,
             train_in_candidates=train_in_candidates,
             max_candidates=max_candidates,
-            dump_embs=dump_embs,
             trie_candidate_map_folder=None,
             trie_qid2eid_file=None,
         )
@@ -632,7 +592,6 @@ class EvalUtils(unittest.TestCase):
             entity_dump=entity_symbols,
             train_in_candidates=train_in_candidates,
             max_candidates=max_candidates,
-            dump_embs=dump_embs,
             trie_candidate_map_folder=trie_candidate_map_folder.name,
             trie_qid2eid_file=trie_qid2eid_file.name,
         )

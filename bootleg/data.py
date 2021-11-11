@@ -54,6 +54,7 @@ def get_dataloaders(
     splits,
     entity_symbols,
     tokenizer,
+    dataset_offsets: Dict[str, List[int]] = None,
 ):
     """Get the dataloaders.
 
@@ -64,16 +65,25 @@ def get_dataloaders(
         load_entity_data: whether to load entity data
         splits: data splits to generate dataloaders for
         entity_symbols: entity symbols
+        dataset_offsets: [start, end] offsets for each split to index into the dataset. Dataset len is end-start.
+                         If end is None, end is the length of the dataset.
 
     Returns: list of dataloaders
     """
+    if dataset_offsets is None:
+        dataset_offsets = {split: [0, None] for split in splits}
+
     task_to_label_dict = {
         t: BATCH_CANDS_LABEL if use_batch_cands else CANDS_LABEL for t in tasks
     }
     is_bert = True
-
     datasets = {}
     for split in splits:
+        if not isinstance(dataset_offsets[split], list):
+            raise TypeError(
+                "dataset_offsets must be dict from splut to list of start, end index range."
+            )
+
         dataset_path = os.path.join(
             args.data_config.data_dir, args.data_config[f"{split}_dataset"].file
         )
@@ -88,6 +98,7 @@ def get_dataloaders(
             dataset_threads=args.run_config.dataset_threads,
             split=split,
             is_bert=is_bert,
+            dataset_offset=dataset_offsets[split],
         )
     dataloaders = []
     for split, dataset in datasets.items():

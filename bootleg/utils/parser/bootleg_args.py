@@ -14,9 +14,13 @@ config_args = {
             "multiprocessing spawn method. forkserver will save memory but have slower startup costs.",
         ),
         "eval_batch_size": (128, "batch size for eval"),
-        "eval_accumulation_steps": (
+        "dump_preds_accumulation_steps": (
             1000,
             "number of eval steps to accumulate the output tensors for before saving results to file",
+        ),
+        "dump_preds_num_data_splits": (
+            1,
+            "number of chunks to split the input file; helps with OOM issues",
         ),
         "overwrite_eval_dumps": (False, "overwrite dumped eval data"),
         "dataloader_threads": (16, "data loader threads to feed gpus"),

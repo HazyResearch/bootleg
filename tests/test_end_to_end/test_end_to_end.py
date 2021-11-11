@@ -55,18 +55,17 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
+        result_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
         assert len([f for li in results for f in li["entity_ids"]]) == 52
-        assert out_emb_file is None
 
     # Doubling up a test here to also test accumulation steps
     def test_end2end_accstep(self):
         """Test end2end with accumulation steps."""
         # Just setting this for testing pipelines
-        self.args.data_config.eval_accumulation_steps = 2
+        self.args.data_config.dump_preds_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
@@ -80,17 +79,16 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
+        result_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
         assert len([f for li in results for f in li["entity_ids"]]) == 52
-        assert out_emb_file is None
 
     # Doubling up a test here to also test greater than 1 eval batch size
     def test_end2end_evalbatch(self):
         """Test end2end with eval batch size."""
-        self.args.data_config.eval_accumulation_steps = 2
+        self.args.data_config.dump_preds_accumulation_steps = 2
         self.args.run_config.dataset_threads = 2
         self.args.run_config.eval_batch_size = 2
 
@@ -106,12 +104,11 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
+        result_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
         assert len([f for li in results for f in li["entity_ids"]]) == 52
-        assert out_emb_file is None
 
         shutil.rmtree("tests/temp", ignore_errors=True)
 
@@ -119,6 +116,7 @@ class TestEnd2End(unittest.TestCase):
     def test_end2end_bert_long_context(self):
         """Test end2end with longer sentence context."""
         self.args.data_config.max_seq_len = 256
+        self.args.run_config.dump_preds_num_data_splits = 3
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
@@ -131,12 +129,11 @@ class TestEnd2End(unittest.TestCase):
             "model_path"
         ] = f"{emmental.Meta.log_path}/last_model.pth"
 
-        result_file, out_emb_file = run_model(mode="dump_preds", config=self.args)
+        result_file = run_model(mode="dump_preds", config=self.args)
         assert os.path.exists(result_file)
         results = [ujson.loads(li) for li in open(result_file)]
         assert 19 == len(results)  # 18 total sentences
         assert len([f for li in results for f in li["entity_ids"]]) == 52
-        assert out_emb_file is None
 
         shutil.rmtree("tests/temp", ignore_errors=True)
 
