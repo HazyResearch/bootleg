@@ -116,7 +116,7 @@ class TestEnd2End(unittest.TestCase):
     def test_end2end_bert_long_context(self):
         """Test end2end with longer sentence context."""
         self.args.data_config.max_seq_len = 256
-        self.args.run_config.dump_preds_num_data_splits = 3
+        self.args.run_config.dump_preds_num_data_splits = 4
         scores = run_model(mode="train", config=self.args)
         assert type(scores) is dict
         assert len(scores) > 0
