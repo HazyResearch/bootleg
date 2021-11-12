@@ -1,6 +1,7 @@
 """Bootleg run command."""
 
 import argparse
+import itertools
 import logging
 import os
 import shutil
@@ -338,9 +339,6 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
     ), "We should only have length 1 dataloaders for dump_preds!"
     final_result_file = None
     # Get emmental action output for entity embeddings
-    emm_entity_emb_str = (
-        "entity_encoder_0" if entity_emb_file is None else "entity_encoder_static_0"
-    )
     num_dump_file_splits = config.run_config.dump_preds_num_data_splits
     if config.learner_config.local_rank in [0, -1]:
         # Setup files/folders
@@ -372,11 +370,14 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
             input_files = list(input_files_dict.keys())
         else:
             input_files = [os.path.join(config.data_config.data_dir, filename)]
+        # Before running dump, we need to collect a mapping from sent_idx to prepped dataset indexes. We don't
+        # want to reprep that data and have no guarantees as to the order of the prepped data w.r.t these chunks.
+        sent_idx2preppedids = dataloaders[0].dataset.get_sentidx_to_rowids()
         # For each split, run dump preds
         output_files = []
         total_mentions_seen = 0
         for input_id, input_filename in enumerate(input_files):
-            print("READING FROM", input_filename)
+            print("READING FROM", input_id, input_filename)
             sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
                 input_filename
             )
@@ -385,6 +386,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                 total_mentions_seen,
                 total_mentions_seen + sum(sentidx2num_mentions.values()),
             )
+            log_rank_0_debug(logger, "Done collecting sentence to mention map")
             dataloader = get_dataloaders(
                 config,
                 tasks,
@@ -394,13 +396,16 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                 entity_symbols,
                 context_tokenizer,
                 dataset_offsets={
-                    data_splits[0]: [
-                        total_mentions_seen,
-                        total_mentions_seen + sum(sentidx2num_mentions.values()),
-                    ]
+                    data_splits[0]: list(
+                        itertools.chain(
+                            *[
+                                sent_idx2preppedids.get(sent_id, [])
+                                for sent_id in sentidx2num_mentions
+                            ]
+                        )
+                    )
                 },
             )[0]
-            log_rank_0_debug(logger, "Done collecting sentence to mention map")
             from tqdm import tqdm
 
             print(
@@ -414,6 +419,7 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                     str(dataloader.dataset[i][0]["sent_idx"].item())
                     not in sentidx2num_mentions
                 ):
+                    print("BARD", i, dataloader.dataset[i][0]["sent_idx"].item())
                     import ipdb
 
                     ipdb.set_trace()
@@ -428,7 +434,6 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                 input_file_save_folder,
                 entity_symbols,
                 NED_TASK,
-                emm_entity_emb_str,
                 config.run_config.overwrite_eval_dumps,
             )
             log_rank_0_debug(

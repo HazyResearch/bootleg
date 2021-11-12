@@ -539,7 +539,6 @@ def dump_model_outputs(
     save_folder,
     entity_symbols,
     task_name,
-    entity_encoder_str,
     overwrite_data,
 ):
     """Dump model outputs.
@@ -552,7 +551,6 @@ def dump_model_outputs(
         save_folder: save folder
         entity_symbols: entity symbols
         task_name: task name
-        entity_encoder_str: emmental action output string to get embedding
         overwrite_data: overwrite saved mmap files
 
     Returns: mmemp file name for saved outputs, dtype file name for loading memmap file

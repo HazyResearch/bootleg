@@ -71,7 +71,7 @@ def get_dataloaders(
     Returns: list of dataloaders
     """
     if dataset_offsets is None:
-        dataset_offsets = {split: [0, None] for split in splits}
+        dataset_offsets = {split: None for split in splits}
 
     task_to_label_dict = {
         t: BATCH_CANDS_LABEL if use_batch_cands else CANDS_LABEL for t in tasks
@@ -79,9 +79,11 @@ def get_dataloaders(
     is_bert = True
     datasets = {}
     for split in splits:
-        if not isinstance(dataset_offsets[split], list):
+        if dataset_offsets[split] is not None and not isinstance(
+            dataset_offsets[split], list
+        ):
             raise TypeError(
-                "dataset_offsets must be dict from splut to list of start, end index range."
+                "dataset_offsets must be dict from split to list of indexes to subselect."
             )
 
         dataset_path = os.path.join(
@@ -98,7 +100,7 @@ def get_dataloaders(
             dataset_threads=args.run_config.dataset_threads,
             split=split,
             is_bert=is_bert,
-            dataset_offset=dataset_offsets[split],
+            dataset_range=dataset_offsets[split],
         )
     dataloaders = []
     for split, dataset in datasets.items():
