@@ -34,7 +34,6 @@ class DisambigLoss:
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels
-            active: whether examples are "active" or not (used in Emmental slicing)
         Returns: loss
         """
         # Grab the first value of training (when doing distributed training, we will have one per process)

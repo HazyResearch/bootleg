@@ -320,7 +320,7 @@ def run_model(
     total_samples = len(context_dataloader.dataset)
     topk_candidates = {}
     context_model = None
-    nn_chunk = config["run_config"]["eval_accumulation_steps"]
+    nn_chunk = config["run_config"]["dump_preds_accumulation_steps"]
     for i in range(int(np.ceil(total_samples / nn_chunk))):
         st = i * nn_chunk
         ed = min((i + 1) * nn_chunk, total_samples)

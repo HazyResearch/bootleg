@@ -36,6 +36,10 @@ jobs:
                   channels: conda-forge
                   channel-priority: strict
                   use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
+            - name: Install SSH Key
+              uses: webfactory/ssh-agent@v0.5.3
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
             - name: Install Bootleg
               shell: bash -l {0}
               run: |
