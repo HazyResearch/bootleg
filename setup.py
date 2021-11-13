@@ -17,7 +17,7 @@ VERSION = main_ns["__version__"]
 REQUIRED = [
     "argh>=0.26.2, <1.0.0",
     "click==7.1.2",
-    "emmental==0.0.9",
+    "emmental @ git+ssh://git@github.com/senwu/emmental.git@master",
     "faiss-cpu>=1.6.8, <1.7.1",
     "jsonlines==2.0.0",
     "marisa_trie_m==0.7.6",

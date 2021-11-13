@@ -495,7 +495,9 @@ def convert_examples_to_features_and_save_single(input_dict, mmap_file):
     slice_names = input_dict["slice_names"]
     total_saved_features = 0
     for idx, in_line in tqdm(
-        enumerate(open(file_name)), total=in_file_lines, desc=f"Processing {file_name}"
+        enumerate(open(file_name)),
+        total=in_file_lines,
+        desc=f"Processing slice {file_name}",
     ):
         example = InputExample.from_dict(ujson.loads(in_line))
         example_idx = save_file_offset + idx

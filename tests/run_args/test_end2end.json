@@ -1,13 +1,13 @@
 {
     "emmental": {
-        "n_epochs": 6,
+        "n_steps": 5,
         "seed": 1234,
         "lr_scheduler": "linear",
         "lr": 1e-4
     },
     "run_config": {
         "dataloader_threads": 0,
-        "eval_accumulation_steps": 1,
+        "dump_preds_accumulation_steps": 1,
         "eval_batch_size": 1,
         "dataset_threads": 1,
         "spawn_method": "fork",

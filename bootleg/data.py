@@ -50,9 +50,11 @@ def get_dataloaders(
     args,
     tasks,
     use_batch_cands,
+    load_entity_data,
     splits,
     entity_symbols,
     tokenizer,
+    dataset_offsets: Dict[str, List[int]] = None,
 ):
     """Get the dataloaders.
 
@@ -60,18 +62,30 @@ def get_dataloaders(
         args: main args
         tasks: task names
         use_batch_cands: whether to use candidates across a batch (train and eval_batch_cands)
+        load_entity_data: whether to load entity data
         splits: data splits to generate dataloaders for
         entity_symbols: entity symbols
+        dataset_offsets: [start, end] offsets for each split to index into the dataset. Dataset len is end-start.
+                         If end is None, end is the length of the dataset.
 
     Returns: list of dataloaders
     """
+    if dataset_offsets is None:
+        dataset_offsets = {split: None for split in splits}
+
     task_to_label_dict = {
         t: BATCH_CANDS_LABEL if use_batch_cands else CANDS_LABEL for t in tasks
     }
     is_bert = True
-
     datasets = {}
     for split in splits:
+        if dataset_offsets[split] is not None and not isinstance(
+            dataset_offsets[split], list
+        ):
+            raise TypeError(
+                "dataset_offsets must be dict from split to list of indexes to subselect."
+            )
+
         dataset_path = os.path.join(
             args.data_config.data_dir, args.data_config[f"{split}_dataset"].file
         )
@@ -80,11 +94,13 @@ def get_dataloaders(
             name="Bootleg",
             dataset=dataset_path,
             use_weak_label=args.data_config[f"{split}_dataset"].use_weak_label,
+            load_entity_data=load_entity_data,
             tokenizer=tokenizer,
             entity_symbols=entity_symbols,
             dataset_threads=args.run_config.dataset_threads,
             split=split,
             is_bert=is_bert,
+            dataset_range=dataset_offsets[split],
         )
     dataloaders = []
     for split, dataset in datasets.items():
