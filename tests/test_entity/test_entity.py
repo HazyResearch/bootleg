@@ -295,9 +295,9 @@ class KGSymbolsTest(unittest.TestCase):
             "Q789": {},
         }
         gold_allrelations = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertIsNone(kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelations, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelations, kg_symbols.get_all_relations())
 
     def test_kg_load_and_save(self):
         """Test kg load and save."""
@@ -313,20 +313,22 @@ class KGSymbolsTest(unittest.TestCase):
         kg_symbols_2 = KGSymbols.load_from_cache(self.save_dir, prefix="test")
 
         self.assertEqual(kg_symbols_2.max_connections, kg_symbols.max_connections)
-        self.assertDictEqual(kg_symbols_2._qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(
+            kg_symbols_2.get_qid2relations_dict(), kg_symbols.get_qid2relations_dict()
+        )
         self.assertIsNone(kg_symbols_2._obj2head)
 
-        # Test that adjacency matrix was saved correctly
-        gold_qid2qid_adj = [
-            tuple(["Q123", "Q345"]),
-            tuple(["Q345", "Q123"]),
-            tuple(["Q567", "Q123"]),
-        ]
-        qid2qid_adj = []
-        with open(os.path.join(self.save_dir, "testkg_adj.txt")) as in_f:
-            for line in in_f:
-                qid2qid_adj.append(tuple(line.split()))
-        self.assertListEqual(gold_qid2qid_adj, qid2qid_adj)
+        max_connections = 2
+        kg_symbols = KGSymbols(qid2relations, max_connections=max_connections)
+        kg_symbols.save(self.save_dir, prefix="test")
+        kg_symbols_2 = KGSymbols.load_from_cache(self.save_dir, prefix="test")
+
+        self.assertEqual(kg_symbols_2.max_connections, kg_symbols.max_connections)
+        self.assertDictEqual(
+            kg_symbols_2.get_qid2relations_dict(), kg_symbols.get_qid2relations_dict()
+        )
+        self.assertDictEqual(qid2relations, kg_symbols.get_qid2relations_dict())
+        self.assertIsNone(kg_symbols_2._obj2head)
 
     def test_relation_add_remove_kgmapping(self):
         """Test relation add remoce kg mapping."""
@@ -360,9 +362,9 @@ class KGSymbolsTest(unittest.TestCase):
             "Q567": {"Q123"},
         }
         gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
         kg_symbols.add_relation("Q123", "sibling", "Q789")
         gold_qid2relations = {
@@ -377,9 +379,9 @@ class KGSymbolsTest(unittest.TestCase):
             "Q789": {"Q123"},
         }
         gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
         kg_symbols.remove_relation("Q123", "sibling", "Q789")
         gold_qid2relations = {
@@ -390,39 +392,52 @@ class KGSymbolsTest(unittest.TestCase):
         }
         gold_obj2head = {"Q123": {"Q789", "Q567", "Q345"}, "Q345": {"Q123"}}
         gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
         # Check nothing changes with bad remove that doesn't exist
         kg_symbols.remove_relation("Q789", "siblinggg", "Q123")
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
-        # Check fails with relation that doesn't exist
-        with self.assertRaises(ValueError) as context:
-            kg_symbols.add_relation("Q789", "siblinggg", "Q567")
-        assert type(context.exception) is ValueError
+        # Check the new relation is added
+        kg_symbols.add_relation("Q789", "siblinggg", "Q567")
+        gold_qid2relations = {
+            "Q123": {"sibling": ["Q345"]},
+            "Q345": {"sibling": ["Q123"]},
+            "Q567": {"sibling": ["Q123"]},
+            "Q789": {"sibling": ["Q123"], "siblinggg": ["Q567"]},
+        }
+        gold_obj2head = {
+            "Q123": {"Q789", "Q567", "Q345"},
+            "Q345": {"Q123"},
+            "Q567": {"Q789"},
+        }
+        gold_allrelationes = {"sibling", "siblinggg"}
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
+        self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
         # Check nothing changes with relation pair that doesn't exist
         kg_symbols.remove_relation("Q567", "siblinggg", "Q789")
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
         kg_symbols.remove_relation("Q789", "sibling", "Q123")
         gold_qid2relations = {
             "Q123": {"sibling": ["Q345"]},
             "Q345": {"sibling": ["Q123"]},
             "Q567": {"sibling": ["Q123"]},
-            "Q789": {},
+            "Q789": {"siblinggg": ["Q567"]},
         }
-        gold_obj2head = {"Q123": {"Q567", "Q345"}, "Q345": {"Q123"}}
-        gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        gold_obj2head = {"Q123": {"Q567", "Q345"}, "Q345": {"Q123"}, "Q567": {"Q789"}}
+        gold_allrelationes = {"sibling", "siblinggg"}
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
     def test_add_entity(self):
         """Test add entity."""
@@ -438,29 +453,48 @@ class KGSymbolsTest(unittest.TestCase):
             qid2relations, max_connections=max_connections, edit_mode=True
         )
 
-        # Check if fails with relation that wasn't seen before
-        with self.assertRaises(ValueError) as context:
-            kg_symbols.add_entity("Q910", {"siblinggg": ["Q567", "Q123", "Q345"]})
-        assert type(context.exception) is ValueError
-
-        # Add kg
-        kg_symbols.add_entity("Q910", {"sibling": ["Q567", "Q123", "Q345"]})
+        kg_symbols.add_entity("Q910", {"siblinggg": ["Q567", "Q123", "Q345"]})
         gold_qid2relations = {
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
             "Q567": {"sibling": ["Q123"]},
             "Q789": {},
-            "Q910": {"sibling": ["Q567", "Q123"]},  # Max connections limits to 2
+            "Q910": {"siblinggg": ["Q567", "Q123"]},  # Max connections limits to 2
         }
         gold_obj2head = {
             "Q123": {"Q910", "Q567", "Q345"},
             "Q345": {"Q123"},
             "Q567": {"Q123", "Q910"},
         }
-        gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        gold_allrelationes = {"sibling", "siblinggg"}
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
+
+        # Add kg
+        # Check can't add new entity
+        with self.assertRaises(ValueError) as context:
+            kg_symbols.add_entity("Q910", {"sibling": ["Q567", "Q123", "Q345"]})
+        assert type(context.exception) is ValueError
+
+        kg_symbols.add_entity("Q911", {"sibling": ["Q567", "Q123", "Q345"]})
+        gold_qid2relations = {
+            "Q123": {"sibling": ["Q345", "Q567"]},
+            "Q345": {"sibling": ["Q123"]},
+            "Q567": {"sibling": ["Q123"]},
+            "Q789": {},
+            "Q910": {"siblinggg": ["Q567", "Q123"]},  # Max connections limits to 2
+            "Q911": {"sibling": ["Q567", "Q123"]},  # Max connections limits to 2
+        }
+        gold_obj2head = {
+            "Q123": {"Q910", "Q567", "Q345", "Q911"},
+            "Q345": {"Q123"},
+            "Q567": {"Q123", "Q910", "Q911"},
+        }
+        gold_allrelationes = {"sibling", "siblinggg"}
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
+        self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
     def test_reidentify_entities(self):
         """Test reidentify entities."""
@@ -488,9 +522,13 @@ class KGSymbolsTest(unittest.TestCase):
             "Q911": {"Q123", "Q911"},
         }
         gold_allrelationes = {"sibling", "sib"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
+
+        with self.assertRaises(ValueError) as context:
+            kg_symbols.reidentify_entity("Q912", "Q913")
+        assert type(context.exception) is ValueError
 
         kg_symbols.reidentify_entity("Q789", "Q912")
         gold_qid2relations = {
@@ -505,9 +543,9 @@ class KGSymbolsTest(unittest.TestCase):
             "Q911": {"Q123", "Q911"},
         }
         gold_allrelationes = {"sibling", "sib"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
     def test_prune_to_entities(self):
         """Test prune to entities."""
@@ -529,9 +567,9 @@ class KGSymbolsTest(unittest.TestCase):
         }
         gold_obj2head = {"Q567": {"Q345"}}
         gold_allrelationes = {"sibling"}
-        self.assertDictEqual(gold_qid2relations, kg_symbols._qid2relations)
+        self.assertDictEqual(gold_qid2relations, kg_symbols.get_qid2relations_dict())
         self.assertDictEqual(gold_obj2head, kg_symbols._obj2head)
-        self.assertSetEqual(gold_allrelationes, kg_symbols._all_relations)
+        self.assertSetEqual(gold_allrelationes, kg_symbols.get_all_relations())
 
 
 class EntitySymbolTest(unittest.TestCase):

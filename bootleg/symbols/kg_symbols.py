@@ -1,13 +1,32 @@
 """KG symbols class."""
-
+import copy
 import os
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Union
 
 from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
+from bootleg.utils.classes.dictvocabulary_tries import ThreeLayerVocabularyTrie
+
+
+def _convert_to_trie(qid2relations, max_connections):
+    all_relations = set()
+    all_qids = set()
+    qid2relations_filt = {}
+    for q, rel_dict in qid2relations.items():
+        qid2relations_filt[q] = {}
+        for rel, tail_qs in rel_dict.items():
+            all_qids.update(set(tail_qs))
+            all_relations.add(rel)
+            qid2relations_filt[q][rel] = tail_qs[:max_connections]
+    qid2relations_trie = ThreeLayerVocabularyTrie(
+        input_dict=qid2relations_filt,
+        key_vocabulary=all_relations,
+        value_vocabulary=all_qids,
+        max_value=max_connections,
+    )
+    return qid2relations_trie
 
 
 class KGSymbols:
@@ -15,50 +34,79 @@ class KGSymbols:
 
     def __init__(
         self,
-        qid2relations: Dict[str, Dict[str, List[str]]],
-        relation_vocab: Optional[Dict[str, str]] = None,
-        max_connections: Optional[int] = 150,
+        qid2relations: Union[Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie],
+        max_connections: Optional[int] = 50,
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
-        """KG initializer."""
+        """KG initializer.
+
+        max_connections acts as the max single number of connections for a given relation.
+        max_connections * 2 is the max number of connections across all relations for a
+        given entity (see ThreeLayerVocabularyTrie).
+        """
         self.max_connections = max_connections
         self.edit_mode = edit_mode
         self.verbose = verbose
-        self._qid2relations: Dict[str, Dict[str, List[str]]] = qid2relations
-        self._all_relations = set()
 
-        # Mapping from human readable string to relation key ID
-        if relation_vocab is None:
-            all_relnames = set(
-                [t for reldict in qid2relations.values() for t in reldict.keys()]
-            )
-            # +1 to save space for the UNK type
-            self._relation_vocab: Dict[str, str] = {v: v for v in sorted(all_relnames)}
-        else:
-            self._relation_vocab: Dict[str, str] = relation_vocab
-        self._relation_vocab_inv = {v: i for i, v in self._relation_vocab.items()}
-
-        # EDIT MODE ONLY: Storing inverse edges to quickly reidentify entities
-        self._obj2head = None
         if self.edit_mode:
-            self._obj2head = dict()
+            self._load_edit_mode(
+                qid2relations,
+            )
+        else:
+            self._load_non_edit_mode(
+                qid2relations,
+            )
+
+    def _load_edit_mode(
+        self,
+        qid2relations: Union[Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie],
+    ):
+        """Load relations in edit mode."""
+        if isinstance(qid2relations, ThreeLayerVocabularyTrie):
+            self._qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = qid2relations.to_dict()
+        else:
+            self._qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = {
+                head_qid: {
+                    rel: tail_qids[: self.max_connections]
+                    for rel, tail_qids in rel_dict.items()
+                }
+                for head_qid, rel_dict in qid2relations.items()
+            }
+        self._obj2head: Union[Dict[str, set], None] = {}
+        self._all_relations: Union[Set[str], None] = set()
         for qid in tqdm(
             self._qid2relations,
             total=len(self._qid2relations),
             desc="Checking relations and building edit mode objs",
-            disable=not verbose,
+            disable=not self.verbose,
         ):
             for rel in self._qid2relations[qid]:
                 self._all_relations.add(rel)
-                self._qid2relations[qid][rel] = self._qid2relations[qid][rel][
-                    : self.max_connections
-                ]
-                if self.edit_mode:
-                    for qid2 in self._qid2relations[qid][rel]:
-                        if qid2 not in self._obj2head:
-                            self._obj2head[qid2] = set()
-                        self._obj2head[qid2].add(qid)
+                for qid2 in self._qid2relations[qid][rel]:
+                    if qid2 not in self._obj2head:
+                        self._obj2head[qid2] = set()
+                    self._obj2head[qid2].add(qid)
+
+    def _load_non_edit_mode(
+        self,
+        qid2relations: Union[Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie],
+    ):
+        """Load relations in not edit mode."""
+        if isinstance(qid2relations, dict):
+            self._qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = _convert_to_trie(qid2relations, self.max_connections)
+        else:
+            self._qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = qid2relations
+        self._all_relations: Union[Set[str], None] = None
+        self._obj2head: Union[Dict[str, set], None] = None
 
     def save(self, save_dir, prefix=""):
         """Dump the kg symbols.
@@ -72,23 +120,13 @@ class KGSymbols:
             filename=os.path.join(save_dir, "config.json"),
             contents={
                 "max_connections": self.max_connections,
-                "datetime": str(datetime.now()),
             },
         )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, f"{prefix}qid2relations.json"),
-            contents=self._qid2relations,
-        )
-        utils.dump_json_file(
-            filename=os.path.join(save_dir, f"{prefix}relation_vocab.json"),
-            contents=self._relation_vocab,
-        )
-        # For backwards compatability with model, dump the adjacency matrix, too
-        with open(os.path.join(save_dir, f"{prefix}kg_adj.txt"), "w") as out_f:
-            for qid in self._qid2relations:
-                for rel in self._qid2relations[qid]:
-                    for qid2 in self._qid2relations[qid][rel]:
-                        out_f.write(f"{qid}\t{qid2}\n")
+        if isinstance(self._qid2relations, dict):
+            qid2relations = _convert_to_trie(self._qid2relations, self.max_connections)
+            qid2relations.dump(os.path.join(save_dir, f"{prefix}qid2relations"))
+        else:
+            self._qid2relations.dump(os.path.join(save_dir, f"{prefix}qid2relations"))
 
     @classmethod
     def load_from_cache(cls, load_dir, prefix="", edit_mode=False, verbose=False):
@@ -104,65 +142,78 @@ class KGSymbols:
         """
         config = utils.load_json_file(filename=os.path.join(load_dir, "config.json"))
         max_connections = config["max_connections"]
-        qid2relations: Dict[str, Dict[str, List[str]]] = utils.load_json_file(
-            filename=os.path.join(load_dir, f"{prefix}qid2relations.json")
-        )
-        relation_vocab: Dict[str, str] = utils.load_json_file(
-            filename=os.path.join(load_dir, f"{prefix}relation_vocab.json")
-        )
-        return cls(qid2relations, relation_vocab, max_connections, edit_mode, verbose)
+        # For backwards compatibility, check if trie directory exists, otherwise load from json
+        rel_load_dir = os.path.join(load_dir, f"{prefix}qid2relations")
+        if not os.path.exists(rel_load_dir):
+            qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = utils.load_json_file(
+                filename=os.path.join(load_dir, f"{prefix}qid2relations.json")
+            )
+        else:
+            qid2relations: Union[
+                Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
+            ] = ThreeLayerVocabularyTrie(
+                load_dir=rel_load_dir, max_value=max_connections
+            )
+        return cls(qid2relations, max_connections, edit_mode, verbose)
 
-    def get_connections_by_relation(self, qid, relation):
-        """Return list of other_qids connected to ``qid`` by relation.
+    def get_qid2relations_dict(self):
+        """Return a dictionary form of the relation to qid mappings object.
 
-        Args:
-            qid: QID
-            relation: relation
-
-        Returns: List
+        Returns: Dict of relation to head qid to list of tail qids
         """
-        return self._qid2relations[qid].get(relation, [])
-
-    def get_all_connections(self, qid):
-        """Return dictionary of relation -> list of other_qids connected to ``qid`` by relation.
-
-        Args:
-            qid: QID
-
-        Returns: Dict
-        """
-        return self._qid2relations[qid]
+        if isinstance(self._qid2relations, dict):
+            return copy.deepcopy(self._qid2relations)
+        else:
+            return self._qid2relations.to_dict()
 
     def get_all_relations(self):
         """Get all relations in our KG mapping.
 
         Returns: Set
         """
-        return self._all_relations
+        if isinstance(self._qid2relations, dict):
+            return self._all_relations
+        else:
+            return set(self._qid2relations.key_vocab_keys())
 
-    def get_relation_name(self, relation):
-        """Return human readable relation from vocab.
-
-        Args:
-            relation: relation
-
-        Returns: string
-        """
-        return self._relation_vocab_inv[relation]
-
-    def is_connected(self, qid1, qid2):
-        """Check if two QIDs are connected in KG.
+    def get_relation_between(self, qid1, qid2):
+        """Check if two QIDs are connected in KG and returns their relation.
 
         Args:
             qid1: QID one
             qid2: QID two
 
-        Returns: boolean
+        Returns: string relation or None
         """
-        for rel in self._qid2relations.get(qid1, {}):
-            if qid2 in self._qid2relations[qid1][rel]:
-                return True
-        return False
+        rel_dict = {}
+        if isinstance(self._qid2relations, dict):
+            rel_dict = self._qid2relations.get(qid1, {})
+        else:
+            if self._qid2relations.is_key_in_trie(qid1):
+                rel_dict = self._qid2relations.get_value(qid1)
+
+        for rel, tail_qids in rel_dict.items():
+            if qid2 in set(tail_qids):
+                return rel
+        return None
+
+    def get_relations_tails_for_qid(self, qid):
+        """Get dict of relation to tail qids for given qid.
+
+        Args:
+            qid: QID
+
+        Returns: Dict relation to list of tail qids for that relation
+        """
+        if isinstance(self._qid2relations, dict):
+            return self._qid2relations.get(qid, {})
+        else:
+            rel_dict = {}
+            if self._qid2relations.is_key_in_trie(qid):
+                rel_dict = self._qid2relations.get_value(qid)
+        return rel_dict
 
     # ============================================================
     # EDIT MODE OPERATIONS
@@ -180,10 +231,7 @@ class KGSymbols:
             qid2: tail entity QID:
         """
         if relation not in self._all_relations:
-            raise ValueError(
-                f"Tried adding {relation} to qid {qid}. We do not support new relations."
-            )
-
+            self._all_relations.add(relation)
         if relation not in self._qid2relations[qid]:
             self._qid2relations[qid][relation] = []
         # Check if qid2 already in that relation
@@ -232,11 +280,11 @@ class KGSymbols:
             qid: QID
             relation_dict: dictionary of relation -> list of connected other_qids by relation
         """
+        if qid in self._qid2relations:
+            raise ValueError(f"{qid} is already in kg symbols")
         for relation in relation_dict:
             if relation not in self._all_relations:
-                raise ValueError(
-                    f"Tried adding {relation} to new qid {qid}. We do not support new relations."
-                )
+                self._all_relations.add(relation)
         self._qid2relations[qid] = relation_dict.copy()
         for rel in self._qid2relations[qid]:
             self._qid2relations[qid][rel] = self._qid2relations[qid][rel][
@@ -258,10 +306,10 @@ class KGSymbols:
             old_qid: old QID
             new_qid: new QID
         """
-        assert old_qid in self._qid2relations and new_qid not in self._qid2relations, (
-            f"Internal Error: checks on existing versus new qid for {old_qid} and {new_qid} "
-            f"failed where {old_qid in self._qid2relations} and {new_qid not in self._qid2relations}"
-        )
+        if old_qid not in self._qid2relations or new_qid in self._qid2relations:
+            raise ValueError(
+                f"Either old qid {old_qid} is not in kg symbols or new qid {new_qid} is already in kg symbols"
+            )
         # Update all object qids (aka subjects-object pairs where the object is the old qid)
         for subj_qid in self._obj2head.get(old_qid, {}):
             for rel in self._qid2relations[subj_qid]:

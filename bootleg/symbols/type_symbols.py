@@ -1,5 +1,6 @@
 """Type symbols class."""
 
+import copy
 import os
 from typing import Dict, List, Optional, Set, Union
 
@@ -7,7 +8,7 @@ from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
-from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
+from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
 
 
 def _convert_to_trie(qid2typenames, max_types):
@@ -16,7 +17,7 @@ def _convert_to_trie(qid2typenames, max_types):
     for q, typs in qid2typenames.items():
         all_typenames.update(set(typs))
         qid2typenames_filt[q] = typs[:max_types]
-    qid2typenames_trie = VocabularyPairedListTrie(
+    qid2typenames_trie = TwoLayerVocabularyScoreTrie(
         input_dict=qid2typenames_filt,
         vocabulary=all_typenames,
         max_value=max_types,
@@ -29,7 +30,7 @@ class TypeSymbols:
 
     def __init__(
         self,
-        qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie],
+        qid2typenames: Union[Dict[str, List[str]], TwoLayerVocabularyScoreTrie],
         max_types: Optional[int] = 10,
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
@@ -50,16 +51,16 @@ class TypeSymbols:
             )
 
     def _load_edit_mode(
-        self, qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie]
+        self, qid2typenames: Union[Dict[str, List[str]], TwoLayerVocabularyScoreTrie]
     ):
         """Load qid to type mappings in edit mode."""
-        if isinstance(qid2typenames, VocabularyPairedListTrie):
+        if isinstance(qid2typenames, TwoLayerVocabularyScoreTrie):
             self._qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
             ] = qid2typenames.to_dict(keep_score=False)
         else:
             self._qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
             ] = {q: typs[: self.max_types] for q, typs in qid2typenames.items()}
         self._all_typenames: Union[Set[str], None] = set(
             [t for typeset in self._qid2typenames.values() for t in typeset]
@@ -81,16 +82,16 @@ class TypeSymbols:
                 self._typename2qids[typname] = set()
 
     def _load_non_edit_mode(
-        self, qid2typenames: Union[Dict[str, List[str]], VocabularyPairedListTrie]
+        self, qid2typenames: Union[Dict[str, List[str]], TwoLayerVocabularyScoreTrie]
     ):
         """Load qid to type mappings in non edit mode (read only mode)."""
         if isinstance(qid2typenames, dict):
             self._qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
             ] = _convert_to_trie(qid2typenames, self.max_types)
         else:
             self._qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
             ] = qid2typenames
 
         self._all_typenames: Union[Set[str], None] = None
@@ -134,14 +135,14 @@ class TypeSymbols:
         type_load_dir = os.path.join(load_dir, f"{prefix}qid2typenames")
         if not os.path.exists(type_load_dir):
             qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
             ] = utils.load_json_file(
                 filename=os.path.join(load_dir, f"{prefix}qid2typenames.json")
             )
         else:
             qid2typenames: Union[
-                Dict[str, List[str]], VocabularyPairedListTrie
-            ] = VocabularyPairedListTrie(load_dir=type_load_dir, max_value=max_types)
+                Dict[str, List[str]], TwoLayerVocabularyScoreTrie
+            ] = TwoLayerVocabularyScoreTrie(load_dir=type_load_dir, max_value=max_types)
         return cls(qid2typenames, max_types, edit_mode, verbose)
 
     def get_all_types(self):
@@ -163,7 +164,7 @@ class TypeSymbols:
             types = self._qid2typenames.get(qid, [])
         else:
             if self._qid2typenames.is_key_in_trie(qid):
-                # VocabularyPairedListTrie assumes values are list of pairs - we only want type name which is first
+                # TwoLayerVocabularyScoreTrie assumes values are list of pairs - we only want type name which is first
                 types = self._qid2typenames.get_value(qid, keep_score=False)
             else:
                 types = []
@@ -175,7 +176,7 @@ class TypeSymbols:
         Returns: Dict of QID to list of typenames.
         """
         if isinstance(self._qid2typenames, dict):
-            return self._qid2typenames
+            return copy.deepcopy(self._qid2typenames)
         else:
             return self._qid2typenames.to_dict(keep_score=False)
 

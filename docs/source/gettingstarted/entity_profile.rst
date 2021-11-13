@@ -78,9 +78,7 @@ Inside the saved folder for the profile, all the mappings needed to run a Bootle
     * ``qid2typenames``: Folder containing a RecordTrie mapping from entity QID to a list of type names.
     * ``config.json``: Contains metadata of the maximum number of types allowed for an entity.
 * ``kg_mappings``: This folder contains relationship entity data.
-    * ``relation_vocab.json``: Mapping from human-readable relation name to relation ID used in qid2relations. Used to generate entity text input.
-    * ``qid2relations.json``: Mapping from head entity QID to a dictionary of relation -> list of tail entities.
-    * ``kg_adj.txt``: List of all connected entities separated by a tab. This is an unlabeled adjacency matrix.
+    * ``qid2relations``: Folder containing a RecordTrie mapping from entity QID to relations to list of tail QIDs associated with the entity QID.
     * ``config.json``: Contains metadata of the maximum number of tail connections allowed for a particular head entity and relation.
 
 .. note::
@@ -103,8 +101,7 @@ Given this metadata, you simply need to specify the types, relation mappings and
         type_symbols_dir: type_mappings/wiki
       entity_kg_data:
         use_entity_kg: true
-        kg_labels: kg_mappings/qid2relations.json
-        kg_vocab: kg_mappings/relation_vocab.json
+        kg_symbols_dir: kg_mappings
 
 See our `example config <https://github.com/HazyResearch/bootleg/tree/master/configs/tutorial/sample_config.yaml>`_
 for a full reference, and see our `entity profile tutorial <https://github

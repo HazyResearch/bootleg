@@ -20,8 +20,8 @@ from tqdm import tqdm
 from bootleg import log_rank_0_debug
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
+from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
 from bootleg.utils.classes.vocab_trie import VocabularyTrie
-from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
 from bootleg.utils.utils import strip_nan, try_rmtree
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ def map_aliases_to_candidates(
 
     Args:
         train_in_candidates: whether the model has a NC entity or not (assumes all gold QIDs are in candidate lists)
-        alias_cand_map: alias -> candidate qids in dict or VocabularyPairedListTrie format
+        alias_cand_map: alias -> candidate qids in dict or TwoLayerVocabularyScoreTrie format
         aliases: list of aliases
 
     Returns: List of lists QIDs
@@ -465,7 +465,7 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
         entity_symbols: entity symbols
     """
     try:
-        VocabularyPairedListTrie(load_dir=save_folder)
+        TwoLayerVocabularyScoreTrie(load_dir=save_folder)
     except FileNotFoundError:
         log_rank_0_debug(
             logger,
@@ -1146,7 +1146,7 @@ def write_data_labels_initializer(
     global sental2embid_global
     sental2embid_global = utils.load_single_item_trie(sental2embid_file)
     global alias_cand_trie_global
-    alias_cand_trie_global = VocabularyPairedListTrie(
+    alias_cand_trie_global = TwoLayerVocabularyScoreTrie(
         load_dir=trie_candidate_map_folder
     )
     global qid2eid_global

@@ -1,16 +1,15 @@
 """Entity symbols."""
+import copy
 import logging
 import os
-import time
-from datetime import datetime
 from typing import Callable, Dict, Optional, Union
 
 from tqdm import tqdm
 
 import bootleg.utils.utils as utils
 from bootleg.symbols.constants import edit_op
+from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
 from bootleg.utils.classes.vocab_trie import VocabularyTrie
-from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ class EntitySymbols:
 
     def __init__(
         self,
-        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
+        alias2qids: Union[Dict[str, list], TwoLayerVocabularyScoreTrie],
         qid2title: Dict[str, str],
         qid2desc: Union[Dict[str, str]] = None,
         qid2eid: Optional[VocabularyTrie] = None,
@@ -69,7 +68,7 @@ class EntitySymbols:
 
     def _load_edit_mode(
         self,
-        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
+        alias2qids: Union[Dict[str, list], TwoLayerVocabularyScoreTrie],
         qid2title: Dict[str, str],
         qid2desc: Union[Dict[str, str]],
         qid2eid: Union[Dict[str, int], VocabularyTrie],
@@ -80,10 +79,12 @@ class EntitySymbols:
         Loading in edit mode requires all inputs be cast to dictionaries. Tries do not allow value changes.
         """
         # Convert to dict for editing
-        if isinstance(alias2qids, VocabularyPairedListTrie):
+        if isinstance(alias2qids, TwoLayerVocabularyScoreTrie):
             alias2qids = alias2qids.to_dict()
 
-        self._alias2qids: Union[Dict[str, list], VocabularyPairedListTrie] = alias2qids
+        self._alias2qids: Union[
+            Dict[str, list], TwoLayerVocabularyScoreTrie
+        ] = alias2qids
         self._qid2title: Dict[str, str] = qid2title
         self._qid2desc: Dict[str, str] = qid2desc
 
@@ -138,7 +139,7 @@ class EntitySymbols:
 
     def _load_non_edit_mode(
         self,
-        alias2qids: Union[Dict[str, list], VocabularyPairedListTrie],
+        alias2qids: Union[Dict[str, list], TwoLayerVocabularyScoreTrie],
         qid2title: Dict[str, str],
         qid2desc: Union[Dict[str, str]],
         qid2eid: Optional[VocabularyTrie],
@@ -146,23 +147,22 @@ class EntitySymbols:
     ):
         """Load items in read-only Trie mode."""
         # Convert to record trie
-        st = time.time()
         if isinstance(alias2qids, dict):
             self._sort_alias_cands(
                 alias2qids, truncate=True, max_cands=self.max_candidates
             )
-            alias2qids = VocabularyPairedListTrie(
+            alias2qids = TwoLayerVocabularyScoreTrie(
                 input_dict=alias2qids,
                 vocabulary=qid2title,
                 max_value=self.max_candidates,
             )
-        print(f"Time for creating alias trie {time.time() - st}")
 
-        self._alias2qids: Union[Dict[str, list], VocabularyPairedListTrie] = alias2qids
+        self._alias2qids: Union[
+            Dict[str, list], TwoLayerVocabularyScoreTrie
+        ] = alias2qids
         self._qid2title: Dict[str, str] = qid2title
         self._qid2desc: Dict[str, str] = qid2desc
 
-        st = time.time()
         # Convert to Tries for non edit mode
         if isinstance(qid2eid, dict):
             self._qid2eid: Union[Dict[str, int], VocabularyTrie] = VocabularyTrie(
@@ -177,9 +177,6 @@ class EntitySymbols:
             )
         else:
             self._alias2id: Union[Dict[str, int], VocabularyTrie] = alias2id
-        print(f"Time for creating vocab trie {time.time() - st}")
-
-        st = time.time()
         # Make reverse functions for each of use
         self._id2alias: Union[
             Dict[int, str], Callable[[int], str]
@@ -187,7 +184,6 @@ class EntitySymbols:
         self._eid2qid: Union[
             Dict[int, str], Callable[[int], str]
         ] = lambda x: self._qid2eid.get_key(x)
-        print(f"Time for iterating indexes {time.time() - st}")
 
         self._qid2aliases: Union[Dict[str, set], None] = None
 
@@ -196,10 +192,8 @@ class EntitySymbols:
         ), "0 can't be an eid. It's reserved for null candidate"
 
         # For when we need to add new entities
-        st = time.time()
         self.max_eid = self._qid2eid.get_max_id()
         self.max_alid = self._alias2id.get_max_id()
-        print(f"Time for max {time.time() - st}")
 
     def save(self, save_dir):
         """Dump the entity symbols.
@@ -212,12 +206,11 @@ class EntitySymbols:
             filename=os.path.join(save_dir, "config.json"),
             contents={
                 "max_candidates": self.max_candidates,
-                "datetime": str(datetime.now()),
             },
         )
         # If in edit mode, must convert back to tris for saving
         if isinstance(self._alias2qids, dict):
-            alias2qids = VocabularyPairedListTrie(
+            alias2qids = TwoLayerVocabularyScoreTrie(
                 input_dict=self._alias2qids,
                 vocabulary=self._qid2title,
                 max_value=self.max_candidates,
@@ -269,41 +262,31 @@ class EntitySymbols:
         max_candidates = config["max_candidates"]
         # For backwards compatibility, check if folder exists - if not, load from json
         # Future versions will assume folders exist
-        st = time.time()
         alias_load_dir = os.path.join(load_dir, alias_cand_map_fld)
         if not os.path.exists(alias_load_dir):
             alias2qids: Dict[str, list] = utils.load_json_file(
                 filename=os.path.join(load_dir, "alias2qids.json")
             )
         else:
-            alias2qids: VocabularyPairedListTrie = VocabularyPairedListTrie(
+            alias2qids: TwoLayerVocabularyScoreTrie = TwoLayerVocabularyScoreTrie(
                 load_dir=alias_load_dir
             )
-        print(f"Time to load alias {time.time() - st}")
-        st = time.time()
         alias_id_load_dir = os.path.join(load_dir, alias_idx_fld)
         alias2id = None
         if os.path.exists(alias_id_load_dir):
             alias2id: VocabularyTrie = VocabularyTrie(load_dir=alias_id_load_dir)
-        print(f"Time to load aliasid {time.time() - st}")
-        st = time.time()
         eid_load_dir = os.path.join(load_dir, "qid2eid")
         qid2eid = None
         if os.path.exists(eid_load_dir):
             qid2eid: VocabularyTrie = VocabularyTrie(load_dir=eid_load_dir)
-        print(f"Time to load qideid {time.time() - st}")
-        st = time.time()
         qid2title: Dict[str, str] = utils.load_json_file(
             filename=os.path.join(load_dir, "qid2title.json")
         )
-        print(f"Time to load alias {time.time() - st}")
-        st = time.time()
         qid2desc = None
         if os.path.exists(os.path.join(load_dir, "qid2desc.json")):
             qid2desc: Dict[str, str] = utils.load_json_file(
                 filename=os.path.join(load_dir, "qid2desc.json")
             )
-        print(f"Time to load desc {time.time() - st}")
         return cls(
             alias2qids,
             qid2title,
@@ -337,7 +320,7 @@ class EntitySymbols:
         Returns: Dict qid2eid mapping
         """
         if isinstance(self._qid2eid, dict):
-            return self._qid2eid
+            return copy.deepcopy(self._qid2eid)
         else:
             return self._qid2eid.to_dict()
 
@@ -350,7 +333,7 @@ class EntitySymbols:
         Returns: Dict alias2qids mapping
         """
         if isinstance(self._alias2qids, dict):
-            return self._alias2qids
+            return copy.deepcopy(self._alias2qids)
         else:
             return self._alias2qids.to_dict()
 
@@ -360,7 +343,7 @@ class EntitySymbols:
 
         Returns: Dict qid2title mapping
         """
-        return self._qid2title
+        return copy.deepcopy(self._qid2title)
 
     def get_allalias_vocabtrie(self):
         """
@@ -369,7 +352,7 @@ class EntitySymbols:
         Returns: Vocab trie of all aliases.
         """
         if isinstance(self._alias2id, VocabularyTrie):
-            return self._alias2id
+            return copy.deepcopy(self._alias2id)
         else:
             return VocabularyTrie(input_dict=self._alias2id)
 

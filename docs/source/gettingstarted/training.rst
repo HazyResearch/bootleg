@@ -72,19 +72,18 @@ We assume the data above is saved in the following directory structure, where th
    entity_db/
         type_mappings/
             wiki/
-                qid2typenames
+                qid2typenames/
                 config.json
         kg_mappings/
             config.json
-            qid2relations.json
-            relation_vocab.json
+            qid2relations/
             kg_adj.txt
         entity_mappings/
-            alias2qids
-            qid2eid
+            alias2qids/
+            qid2eid/
             qid2title.json
             qid2desc.json
-            alias2id
+            alias2id/
             config.json
 
 Preparing the Config
@@ -138,8 +137,7 @@ As described in the _Bootleg Model, Bootleg generates an embedding entity from a
           max_ent_type_len: 20
         entity_kg_data:
           use_entity_kg: true
-          kg_labels: kg_mappings/qid2relations.json
-          kg_vocab: kg_mappings/relation_vocab.json
+          kg_symbols_dir: kg_mappings
           max_ent_kg_len: 60
         max_seq_len: 128
         max_seq_window_len: 64

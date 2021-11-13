@@ -1,8 +1,6 @@
 """Bootleg data utils."""
 import os
 
-import ujson
-
 from bootleg.symbols.constants import FINAL_LOSS, SPECIAL_TOKENS
 from bootleg.utils import utils
 
@@ -177,49 +175,6 @@ def add_special_tokens(tokenizer):
     """
     # Add standard tokens
     tokenizer.add_special_tokens(SPECIAL_TOKENS)
-
-
-def read_in_relations(data_config, entitysymbols):
-    """
-    Read in relation mapping.
-
-    Reads in relation kg mapping from QID -> relation id -> list of "tail"
-    qid. Outputs dict of QID -> list of relationship strings of "<relation>
-
-    <tail qid>" We map the relation id to a string via vocab mapping.
-
-    Args:
-        data_config: data config
-        entitysymbols: entity symbols
-
-    Returns: dictionary of QID to list of strings of relations and tail QIDS of triple
-    """
-    entity_dir = data_config.entity_dir
-    kg_file = data_config.entity_kg_data.kg_labels
-    kg_vocab_file = data_config.entity_kg_data.kg_vocab
-    kg_file = os.path.join(entity_dir, kg_file)
-    vocab_file = os.path.join(entity_dir, kg_vocab_file)
-    with open(vocab_file, "r") as in_f:
-        vocab = ujson.load(in_f)
-        vocab_inv = {v: k for k, v in vocab.items()}
-        assert len(vocab) == len(vocab_inv), (
-            f"Inverse vocab from {vocab_file} not" f"same length as vocab"
-        )
-    with open(kg_file) as in_f:
-        qid2relationtriples = {}
-        for qid, rel_dict in ujson.load(in_f).items():
-            # Happens if have QIDs that are not in saved file
-            if not entitysymbols.qid_exists(qid):
-                continue
-            triples = []
-            for rel, tail_list in rel_dict.items():
-                mapped_rel = vocab_inv[rel]
-                for tail_qid in tail_list:
-                    if not entitysymbols.qid_exists(tail_qid):
-                        continue
-                    triples.append(mapped_rel + " " + entitysymbols.get_title(tail_qid))
-            qid2relationtriples[qid] = triples
-    return qid2relationtriples
 
 
 def read_in_akas(entitysymbols):

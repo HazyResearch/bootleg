@@ -104,7 +104,6 @@ class EntityProfileTest(unittest.TestCase):
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
             "Q567": {"sibling": ["Q123"]},
-            "Q789": {},
         }
         (
             qid2title,
@@ -249,9 +248,9 @@ class EntityProfileTest(unittest.TestCase):
                 set(entity_profile2.get_all_types(type_sys)),
             )
         for qid in entity_profile.get_all_qids():
-            self.assertSetEqual(
-                set(entity_profile.get_all_connections(qid)),
-                set(entity_profile2.get_all_connections(qid)),
+            self.assertDictEqual(
+                entity_profile.get_relations_tails_for_qid(qid),
+                entity_profile2.get_relations_tails_for_qid(qid),
             )
 
         # Test load with no types or kgs
@@ -266,7 +265,7 @@ class EntityProfileTest(unittest.TestCase):
         self.assertIsNone(entity_profile2._kg_symbols)
 
         # Testing that the functions still work despite not loading them
-        assert len(entity_profile2.get_all_connections("Q123")) == 0
+        assert entity_profile2.get_relations_tails_for_qid("Q123") is None
 
         # Test load with no types or kgs
         entity_profile2 = EntityProfile.load_from_cache(
@@ -388,7 +387,7 @@ class EntityProfileTest(unittest.TestCase):
             set(entity_profile.get_entities_of_type("cat", "wiki")), {"Q345"}
         )
         self.assertEqual(entity_profile.num_entities_with_pad_and_nocand, 4)
-        self.assertTrue(entity_profile.is_connected("Q123", "Q345"))
+        self.assertEqual(entity_profile.get_relation_between("Q123", "Q345"), "sibling")
 
     def test_add_entity(self):
         """Test add entity."""
@@ -482,21 +481,25 @@ class EntityProfileTest(unittest.TestCase):
         )
 
         new_entity = {
-            "entity_id": "Q789",
+            "entity_id": "Q790",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
             "description": "Snake",
             "types": {"hyena": ["animal"]},
             "relations": [{"relation": "sibbbling", "object": "Q123"}],
         }
-
-        # Test new relation
-        with self.assertRaises(ValueError) as context:
-            entity_profile.add_entity(new_entity)
-        assert type(context.exception) is ValueError
-        assert (
-            "When adding a new entity, you must use the same set of relations."
-            in str(context.exception)
+        entity_profile.add_entity(new_entity)
+        self.assertTrue(entity_profile.qid_exists("Q790"))
+        self.assertEqual(entity_profile.get_title("Q790"), "Snake")
+        self.assertEqual(entity_profile.get_desc("Q790"), "Snake")
+        self.assertListEqual(
+            entity_profile.get_mentions_with_scores("Q790"),
+            [["snake", 10.0], ["animal", 3.0]],
+        )
+        self.assertListEqual(entity_profile.get_types("Q790", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile.get_types("Q790", "wiki"), [])
+        self.assertEqual(
+            entity_profile.get_relation_between("Q790", "Q123"), "sibbbling"
         )
 
         new_entity = {
@@ -518,9 +521,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q789", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q789", "wiki"), [])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q789", "sibling"), ["Q123"]
-        )
+        self.assertEqual(entity_profile.get_relation_between("Q789", "Q123"), "sibling")
 
         # Update entity
         new_entity = {
@@ -542,9 +543,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q789", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q789", "wiki"), [])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q789", "sibling"), ["Q123"]
-        )
+        self.assertEqual(entity_profile.get_relation_between("Q789", "Q123"), "sibling")
 
         # Check that no_kg still works with load_from_cache
         entity_profile2 = EntityProfile.load_from_cache(
@@ -560,9 +559,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q789", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q789", "wiki"), [])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q789", "sibling"), []
-        )
+        self.assertEqual(entity_profile.get_relation_between("Q789", "Q123"), "sibling")
 
     def test_reindentify_entity(self):
         """Test reindentify entity."""
@@ -612,10 +609,8 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q911", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q911", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q911", "sibling"),
-            ["Q345", "Q567"],
-        )
+        self.assertEqual(entity_profile.get_relation_between("Q911", "Q345"), "sibling")
+        self.assertEqual(entity_profile.get_relation_between("Q911", "Q567"), "sibling")
 
         # Check that no_kg still works with load_from_cache
         entity_profile2 = EntityProfile.load_from_cache(
@@ -632,10 +627,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q911", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q911", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q911", "sibling"),
-            [],
-        )
+        self.assertIsNone(entity_profile2.get_relation_between("Q911", "Q345"))
 
     def test_prune_to_entities(self):
         """Test prune to entities."""
@@ -679,10 +671,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q123", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q123", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q123", "sibling"),
-            [],
-        )
+        self.assertIsNone(entity_profile.get_relation_between("Q123", "Q567"))
 
         # Check that no_kg still works with load_from_cache
         entity_profile2 = EntityProfile.load_from_cache(
@@ -697,10 +686,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q123", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q123", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q123", "sibling"),
-            [],
-        )
+        self.assertIsNone(entity_profile.get_relation_between("Q123", "Q567"))
 
     def test_end2end(self):
         """Test end2end."""

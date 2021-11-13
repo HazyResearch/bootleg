@@ -34,8 +34,7 @@ data_config:
     type_symbols_dir: type_mappings/wiki
   entity_kg_data:
     use_entity_kg: true
-    kg_labels: kg_mappings/qid2relations.json
-    kg_vocab: kg_mappings/relation_vocab.json
+    kg_symbols_dir: kg_mappings
   max_seq_len: 64
   max_seq_window_len: 32
   max_ent_len: 64

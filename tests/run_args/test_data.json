@@ -15,7 +15,7 @@
         "overwrite_preprocessed_data": true,
         "entity_type_data": {
             "use_entity_types": true,
-            "type_symbols_dir": "type_mappings",
+            "type_symbols_dir": "type_mappings/wiki",
             "max_ent_type_len": 5,
         },
         "word_embedding":

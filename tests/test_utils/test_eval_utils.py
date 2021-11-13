@@ -11,8 +11,8 @@ import ujson
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import eval_utils
+from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
 from bootleg.utils.classes.vocab_trie import VocabularyTrie
-from bootleg.utils.classes.vocabularypairedlist_trie import VocabularyPairedListTrie
 from bootleg.utils.eval_utils import write_data_labels
 
 
@@ -37,7 +37,7 @@ class EntitySymbolsSubclass(EntitySymbols):
             "f": [["Q2", 5.0], ["Q1", 3]],
             "g": [["Q1", 30.0], ["Q2", 3]],
         }
-        self._alias2qids = VocabularyPairedListTrie(
+        self._alias2qids = TwoLayerVocabularyScoreTrie(
             input_dict=alias2qids,
             vocabulary=self._qid2title,
             max_value=self.max_candidates,

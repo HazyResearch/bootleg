@@ -43,8 +43,7 @@ data_config:
     type_symbols_dir: type_mappings/wiki
   entity_kg_data:
     use_entity_kg: true
-    kg_labels: kg_mappings/qid2relations.json
-    kg_vocab: kg_mappings/relation_vocab.json
+    kg_symbols_dir: kg_mappings
   entity_dir: /home/data/bootleg-data/wiki_title_0122/entity_db
   max_seq_len: 128
   max_seq_window_len: 64

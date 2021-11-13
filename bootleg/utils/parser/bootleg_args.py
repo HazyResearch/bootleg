@@ -94,20 +94,16 @@ config_args = {
         "entity_type_data": {
             "use_entity_types": (False, "whether to use entity type data"),
             "type_symbols_dir": (
-                "type_symbols/wiki",
-                "type file from qid to list of type type names",
+                "type_mappings/wiki",
+                "directory to type symbols inside entity_dir",
             ),
             "max_ent_type_len": (20, "max WORD length for type sequence"),
         },
         "entity_kg_data": {
             "use_entity_kg": (False, "whether to use entity type data"),
-            "kg_labels": (
-                "qid2relations.json",
-                "type file from qid to json of kg relation id to list of tail qids",
-            ),
-            "kg_vocab": (
-                "relation_vocab.json",
-                "map from kg relation to textual title",
+            "kg_symbols_dir": (
+                "kg_mappings",
+                "directory to kg symbols inside entity_dir",
             ),
             "max_ent_kg_len": (60, "max WORD length for kg sequence"),
         },

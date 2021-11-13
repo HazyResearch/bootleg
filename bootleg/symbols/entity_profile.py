@@ -279,8 +279,6 @@ class EntityProfile:
             for type_sys in type_systems:
                 if qid not in type_systems[type_sys]:
                     type_systems[type_sys][qid] = []
-            if qid not in qid2relations:
-                qid2relations[qid] = {}
         return qid2title, qid2desc, alias2qids, type_systems, qid2relations
 
     # To quickly get the mention scores, the object must be in edit mode
@@ -302,7 +300,7 @@ class EntityProfile:
                     if len(types) > 0:
                         ent_type_sys[type_sys] = types
                 relations = []
-                all_connections = self.get_all_connections(qid)
+                all_connections = self.get_relations_tails_for_qid(qid)
                 for rel in all_connections:
                     for qid2 in all_connections[rel]:
                         relations.append({"relation": rel, "object": qid2})
@@ -456,45 +454,31 @@ class EntityProfile:
         return self._type_systems[type_system].get_types(qid)
 
     @check_qid_exists
-    def get_connections_by_relation(self, qid, relation):
-        """Return list of other_qids connected to ``qid`` by relation.
-
-        Args:
-            qid: QID
-            relation: relation
-
-        Returns: List
-        """
-        if self._kg_symbols is None:
-            return []
-        return self._kg_symbols.get_connections_by_relation(qid, relation)
-
-    @check_qid_exists
-    def get_all_connections(self, qid):
-        """Return dictionary of relation -> list of other_qids connected to ``qid`` by relation.
-
-        Args:
-            qid: QID
-
-        Returns: Dict
-        """
-        if self._kg_symbols is None:
-            return {}
-        return self._kg_symbols.get_all_connections(qid)
-
-    @check_qid_exists
-    def is_connected(self, qid, qid2):
-        """Check if two QIDs are connected in KG.
+    def get_relation_between(self, qid, qid2):
+        """Check if two QIDs are connected in KG and returns their relation.
 
         Args:
             qid: QID one
             qid2: QID two
 
-        Returns: boolean
+        Returns: string relation or None
         """
         if self._kg_symbols is None:
-            return False
-        return self._kg_symbols.is_connected(qid, qid2)
+            return None
+        return self._kg_symbols.get_relation_between(qid, qid2)
+
+    @check_qid_exists
+    def get_relations_tails_for_qid(self, qid):
+        """Get dict of relation to tail qids for given qid.
+
+        Args:
+            qid: QID
+
+        Returns: Dict relation to list of tail qids for that relation
+        """
+        if self._kg_symbols is None:
+            return None
+        return self._kg_symbols.get_relations_tails_for_qid(qid)
 
     # ============================================================
     # EDIT MODE OPERATIONS
@@ -582,20 +566,12 @@ class EntityProfile:
                     f"Error {entity_obj}. When adding a new entity, you must use the same type system. "
                     f"We don't support new type systems."
                 )
-        # Add kg relations QID -> relation -> list of object QIDs
+        # Add kg relations relation -> list of object QIDs
         parsed_rels = {}
         for rel_pair in ent.relations:
             if "relation" not in rel_pair or "object" not in rel_pair:
                 raise ValueError(
                     "For each value in relations, it must be a JSON with keys relation and object"
-                )
-            if (
-                self._kg_symbols is not None
-                and rel_pair["relation"] not in self._kg_symbols.get_all_relations()
-            ):
-                raise ValueError(
-                    f"Error {entity_obj}. When adding a new entity, you must use the same set of relations. "
-                    f"We don't support new relations."
                 )
             if rel_pair["relation"] not in parsed_rels:
                 parsed_rels[rel_pair["relation"]] = []
@@ -685,7 +661,7 @@ class EntityProfile:
         # Update KG
         if self._kg_symbols is not None:
             for rel, qid2_list in list(
-                self._kg_symbols.get_all_connections(ent.entity_id).items()
+                self._kg_symbols.get_relations_tails_for_qid(ent.entity_id).items()
             ):
                 for qid2 in qid2_list:
                     self._kg_symbols.remove_relation(ent.entity_id, rel, qid2)

@@ -17,11 +17,11 @@ from bootleg.end2end.annotator_utils import DownloadProgressBar
 from bootleg.end2end.extract_mentions import find_aliases_in_sentence_tag
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
+from bootleg.symbols.kg_symbols import KGSymbols
 from bootleg.symbols.type_symbols import TypeSymbols
 from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
-from bootleg.utils.data_utils import read_in_relations
 from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
@@ -250,16 +250,17 @@ class BootlegAnnotator(object):
                     self.config.data_config.entity_type_data.type_symbols_dir,
                 )
             )
-
         add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
-        self.qid2relations = {}
+        self.kg_symbols = None
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
         if add_entity_kg and self.entity_emb_file is None:
             logger.debug("Reading entity kg database")
-            self.qid2relations = read_in_relations(
-                self.config.data_config, self.entity_db
+            self.kg_symbols = KGSymbols.load_from_cache(
+                os.path.join(
+                    self.config.data_config.entity_dir,
+                    self.config.data_config.entity_kg_data.kg_symbols_dir,
+                )
             )
-
         logger.debug("Reading word tokenizers")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.config.data_config.word_embedding.bert_model,
@@ -683,7 +684,7 @@ class BootlegAnnotator(object):
             qid,
             constants,
             self.entity_db,
-            self.qid2relations,
+            self.kg_symbols,
             self.type_symbols,
         )
         inputs = self.tokenizer(
