@@ -45,13 +45,12 @@ class DisambigLoss:
         )  # Squeeze single alias
         return ret.exp()
 
-    def disambig_loss(self, intermediate_output_dict, Y, active):
+    def disambig_loss(self, intermediate_output_dict, Y):
         """Return the entity disambiguation loss on prediction heads.
 
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels
-            active: whether examples are "active" or not (used in Emmental slicing)
 
         Returns: loss
         """
@@ -104,13 +103,12 @@ class DisambigLoss:
         score = torch.mm(out, ent_out.t()) / self.temperature
         return F.softmax(score, dim=-1)
 
-    def batch_cands_disambig_loss(self, intermediate_output_dict, Y, active):
+    def batch_cands_disambig_loss(self, intermediate_output_dict, Y):
         """Return the entity disambiguation loss on prediction heads.
 
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels
-            active: whether examples are "active" or not (used in Emmental slicing)
         Returns: loss
         """
         # Grab the first value of training (when doing distributed training, we will have one per process)
@@ -142,7 +140,8 @@ def create_task(
 
     Args:
         args: args
-        entity_symbols: entity symbols (default None)
+        use_batch_cands: use batch candidates for training
+        len_context_tok: length of the context tokenizer
         slice_datasets: slice datasets used in scorer (default None)
         entity_emb_file: file for pretrained entity embeddings - used for EVAL only
 
