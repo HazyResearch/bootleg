@@ -377,14 +377,8 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         output_files = []
         total_mentions_seen = 0
         for input_id, input_filename in enumerate(input_files):
-            print("READING FROM", input_id, input_filename)
             sentidx2num_mentions, sent_idx2row = eval_utils.get_sent_idx2num_mens(
                 input_filename
-            )
-            print(
-                "RANGE",
-                total_mentions_seen,
-                total_mentions_seen + sum(sentidx2num_mentions.values()),
             )
             log_rank_0_debug(logger, "Done collecting sentence to mention map")
             dataloader = get_dataloaders(
@@ -406,23 +400,6 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
                     )
                 },
             )[0]
-            from tqdm import tqdm
-
-            print(
-                "HERE",
-                len(dataloader.dataset),
-                "VS",
-                sum(sentidx2num_mentions.values()),
-            )
-            for i in tqdm(range(len(dataloader.dataset))):
-                if (
-                    str(dataloader.dataset[i][0]["sent_idx"].item())
-                    not in sentidx2num_mentions
-                ):
-                    print("BARD", i, dataloader.dataset[i][0]["sent_idx"].item())
-                    import ipdb
-
-                    ipdb.set_trace()
             input_file_save_folder = os.path.join(
                 temp_eval_folder, f"_data_out_{input_id}"
             )

@@ -11,7 +11,6 @@ from collections import defaultdict
 import emmental
 import numpy as np
 import pandas as pd
-import psutil
 import torch
 import torch.nn.functional as F
 import ujson
@@ -381,22 +380,6 @@ def batched_pred_iter(
                     # Index 0 -> sent_idx, Index 1 -> subsent_idx, Index 2 -> List of aliases positions
                     # (-1 means no mention in train example)
                     sent_idx = uid_bdict[task_name][ex_idx][0]
-                    if batch_num % 10 == 0 and ex_idx == 0:
-                        log_rank_0_debug(
-                            logger,
-                            f"{batch_num} at sent {sent_idx} PROCESS MEM "
-                            f"{psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3}",
-                        )
-                        log_rank_0_debug(
-                            logger,
-                            f"Available Mem: {psutil.virtual_memory().available / 1024 ** 3} "
-                            f"Used Mem: {psutil.virtual_memory().used / 1024 ** 3} "
-                            f"Perc Used: {psutil.virtual_memory().percent}%",
-                        )
-                        # if psutil.virtual_memory().percent > 90:
-                        #     import ipdb
-                        #
-                        #     ipdb.set_trace()
                     # Only increment for NED TASK
                     if task_name == NED_TASK:
                         # alias_pos_for_eval gives which mentions are meant to be evaluated in this batch (-1 means
@@ -412,8 +395,6 @@ def batched_pred_iter(
                         if sent_idx not in cur_sentidx2_nummentions:
                             cur_sentidx2_nummentions[sent_idx] = set()
                         # Index 2 is index of alias positions in original list (-1 means no mention)
-                        if alias_pos_for_eval == -1:
-                            print("ALIAS POST WAS -1 AT", sent_idx)
                         if alias_pos_for_eval != -1:
                             cur_sentidx2_nummentions[sent_idx].add(alias_pos_in_og_list)
                     uid_dict[task_name][sent_idx].extend(
@@ -443,9 +424,6 @@ def batched_pred_iter(
                 )
                 all_finalized_sentences.extend([str(s) for s in finalized_sent_idxs])
                 num_eval_steps = 0
-                log_rank_0_debug(
-                    logger, f"Found {len(finalized_sent_idxs)} sentences...clearing"
-                )
                 for final_sent_i in finalized_sent_idxs:
                     assert final_sent_i in cur_sentidx2_nummentions
                     del cur_sentidx2_nummentions[final_sent_i]
@@ -457,12 +435,7 @@ def batched_pred_iter(
                         if task_name in out_dict.keys():
                             for action_name in out_dict[task_name].keys():
                                 del out_dict[task_name][action_name][final_sent_i]
-                log_rank_0_debug(
-                    logger,
-                    f"MEM {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 3}",
-                )
                 if len(res) > 0:
-                    # print("FINALIZED", finalized_sent_idxs)
                     yield res
     res, finalized_sent_idxs = collect_result(
         uid_dict, gold_dict, pred_dict, prob_dict, out_dict, cur_sentidx2_nummentions
@@ -595,7 +568,7 @@ def dump_model_outputs(
         mode="w+",
         shape=(1,),
     ).nbytes
-    total_expected_size = item_size * len(dataloader.dataset) // 1024 ** 3
+    total_expected_size = item_size * len(dataloader.dataset) / 1024 ** 3
     log_rank_0_info(
         logger,
         f"Expected size is {total_expected_size}GB.",

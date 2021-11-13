@@ -163,13 +163,11 @@ def load_jsonl(filepath):
 
     Returns: List[Dict] of data
     """
-    st = time.time()
     lines = []
     num_lines = sum([1 for _ in open(filepath)])
     with open(filepath, "r") as in_f:
         for line in tqdm(in_f, total=num_lines):
             lines.append(ujson.loads(line))
-    print("time", time.time() - st)
     return lines
 
 

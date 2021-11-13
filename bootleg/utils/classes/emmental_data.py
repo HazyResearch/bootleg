@@ -50,7 +50,6 @@ class RangedEmmentalDataset(EmmentalDataset):
         Returns:
           Tuple of x_dict and y_dict
         """
-        print(index, self.data_range[index])
         return super().__getitem__(self.data_range[index])
 
     def __len__(self) -> int:
