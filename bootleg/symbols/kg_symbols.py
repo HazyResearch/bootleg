@@ -1,6 +1,7 @@
 """KG symbols class."""
 import copy
 import os
+import re
 from typing import Dict, List, Optional, Set, Union
 
 from tqdm import tqdm
@@ -150,6 +151,15 @@ class KGSymbols:
             ] = utils.load_json_file(
                 filename=os.path.join(load_dir, f"{prefix}qid2relations.json")
             )
+            # Make sure relation is _not_ PID. The user should have the qid2relation dict that is pre-translated
+            first_qid = next(iter(qid2relations.keys()))
+            first_rel = next(iter(qid2relations[first_qid].keys()))
+            if re.match("^P[0-9]+$", first_rel):
+                raise ValueError(
+                    "Your qid2relations dict has a relation as a PID identifier. Please replace "
+                    "with human readable strings for training. "
+                    "See https://www.wikidata.org/wiki/Wikidata:Database_reports/List_of_properties/all"
+                )
         else:
             qid2relations: Union[
                 Dict[str, Dict[str, List[str]]], ThreeLayerVocabularyTrie
