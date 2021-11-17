@@ -2,7 +2,7 @@
 import torch
 import torch.nn.functional as F
 from emmental.scorer import Scorer
-from emmental.task import EmmentalTask
+from emmental.task import Action, EmmentalTask
 from torch import nn
 from transformers import AutoModel
 
@@ -200,20 +200,18 @@ def create_task(
 
     # Create task flow
     task_flow = [
-        {
-            "name": entity_encoder_str,
-            "module": entity_encoder_str,
-            "inputs": entity_inputs,
-        },
-        {
-            "name": "context_encoder",
-            "module": "context_encoder",
-            "inputs": [
+        Action(
+            name=entity_encoder_str, module=entity_encoder_str, inputs=entity_inputs
+        ),
+        Action(
+            name="context_encoder",
+            module="context_encoder",
+            inputs=[
                 ("_input_", "input_ids"),
                 ("_input_", "token_type_ids"),
                 ("_input_", "attention_mask"),
             ],
-        },
+        ),
     ]
 
     return EmmentalTask(
