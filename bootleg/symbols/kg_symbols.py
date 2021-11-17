@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
-from bootleg.utils.classes.dictvocabulary_tries import ThreeLayerVocabularyTrie
+from bootleg.utils.classes.nested_vocab_tries import ThreeLayerVocabularyTrie
 
 
 def _convert_to_trie(qid2relations, max_connections):
@@ -188,14 +188,14 @@ class KGSymbols:
         else:
             return set(self._qid2relations.key_vocab_keys())
 
-    def get_relation_between(self, qid1, qid2):
-        """Check if two QIDs are connected in KG and returns their relation.
+    def get_relations_between(self, qid1, qid2):
+        """Check if two QIDs are connected in KG and returns the relations between then.
 
         Args:
             qid1: QID one
             qid2: QID two
 
-        Returns: string relation or None
+        Returns: string relation or empty set
         """
         rel_dict = {}
         if isinstance(self._qid2relations, dict):
@@ -203,11 +203,11 @@ class KGSymbols:
         else:
             if self._qid2relations.is_key_in_trie(qid1):
                 rel_dict = self._qid2relations.get_value(qid1)
-
+        rels = set()
         for rel, tail_qids in rel_dict.items():
             if qid2 in set(tail_qids):
-                return rel
-        return None
+                rels.add(rel)
+        return rels
 
     def get_relations_tails_for_qid(self, qid):
         """Get dict of relation to tail qids for given qid.

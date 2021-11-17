@@ -11,8 +11,10 @@ import ujson
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import eval_utils
-from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
-from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.nested_vocab_tries import (
+    TwoLayerVocabularyScoreTrie,
+    VocabularyTrie,
+)
 from bootleg.utils.eval_utils import write_data_labels
 
 
@@ -44,8 +46,8 @@ class EntitySymbolsSubclass(EntitySymbols):
         )
         self.num_entities = len(self._qid2eid)
         self.num_entities_with_pad_and_nocand = self.num_entities + 2
-        self.alias_cand_map_fld = "alias2qids"
-        self.alias_idx_fld = "alias2qids"
+        self.alias_cand_map_dir = "alias2qids"
+        self.alias_idx_dir = "alias2qids"
 
 
 class EvalUtils(unittest.TestCase):

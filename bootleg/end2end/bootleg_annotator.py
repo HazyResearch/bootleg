@@ -234,10 +234,10 @@ class BootlegAnnotator(object):
                 self.config.data_config.entity_dir,
                 self.config.data_config.entity_map_dir,
             ),
-            alias_cand_map_fld=self.config.data_config.alias_cand_map,
-            alias_idx_fld=self.config.data_config.alias_idx_map,
+            alias_cand_map_dir=self.config.data_config.alias_cand_map,
+            alias_idx_dir=self.config.data_config.alias_idx_map,
         )
-        self.all_aliases_trie = self.entity_db.get_allalias_vocabtrie()
+        self.all_aliases_trie = self.entity_db.get_all_alias_vocabtrie()
 
         add_entity_type = self.config.data_config.entity_type_data.use_entity_types
         self.type_symbols = None
@@ -283,7 +283,11 @@ class BootlegAnnotator(object):
             entity_emb_file=self.entity_emb_file,
         )
         # As we manually keep track of the aliases for scoring, we only need the embeddings as action outputs
-        task_to_add.action_outputs = [("entity_encoder", 0)]
+        task_to_add.action_outputs = (
+            [("entity_encoder", 0)]
+            if self.entity_emb_file is None
+            else [("entity_encoder_static", 0)]
+        )
         self.model.add_task(task_to_add)
 
         logger.debug("Loading model")

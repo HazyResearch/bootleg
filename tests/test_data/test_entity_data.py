@@ -36,8 +36,8 @@ class DataEntityLoader(unittest.TestCase):
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
-            alias_cand_map_fld=self.args.data_config.alias_cand_map,
-            alias_idx_fld=self.args.data_config.alias_idx_map,
+            alias_cand_map_dir=self.args.data_config.alias_cand_map,
+            alias_idx_dir=self.args.data_config.alias_idx_map,
         )
         self.entity_temp_dir = "tests/data/entity_loader/entity_data_test"
         self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
@@ -376,8 +376,8 @@ class DataEntityLoader(unittest.TestCase):
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
-            alias_cand_map_fld=self.args.data_config.alias_cand_map,
-            alias_idx_fld=self.args.data_config.alias_idx_map,
+            alias_cand_map_dir=self.args.data_config.alias_cand_map,
+            alias_idx_dir=self.args.data_config.alias_idx_map,
         )
 
         max_seq_len = 7

@@ -576,8 +576,8 @@ def convert_examples_to_features_and_save_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_fld=data_config.alias_cand_map,
-        alias_idx_fld=data_config.alias_idx_map,
+        alias_cand_map_dir=data_config.alias_cand_map,
+        alias_idx_dir=data_config.alias_idx_map,
     )
     global mmap_file_global
     mmap_file_global = np.memmap(save_dataset_name, dtype=X_storage, mode="r+")
@@ -1040,8 +1040,8 @@ def build_and_save_entity_inputs_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_fld=data_config.alias_cand_map,
-        alias_idx_fld=data_config.alias_idx_map,
+        alias_cand_map_dir=data_config.alias_cand_map,
+        alias_idx_dir=data_config.alias_idx_map,
     )
 
 

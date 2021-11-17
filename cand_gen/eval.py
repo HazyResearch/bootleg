@@ -247,8 +247,8 @@ def run_model(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_fld=config.data_config.alias_cand_map,
-        alias_idx_fld=config.data_config.alias_idx_map,
+        alias_cand_map_dir=config.data_config.alias_cand_map,
+        alias_idx_dir=config.data_config.alias_idx_map,
     )
     qid2eid = entity_symbols.get_qid2eid_dict()
     eid2qid = {v: k for k, v in qid2eid.items()}
@@ -291,16 +291,13 @@ def run_model(
     log_rank_0_info(logger, "Building index...")
     if torch.cuda.device_count() > 0 and config["model_config"]["device"] >= 0:
         if config["model_config"]["dataparallel"]:
-            print("DATAPARALLEL FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             faiss_index = faiss.index_cpu_to_all_gpus(faiss_cpu_index)
         else:
-            print("GPU FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             res = faiss.StandardGpuResources()
             faiss_index = faiss.index_cpu_to_gpu(res, 0, faiss_cpu_index)
     else:
-        print("CPU FAISS")
         faiss_index = faiss.IndexFlatIP(entity_embs.shape[-1])
 
     faiss_index.add(entity_embs)
@@ -324,7 +321,6 @@ def run_model(
     for i in range(int(np.ceil(total_samples / nn_chunk))):
         st = i * nn_chunk
         ed = min((i + 1) * nn_chunk, total_samples)
-        print("DATASET RANGE", st, ed, "NUM", total_samples, "CH", nn_chunk)
         context_preds, context_dataloader, context_model = gen_context_embeddings(
             config,
             context_tokenizer,

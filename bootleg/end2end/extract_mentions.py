@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 from bootleg.symbols.constants import ANCHOR_KEY
 from bootleg.symbols.entity_symbols import EntitySymbols
-from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.nested_vocab_tries import VocabularyTrie
 from bootleg.utils.utils import get_lnrm
 
 logger = logging.getLogger(__name__)
@@ -384,7 +384,7 @@ def extract_mentions(
     """
     assert os.path.exists(in_filepath), f"{in_filepath} does not exist"
     entity_symbols: EntitySymbols = EntitySymbols.load_from_cache(entity_db_dir)
-    all_aliases_trie: VocabularyTrie = entity_symbols.get_allalias_vocabtrie()
+    all_aliases_trie: VocabularyTrie = entity_symbols.get_all_alias_vocabtrie()
     if num_chunks is None:
         num_chunks = num_workers
     start_time = time.time()

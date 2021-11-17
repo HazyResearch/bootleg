@@ -206,8 +206,8 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_fld=config.data_config.alias_cand_map,
-        alias_idx_fld=config.data_config.alias_idx_map,
+        alias_cand_map_dir=config.data_config.alias_cand_map,
+        alias_idx_dir=config.data_config.alias_idx_map,
     )
     # Create tasks
     tasks = [NED_TASK]

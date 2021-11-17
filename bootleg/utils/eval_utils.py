@@ -20,8 +20,10 @@ from tqdm import tqdm
 from bootleg import log_rank_0_debug
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
-from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
-from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.nested_vocab_tries import (
+    TwoLayerVocabularyScoreTrie,
+    VocabularyTrie,
+)
 from bootleg.utils.utils import strip_nan, try_rmtree
 
 logger = logging.getLogger(__name__)

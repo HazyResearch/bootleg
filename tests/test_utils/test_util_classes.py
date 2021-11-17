@@ -3,11 +3,11 @@ import tempfile
 import unittest
 
 from bootleg.end2end.annotator_utils import DownloadProgressBar
-from bootleg.utils.classes.dictvocabulary_tries import (
+from bootleg.utils.classes.nested_vocab_tries import (
     ThreeLayerVocabularyTrie,
     TwoLayerVocabularyScoreTrie,
+    VocabularyTrie,
 )
-from bootleg.utils.classes.vocab_trie import VocabularyTrie
 
 
 class UtilClasses(unittest.TestCase):

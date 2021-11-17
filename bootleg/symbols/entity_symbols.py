@@ -8,8 +8,10 @@ from tqdm import tqdm
 
 import bootleg.utils.utils as utils
 from bootleg.symbols.constants import edit_op
-from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
-from bootleg.utils.classes.vocab_trie import VocabularyTrie
+from bootleg.utils.classes.nested_vocab_tries import (
+    TwoLayerVocabularyScoreTrie,
+    VocabularyTrie,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +27,15 @@ class EntitySymbols:
         qid2eid: Optional[VocabularyTrie] = None,
         alias2id: Optional[VocabularyTrie] = None,
         max_candidates: int = 30,
-        alias_cand_map_fld: str = "alias2qids",
-        alias_idx_fld: str = "alias2id",
+        alias_cand_map_dir: str = "alias2qids",
+        alias_idx_dir: str = "alias2id",
         edit_mode: Optional[bool] = False,
         verbose: Optional[bool] = False,
     ):
         """Entity symbols initializer."""
         # We support different candidate mappings for the same set of entities
-        self.alias_cand_map_fld = alias_cand_map_fld
-        self.alias_idx_fld = alias_idx_fld
+        self.alias_cand_map_dir = alias_cand_map_dir
+        self.alias_idx_dir = alias_idx_dir
         self.max_candidates = max_candidates
         self.edit_mode = edit_mode
         self.verbose = verbose
@@ -215,15 +217,15 @@ class EntitySymbols:
                 vocabulary=self._qid2title,
                 max_value=self.max_candidates,
             )
-            alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_fld))
+            alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_dir))
         else:
-            self._alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_fld))
+            self._alias2qids.dump(os.path.join(save_dir, self.alias_cand_map_dir))
 
         if isinstance(self._alias2id, dict):
             alias2id = VocabularyTrie(input_dict=self._alias2id)
-            alias2id.dump(os.path.join(save_dir, self.alias_idx_fld))
+            alias2id.dump(os.path.join(save_dir, self.alias_idx_dir))
         else:
-            self._alias2id.dump(os.path.join(save_dir, self.alias_idx_fld))
+            self._alias2id.dump(os.path.join(save_dir, self.alias_idx_dir))
 
         if isinstance(self._qid2eid, dict):
             qid2eid = VocabularyTrie(input_dict=self._qid2eid)
@@ -244,8 +246,8 @@ class EntitySymbols:
     def load_from_cache(
         cls,
         load_dir,
-        alias_cand_map_fld="alias2qids",
-        alias_idx_fld="alias2id",
+        alias_cand_map_dir="alias2qids",
+        alias_idx_dir="alias2id",
         edit_mode=False,
         verbose=False,
     ):
@@ -253,8 +255,8 @@ class EntitySymbols:
 
         Args:
             load_dir: directory to load from
-            alias_cand_map_fld: alias2qid file
-            alias_idx_fld: alias2id file
+            alias_cand_map_dir: alias2qid directory
+            alias_idx_dir: alias2id directory
             edit_mode: edit mode flag
             verbose: verbose flag
         """
@@ -262,7 +264,7 @@ class EntitySymbols:
         max_candidates = config["max_candidates"]
         # For backwards compatibility, check if folder exists - if not, load from json
         # Future versions will assume folders exist
-        alias_load_dir = os.path.join(load_dir, alias_cand_map_fld)
+        alias_load_dir = os.path.join(load_dir, alias_cand_map_dir)
         if not os.path.exists(alias_load_dir):
             alias2qids: Dict[str, list] = utils.load_json_file(
                 filename=os.path.join(load_dir, "alias2qids.json")
@@ -271,7 +273,7 @@ class EntitySymbols:
             alias2qids: TwoLayerVocabularyScoreTrie = TwoLayerVocabularyScoreTrie(
                 load_dir=alias_load_dir
             )
-        alias_id_load_dir = os.path.join(load_dir, alias_idx_fld)
+        alias_id_load_dir = os.path.join(load_dir, alias_idx_dir)
         alias2id = None
         if os.path.exists(alias_id_load_dir):
             alias2id: VocabularyTrie = VocabularyTrie(load_dir=alias_id_load_dir)
@@ -294,8 +296,8 @@ class EntitySymbols:
             qid2eid,
             alias2id,
             max_candidates,
-            alias_cand_map_fld,
-            alias_idx_fld,
+            alias_cand_map_dir,
+            alias_idx_dir,
             edit_mode,
             verbose,
         )
@@ -345,14 +347,14 @@ class EntitySymbols:
         """
         return copy.deepcopy(self._qid2title)
 
-    def get_allalias_vocabtrie(self):
+    def get_all_alias_vocabtrie(self):
         """
         Get a trie of all aliases.
 
         Returns: Vocab trie of all aliases.
         """
         if isinstance(self._alias2id, VocabularyTrie):
-            return copy.deepcopy(self._alias2id)
+            return self._alias2id
         else:
             return VocabularyTrie(input_dict=self._alias2id)
 

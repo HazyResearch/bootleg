@@ -454,7 +454,7 @@ class EntityProfile:
         return self._type_systems[type_system].get_types(qid)
 
     @check_qid_exists
-    def get_relation_between(self, qid, qid2):
+    def get_relations_between(self, qid, qid2):
         """Check if two QIDs are connected in KG and returns their relation.
 
         Args:
@@ -465,7 +465,7 @@ class EntityProfile:
         """
         if self._kg_symbols is None:
             return None
-        return self._kg_symbols.get_relation_between(qid, qid2)
+        return self._kg_symbols.get_relations_between(qid, qid2)
 
     @check_qid_exists
     def get_relations_tails_for_qid(self, qid):

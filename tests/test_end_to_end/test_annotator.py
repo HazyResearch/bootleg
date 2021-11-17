@@ -193,9 +193,11 @@ class TestEnd2End(unittest.TestCase):
         ann = BootlegAnnotator(
             config=self.args, verbose=True, entity_emb_file=out_emb_file
         )
+        ann.return_embs = True
         # TEST SINGLE TEXT
         # Res should have alias1
         res = ann.label_mentions("alias1 alias2 multi word alias3 I have no idea")
+        assert "embs" in res
         gold_ans = {
             "qids": [["Q1"]],
             "titles": [["alias1"]],

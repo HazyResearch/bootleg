@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils
-from bootleg.utils.classes.dictvocabulary_tries import TwoLayerVocabularyScoreTrie
+from bootleg.utils.classes.nested_vocab_tries import TwoLayerVocabularyScoreTrie
 
 
 def _convert_to_trie(qid2typenames, max_types):

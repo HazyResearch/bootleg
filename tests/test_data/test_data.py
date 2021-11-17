@@ -101,7 +101,7 @@ class DataLoader(unittest.TestCase):
             os.path.join(
                 self.args.data_config.entity_dir, self.args.data_config.entity_map_dir
             ),
-            alias_cand_map_fld=self.args.data_config.alias_cand_map,
+            alias_cand_map_dir=self.args.data_config.alias_cand_map,
         )
         self.temp_file_name = "tests/data/data_loader/test_data.jsonl"
         self.guid_dtype = lambda max_aliases: np.dtype(

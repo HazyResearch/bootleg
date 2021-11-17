@@ -703,7 +703,7 @@ class EntitySymbolTest(unittest.TestCase):
         self.assertEqual(entity_symbols.alias_exists("alias3"), True)
         self.assertEqual(entity_symbols.alias_exists("alias5"), False)
         self.assertDictEqual(
-            entity_symbols.get_allalias_vocabtrie().to_dict(),
+            entity_symbols.get_all_alias_vocabtrie().to_dict(),
             {"alias1": 0, "alias3": 2, "alias4": 3, "multi word alias2": 1},
         )
 
@@ -1266,7 +1266,7 @@ class AliasTableTest(unittest.TestCase):
         """Set up."""
         entity_dump_dir = "tests/data/entity_loader/entity_data/entity_mappings"
         self.entity_symbols = EntitySymbols.load_from_cache(
-            entity_dump_dir, alias_cand_map_fld="alias2qids"
+            entity_dump_dir, alias_cand_map_dir="alias2qids"
         )
         self.config = {
             "data_config": {
