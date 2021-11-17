@@ -2,7 +2,14 @@ Unreleased 1.1.0dev0
 ---------------------
 Changed
 ^^^^^^^^^
-We did an architectural change and switched to a biencoder model. This changes our task flow and dataprep. This new model uses less CPU storage and uses the standard BERT architecture. Our entity encoder now takes a textual input of an entity that contains its title, description, KG relationships, and types.
+* We did an architectural change and switched to a biencoder model. This changes our task flow and dataprep. This new model uses less CPU storage and uses the standard BERT architecture. Our entity encoder now takes a textual input of an entity that contains its title, description, KG relationships, and types.
+* To support larger files for dumping predictions over, we support adding an ``entity_emb_file`` to the model (extracted from ``extract_all_entities.py``. This will make evaluation faster. Further, we added ``dump_preds_num_data_splits`` to split a file before dumping. As each file pass gets a new dataload object, this can mitiage any torch dataloader memory issues that happens over large files.
+* Renamed ``eval_accumulation_steps`` to ``dump_preds_accumulation_steps``.
+* Removed option to ``dump_embs``.  Users should use ``dump_preds`` instead. The output file will have ``entity_ids`` attribute that will index into the extracted entity embeddings.
+
+Added
+^^^^^^
+* ``extract_all_entities.py`` as a way to extract all entity embeddings. These entity embeddings can be used in eval and be used downstream. Uses can use ``get_eid`` from the ``EntityProfile`` to extract the row id for a specific entity.
 
 1.0.5 - 2021-08-20
 ---------------------
@@ -54,7 +61,7 @@ Fixed
 Added
 ^^^^^^^
 * ``data_config.print_examples_prep`` flag to toggle data example printing during data prep.
-* ``data_config.eval_accumulation_steps`` to support subbatching dumping of predictings. We save outputs to separate files of size approximately ``data_config.eval_accumulation_steps*data_config.eval_batch_size`` and merge into a final file at the end.
+* ``data_config.dump_preds_accumulation_steps`` to support subbatching dumping of predictings. We save outputs to separate files of size approximately ``data_config.dump_preds_accumulation_steps*data_config.eval_batch_size`` and merge into a final file at the end.
 * Entity Profile API. See the `docs <https://bootleg.readthedocs.io/en/latest/gettingstarted/entity_profile.html>`_. This allows for modifying entity metadata as well as adding and removing entities. We profile methods for refitting a model with a new profile for immediate inference, no finetuning needed.
 
 Changed

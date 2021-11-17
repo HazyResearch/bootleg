@@ -51,7 +51,6 @@ class DisambigLoss:
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels
-            active: whether examples are "active" or not (used in Emmental slicing)
 
         Returns: loss
         """
@@ -110,7 +109,6 @@ class DisambigLoss:
         Args:
             intermediate_output_dict: output dict from the Emmental task flor
             Y: gold labels
-            active: whether examples are "active" or not (used in Emmental slicing)
         Returns: loss
         """
         # Grab the first value of training (when doing distributed training, we will have one per process)
@@ -142,7 +140,8 @@ def create_task(
 
     Args:
         args: args
-        entity_symbols: entity symbols (default None)
+        use_batch_cands: use batch candidates for training
+        len_context_tok: length of the context tokenizer
         slice_datasets: slice datasets used in scorer (default None)
         entity_emb_file: file for pretrained entity embeddings - used for EVAL only
 

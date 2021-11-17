@@ -17,7 +17,7 @@ import ujson
 from emmental.utils.utils import array_to_numpy, prob_to_pred
 from tqdm import tqdm
 
-from bootleg import log_rank_0_debug
+from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.task_config import NED_TASK
 from bootleg.utils import data_utils, utils
 from bootleg.utils.classes.nested_vocab_tries import (
@@ -223,7 +223,11 @@ def get_sent_idx2num_mens(data_file):
     sent_idx2row = {}
     total_num_mentions = 0
     with open(data_file) as f:
-        for line in f:
+        for line in tqdm(
+            f,
+            total=sum([1 for _ in open(data_file)]),
+            desc="Getting sentidx2line mapping",
+        ):
             line = ujson.loads(line)
             # keep track of the start idx in the condensed memory mapped file for each sentence (varying number of
             # aliases)
@@ -245,12 +249,12 @@ def get_sent_idx2num_mens(data_file):
 
 # Modified from
 # https://github.com/SenWu/emmental/blob/master/src/emmental/model.py#L455
-# to support eval_accumulation_steps
+# to support dump_preds_accumulation_steps
 @torch.no_grad()
 def batched_pred_iter(
     model,
     dataloader,
-    eval_accumulation_steps,
+    dump_preds_accumulation_steps,
     sent_idx2num_mens,
 ):
     """
@@ -269,7 +273,7 @@ def batched_pred_iter(
     Args:
       model: model
       dataloader: The dataloader to predict
-      eval_accumulation_steps: Number of eval steps to run before returning
+      dump_preds_accumulation_steps: Number of eval steps to run before returning
       sent_idx2num_mens: list of sent index to number of mentions
 
     Returns:
@@ -285,6 +289,7 @@ def batched_pred_iter(
         final_out_d = defaultdict(lambda: defaultdict(list))
         sentidxs_finalized = []
         # print("FINALIZE", cur_sentidx_nummen, [sent_idx2num_mens[str(k)] for k in cur_sentidx_nummen])
+        log_rank_0_debug(logger, f"Collecting {len(cur_sentidx_nummen)} results")
         for sent_idx, cur_mention_set in cur_sentidx_nummen.items():
             assert (
                 len(cur_mention_set) <= sent_idx2num_mens[str(sent_idx)]
@@ -393,8 +398,6 @@ def batched_pred_iter(
                         if sent_idx not in cur_sentidx2_nummentions:
                             cur_sentidx2_nummentions[sent_idx] = set()
                         # Index 2 is index of alias positions in original list (-1 means no mention)
-                        if alias_pos_for_eval == -1:
-                            print("ALIAS POST WAS -1 AT", sent_idx)
                         if alias_pos_for_eval != -1:
                             cur_sentidx2_nummentions[sent_idx].add(alias_pos_in_og_list)
                     uid_dict[task_name][sent_idx].extend(
@@ -412,7 +415,7 @@ def batched_pred_iter(
                             out_dict[task_name][action_name][sent_idx].extend(
                                 out_bdict[task_name][action_name][ex_idx : ex_idx + 1]
                             )
-            if num_eval_steps >= eval_accumulation_steps:
+            if num_eval_steps >= dump_preds_accumulation_steps:
                 # Collect the sentences that have all mentions collected
                 res, finalized_sent_idxs = collect_result(
                     uid_dict,
@@ -436,7 +439,6 @@ def batched_pred_iter(
                             for action_name in out_dict[task_name].keys():
                                 del out_dict[task_name][action_name][final_sent_i]
                 if len(res) > 0:
-                    # print("FINALIZED", finalized_sent_idxs)
                     yield res
     res, finalized_sent_idxs = collect_result(
         uid_dict, gold_dict, pred_dict, prob_dict, out_dict, cur_sentidx2_nummentions
@@ -479,62 +481,188 @@ def check_and_create_alias_cand_trie(save_folder, entity_symbols):
     return
 
 
-def get_emb_file(result_idx, save_folder):
-    """Get the embedding numpy file for the `result_idx` batch.
+def get_emb_file(save_folder):
+    """Get the embedding numpy file for the batch.
 
     Args:
-        result_idx: result index of the result batch
         save_folder: save folder
 
     Returns: string
     """
-    return os.path.join(save_folder, f"out_emb_file_{result_idx}.npy")
+    return os.path.join(save_folder, "bootleg_emb_file.npy")
 
 
-def get_result_file(result_idx, save_folder):
-    """Get the jsonl label file for the `result_idx` batch.
+def get_result_file(save_folder):
+    """Get the jsonl label file for the batch.
 
     Args:
-        result_idx: result index of the result batch
         save_folder: save folder
 
     Returns: string
     """
-    return os.path.join(save_folder, f"result_label_file_{result_idx}.jsonl")
+    return os.path.join(save_folder, "bootleg_labels.jsonl")
 
 
-def disambig_dump_preds(
-    result_idx,
-    result_alias_offset,
+def dump_model_outputs(
+    model,
+    dataloader,
     config,
-    res_dict,
+    sentidx2num_mentions,
+    save_folder,
+    entity_symbols,
+    task_name,
+    overwrite_data,
+):
+    """Dump model outputs.
+
+    Args:
+        model: model
+        dataloader: data loader
+        config: config
+        sentidx2num_mentions: Dict from sentence idx to number of mentions
+        save_folder: save folder
+        entity_symbols: entity symbols
+        task_name: task name
+        overwrite_data: overwrite saved mmap files
+
+    Returns: mmemp file name for saved outputs, dtype file name for loading memmap file
+    """
+    # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
+    # indices for overflowing sentences)
+    unmerged_memmap_dir = os.path.join(save_folder, "model_outputs_mmap")
+    utils.ensure_dir(unmerged_memmap_dir)
+    final_unmerged_memmap = os.path.join(save_folder, "model_outputs_final.mmap")
+    emb_file_config = os.path.join(unmerged_memmap_dir, "model_outputs_config.npy")
+
+    if (
+        not overwrite_data
+        and os.path.exists(final_unmerged_memmap)
+        and os.path.exists(emb_file_config)
+    ):
+        log_rank_0_info(
+            logger,
+            f"Skipping GPU dumpings. {final_unmerged_memmap} already exists and overwrite is F.",
+        )
+        return final_unmerged_memmap, emb_file_config
+
+    K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
+    unmerged_storage_type = np.dtype(
+        [
+            ("M", int),
+            ("K", int),
+            ("hidden_size", int),
+            ("sent_idx", int),
+            ("subsent_idx", int),
+            ("alias_list_pos", int, 1),
+            ("final_loss_true", int, 1),
+            ("final_loss_pred", int, 1),
+            ("final_loss_prob", float, 1),
+            ("final_loss_cand_probs", float, K),
+        ]
+    )
+    np.save(emb_file_config, unmerged_storage_type, allow_pickle=True)
+    item_size = np.memmap(
+        final_unmerged_memmap,
+        dtype=unmerged_storage_type,
+        mode="w+",
+        shape=(1,),
+    ).nbytes
+    total_expected_size = item_size * len(dataloader.dataset) / 1024 ** 3
+    log_rank_0_info(
+        logger,
+        f"Expected size is {total_expected_size}GB.",
+    )
+    data_arr = np.memmap(
+        final_unmerged_memmap,
+        dtype=unmerged_storage_type,
+        mode="w+",
+        shape=(len(dataloader.dataset),),
+    )
+    # Init sent_idx to -1 for debugging
+    data_arr[:]["sent_idx"] = -1
+    arr_idx = 0
+    for res_i, res_dict in enumerate(
+        batched_pred_iter(
+            model,
+            dataloader,
+            config.run_config.dump_preds_accumulation_steps,
+            sentidx2num_mentions,
+        )
+    ):
+        batch_size = len(res_dict["uids"][task_name])
+        for i in tqdm(range(batch_size), total=batch_size, desc="Saving outputs"):
+            # res_dict["output"][task_name] is dict with keys ['_input__alias_orig_list_pos',
+            # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train',
+            # '_input__subsent_idx', 0, 1]
+            sent_idx = res_dict["outputs"][task_name]["_input__sent_idx"][i]
+            # print("INSIDE LOOP", sent_idx, "AT", i)
+            subsent_idx = res_dict["outputs"][task_name]["_input__subsent_idx"][i]
+            alias_orig_list_pos = res_dict["outputs"][task_name][
+                "_input__alias_orig_list_pos"
+            ][i]
+            gold_cand_K_idx_train = res_dict["outputs"][task_name][
+                "_input__for_dump_gold_cand_K_idx_train"
+            ][i]
+            data_arr[arr_idx]["K"] = K
+            data_arr[arr_idx]["hidden_size"] = config.model_config.hidden_size
+            data_arr[arr_idx]["sent_idx"] = sent_idx
+            data_arr[arr_idx]["subsent_idx"] = subsent_idx
+            data_arr[arr_idx]["alias_list_pos"] = alias_orig_list_pos
+            # This will give all aliases seen by the model during training, independent of if it's gold or not
+            data_arr[arr_idx]["final_loss_true"] = gold_cand_K_idx_train
+
+            # get max for each alias, probs is K
+            max_probs = res_dict["probs"][task_name][i].max(axis=0)
+            pred_cands = res_dict["probs"][task_name][i].argmax(axis=0)
+
+            data_arr[arr_idx]["final_loss_pred"] = pred_cands
+            data_arr[arr_idx]["final_loss_prob"] = max_probs
+            data_arr[arr_idx]["final_loss_cand_probs"] = res_dict["probs"][task_name][
+                i
+            ].reshape(1, -1)
+            arr_idx += 1
+        del res_dict
+    # Merge all memmap files
+    log_rank_0_info(
+        logger,
+        f"Finished dumping to memmap files. with {len(dataloader.dataset)} samples. Saved to {final_unmerged_memmap}",
+    )
+    # for i in range(len(mmap_file)):
+    #     si = mmap_file[i]["sent_idx"]
+    #     if -1 == si:
+    #         import pdb
+    #         pdb.set_trace()
+    #     assert si != -1, f"{i} {mmap_file[i]}"
+    return final_unmerged_memmap, emb_file_config
+
+
+def collect_and_merge_results(
+    unmerged_entity_emb_file,
+    emb_file_config,
+    config,
     sent_idx2num_mens,
     sent_idx2row,
     save_folder,
     entity_symbols,
-    dump_embs,
-    task_name,
 ):
-    """Dump the predictions of a disambiguation task.
+    """Merge mentions, filtering non-gold labels, and saves to file.
 
     Args:
-        result_idx: batch index of the result arrays
-        result_alias_offset: overall offset of the starting example (i.e., the number of previous mens already written)
+        unmerged_entity_emb_file: memmap file from dump step
+        emb_file_config: config file for loading memmap file
         config: model config
         res_dict: result dictionary from Emmental predict
         sent_idx2num_mens: Dict sentence idx to number of mentions
         sent_idx2row: Dict sentence idx to row of eval data
         save_folder: folder to save results
         entity_symbols: entity symbols
-        dump_embs: whether to save the contextualized embeddings or not
-        task_name: task name
 
-    Returns: saved prediction file, saved embedding file (will be None if dump_embs is False)
+    Returns: saved prediction file, total mentions seen
     """
     num_processes = min(
         config.run_config.dataset_threads, int(multiprocessing.cpu_count() * 0.9)
     )
-    cache_dir = os.path.join(save_folder, f"cache_{result_idx}")
+    cache_dir = os.path.join(save_folder, "cache")
     utils.ensure_dir(cache_dir)
     trie_candidate_map_folder = None
     trie_qid2eid_file = None
@@ -554,197 +682,62 @@ def disambig_dump_preds(
             assert isinstance(entity_symbols._qid2eid, VocabularyTrie)
             entity_symbols._qid2eid.dump(trie_qid2eid_file)
 
-    # This is dumping
-    disambig_res_dict = {}
-    for k in res_dict:
-        assert task_name in res_dict[k], f"{task_name} not in res_dict for key {k}"
-        disambig_res_dict[k] = res_dict[k][task_name]
-
     # write to file (M x hidden x size for each data point -- next step will deal with recovering original sentence
     # indices for overflowing sentences)
-    unmerged_entity_emb_file = os.path.join(save_folder, "entity_embs.pt")
-    merged_entity_emb_file = os.path.join(save_folder, "entity_embs_unmerged.pt")
-    emb_file_config = os.path.splitext(unmerged_entity_emb_file)[0] + "_config.npy"
+    merged_entity_emb_file = os.path.join(save_folder, "entity_embs_unmerged.mmap")
     K = entity_symbols.max_candidates + (not config.data_config.train_in_candidates)
-    if dump_embs:
-        unmerged_storage_type = np.dtype(
-            [
-                ("M", int),
-                ("K", int),
-                ("hidden_size", int),
-                ("sent_idx", int),
-                ("subsent_idx", int),
-                ("alias_list_pos", int, 1),
-                ("entity_emb", float, config.model_config.hidden_size),
-                ("final_loss_true", int, 1),
-                ("final_loss_pred", int, 1),
-                ("final_loss_prob", float, 1),
-                ("final_loss_cand_probs", float, K),
-            ]
-        )
-        merged_storage_type = np.dtype(
-            [
-                ("hidden_size", int),
-                ("sent_idx", int),
-                ("alias_list_pos", int),
-                ("entity_emb", float, config.model_config.hidden_size),
-                ("final_loss_pred", int),
-                ("final_loss_prob", float),
-                ("final_loss_cand_probs", float, K),
-            ]
-        )
-    else:
-        # don't need to extract contextualized entity embedding
-        unmerged_storage_type = np.dtype(
-            [
-                ("M", int),
-                ("K", int),
-                ("hidden_size", int),
-                ("sent_idx", int),
-                ("subsent_idx", int),
-                ("alias_list_pos", int, 1),
-                ("final_loss_true", int, 1),
-                ("final_loss_pred", int, 1),
-                ("final_loss_prob", float, 1),
-                ("final_loss_cand_probs", float, K),
-            ]
-        )
-        merged_storage_type = np.dtype(
-            [
-                ("hidden_size", int),
-                ("sent_idx", int),
-                ("alias_list_pos", int),
-                ("final_loss_pred", int),
-                ("final_loss_prob", float),
-                ("final_loss_cand_probs", float, K),
-            ]
-        )
-    mmap_file = np.memmap(
-        unmerged_entity_emb_file,
-        dtype=unmerged_storage_type,
-        mode="w+",
-        shape=(len(disambig_res_dict["uids"]),),
+    merged_storage_type = np.dtype(
+        [
+            ("hidden_size", int),
+            ("sent_idx", int),
+            ("alias_list_pos", int),
+            ("final_loss_pred", int),
+            ("final_loss_prob", float),
+            ("final_loss_cand_probs", float, K),
+        ]
     )
-    # print("MEMMAP FILE SHAPE", len(disambig_res_dict["uids"]))
-    # Init sent_idx to -1 for debugging
-    mmap_file[:]["sent_idx"] = -1
-    np.save(emb_file_config, unmerged_storage_type, allow_pickle=True)
-    log_rank_0_debug(
-        logger, f"Created file {unmerged_entity_emb_file} to save predictions."
+    unmerged_storage_type = np.dtype(
+        np.load(emb_file_config, allow_pickle=True).tolist()
     )
-
-    log_rank_0_debug(logger, f'{len(disambig_res_dict["uids"])} samples')
-    for_iteration = [
-        disambig_res_dict["uids"],
-        disambig_res_dict["golds"],
-        disambig_res_dict["probs"],
-        disambig_res_dict["preds"],
-    ]
-    all_sent_idx = set()
-    entity_encoder_str = None
-    for i, (uid, gold, probs, model_pred) in enumerate(zip(*for_iteration)):
-        # disambig_res_dict["output"] is dict with keys ['_input__alias_orig_list_pos',
-        # 'bootleg_pred_1', '_input__sent_idx', '_input__for_dump_gold_cand_K_idx_train', '_input__subsent_idx', 0, 1]
-        if entity_encoder_str is None:
-            entity_encoder_str = [
-                k
-                for k in disambig_res_dict["outputs"].keys()
-                if k.startswith("entity_encoder")
-            ][0]
-        sent_idx = disambig_res_dict["outputs"]["_input__sent_idx"][i]
-        # print("INSIDE LOOP", sent_idx, "AT", i)
-        subsent_idx = disambig_res_dict["outputs"]["_input__subsent_idx"][i]
-        alias_orig_list_pos = disambig_res_dict["outputs"][
-            "_input__alias_orig_list_pos"
-        ][i]
-        gold_cand_K_idx_train = disambig_res_dict["outputs"][
-            "_input__for_dump_gold_cand_K_idx_train"
-        ][i]
-        output_embeddings = disambig_res_dict["outputs"][entity_encoder_str][i]
-        mmap_file[i]["K"] = K
-        mmap_file[i]["hidden_size"] = config.model_config.hidden_size
-        mmap_file[i]["sent_idx"] = sent_idx
-        mmap_file[i]["subsent_idx"] = subsent_idx
-        mmap_file[i]["alias_list_pos"] = alias_orig_list_pos
-        # This will give all aliases seen by the model during training, independent of if it's gold or not
-        mmap_file[i]["final_loss_true"] = gold_cand_K_idx_train
-
-        # get max for each alias, probs is K
-        max_probs = probs.max(axis=0)
-        pred_cands = probs.argmax(axis=0)
-
-        mmap_file[i]["final_loss_pred"] = pred_cands
-        mmap_file[i]["final_loss_prob"] = max_probs
-        mmap_file[i]["final_loss_cand_probs"] = probs.reshape(1, -1)
-
-        all_sent_idx.add(str(sent_idx))
-        # final_entity_embs is M x K x hidden_size, pred_cands is M
-        if dump_embs:
-            chosen_entity_embs = output_embeddings[pred_cands]
-            # write chosen entity embs to file for contextualized entity embeddings
-            mmap_file[i]["entity_emb"] = chosen_entity_embs
-
-    # for i in range(len(mmap_file)):
-    #     si = mmap_file[i]["sent_idx"]
-    #     if -1 == si:
-    #         import pdb
-    #         pdb.set_trace()
-    #     assert si != -1, f"{i} {mmap_file[i]}"
-    # Store all predicted sentences to filter the sentence mapping by
-    subset_sent_idx2num_mens = {
-        k: v for k, v in sent_idx2num_mens.items() if k in all_sent_idx
-    }
-    # print("ALL SEEN", all_sent_idx)
-    subsent_sent_idx2row = {k: v for k, v in sent_idx2row.items() if k in all_sent_idx}
-    result_file = get_result_file(result_idx, save_folder)
+    result_file = get_result_file(save_folder)
     log_rank_0_debug(logger, f"Writing predictions to {result_file}...")
     merge_subsentences(
         num_processes=num_processes,
-        subset_sent_idx2num_mens=subset_sent_idx2num_mens,
+        subset_sent_idx2num_mens=sent_idx2num_mens,
         cache_folder=cache_dir,
         to_save_file=merged_entity_emb_file,
         to_save_storage=merged_storage_type,
         to_read_file=unmerged_entity_emb_file,
         to_read_storage=unmerged_storage_type,
-        dump_embs=dump_embs,
     )
     write_data_labels(
         num_processes=num_processes,
-        result_alias_offset=result_alias_offset,
         merged_entity_emb_file=merged_entity_emb_file,
         merged_storage_type=merged_storage_type,
-        sent_idx2row=subsent_sent_idx2row,
+        sent_idx2row=sent_idx2row,
         cache_folder=cache_dir,
         out_file=result_file,
         entity_dump=entity_symbols,
         train_in_candidates=config.data_config.train_in_candidates,
         max_candidates=entity_symbols.max_candidates,
-        dump_embs=dump_embs,
         trie_candidate_map_folder=trie_candidate_map_folder,
         trie_qid2eid_file=trie_qid2eid_file,
     )
 
-    out_emb_file = None
     filt_emb_data = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     total_mentions_seen = len(filt_emb_data)
-    # save easier-to-use embedding file
-    if dump_embs:
-        hidden_size = filt_emb_data[0]["hidden_size"]
-        out_emb_file = get_emb_file(result_idx, save_folder)
-        np.save(out_emb_file, filt_emb_data["entity_emb"].reshape(-1, hidden_size))
-        log_rank_0_debug(
-            logger,
-            f"Saving contextual entity embeddings for {result_idx} to {out_emb_file}",
-        )
     filt_emb_data = None
 
     # Cleanup cache - sometimes the file in cache_dir is still open so we need to retry to delete it
     try_rmtree(cache_dir)
 
-    log_rank_0_debug(logger, f"Wrote predictions for {result_idx} to {result_file}")
-    return result_file, out_emb_file, all_sent_idx, total_mentions_seen
+    log_rank_0_debug(
+        logger,
+        f"Wrote predictions to {result_file} with {total_mentions_seen} mentions",
+    )
+    return result_file, total_mentions_seen
 
 
 def merge_subsentences(
@@ -755,7 +748,6 @@ def merge_subsentences(
     to_save_storage,
     to_read_file,
     to_read_storage,
-    dump_embs=False,
 ):
     """
     Merge and flatten sentence over sub-sentences.
@@ -773,7 +765,6 @@ def merge_subsentences(
         to_save_storage: save file storage type
         to_read_file: memmap file to read predictions from
         to_read_storage: read file storage type
-        dump_embs: whether to save embeddings or not
     """
     # Compute sent idx to offset so we know where to fill in mentions
     cur_offset = 0
@@ -801,7 +792,6 @@ def merge_subsentences(
         seen_ids = merge_subsentences_single(
             K,
             hidden_size,
-            dump_embs,
             all_ids,
             filt_emb_data,
             full_pred_data,
@@ -820,9 +810,7 @@ def merge_subsentences(
             for ids in range(0, len(full_pred_data), chunk_size)
         ]
         # Start pool
-        input_args = [
-            [K, hidden_size, dump_embs, chunk] for chunk in row_idx_set_chunks
-        ]
+        input_args = [[K, hidden_size, chunk] for chunk in row_idx_set_chunks]
         log_rank_0_debug(
             logger, f"Merging sentences together with {num_processes} processes"
         )
@@ -853,7 +841,9 @@ def merge_subsentences(
     #     al_test = filt_emb_data[i]["alias_list_pos"]
     #     if si == -1 or al_test == -1:
     #         print("BAD", i, filt_emb_data[i])
-    #         import ipdb; ipdb.set_trace()
+    #         import pdb
+    #
+    #         pdb.set_trace()
     logging.debug(f"Saw {len(seen_ids)} sentences")
     logging.debug(f"Time to merge sub-sentences {time.time() - start}s")
     return
@@ -874,18 +864,17 @@ def merge_subsentences_initializer(
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(to_write_file, dtype=to_write_storage, mode="r+")
     global full_pred_data_global
-    full_pred_data_global = np.memmap(to_read_file, dtype=to_read_storage, mode="r+")
+    full_pred_data_global = np.memmap(to_read_file, dtype=to_read_storage, mode="r")
     global sentidx2offset_marisa_global
     sentidx2offset_marisa_global = utils.load_single_item_trie(sentidx2offset_file)
 
 
 def merge_subsentences_hlp(args):
     """Merge subsentences multiprocessing subprocess helper."""
-    K, hidden_size, dump_embs, r_idx_set = args
+    K, hidden_size, r_idx_set = args
     return merge_subsentences_single(
         K,
         hidden_size,
-        dump_embs,
         r_idx_set,
         filt_emb_data_global,
         full_pred_data_global,
@@ -896,7 +885,6 @@ def merge_subsentences_hlp(args):
 def merge_subsentences_single(
     K,
     hidden_size,
-    dump_embs,
     r_idx_set,
     filt_emb_data,
     full_pred_data,
@@ -910,7 +898,6 @@ def merge_subsentences_single(
     Args:
         K: number candidates
         hidden_size: hidden size
-        dump_embs: dump embedding flag
         r_idx_set: batch result index
         filt_emb_data: mmap embedding file to write
         full_pred_data: mmap result file to read
@@ -943,8 +930,6 @@ def merge_subsentences_single(
                 emb_id not in seen_ids
             ), f"{emb_id} already seen, something went wrong with sub-sentences"
             seen_ids.add(emb_id)
-            if dump_embs:
-                filt_emb_data["entity_emb"][emb_id] = row["entity_emb"]
             filt_emb_data["sent_idx"][emb_id] = sent_idx
             filt_emb_data["alias_list_pos"][emb_id] = alias_orig_pos
             filt_emb_data["final_loss_pred"][emb_id] = row["final_loss_pred"]
@@ -965,10 +950,14 @@ def get_sental2embid(merged_entity_emb_file, merged_storage_type):
     Returns: Dict of f"{sent_idx}_{alias_idx}" -> index in merged_entity_emb_file
     """
     filt_emb_data = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     sental2embid = {}
-    for i, row in enumerate(filt_emb_data):
+    for i, row in tqdm(
+        enumerate(filt_emb_data),
+        total=len(filt_emb_data),
+        desc="Getting setnal2emb map",
+    ):
         sent_idx = row["sent_idx"]
         alias_idx = row["alias_list_pos"]
         assert (
@@ -981,7 +970,6 @@ def get_sental2embid(merged_entity_emb_file, merged_storage_type):
 
 def write_data_labels(
     num_processes,
-    result_alias_offset,
     merged_entity_emb_file,
     merged_storage_type,
     sent_idx2row,
@@ -990,17 +978,13 @@ def write_data_labels(
     entity_dump,
     train_in_candidates,
     max_candidates,
-    dump_embs,
     trie_candidate_map_folder=None,
     trie_qid2eid_file=None,
 ):
     """Take the flattened data from merge_sentences and write out predictions.
 
-    The embedding ids are added to the file if dump_embs is True.
-
     Args:
         num_processes: number of processes
-        result_alias_offset: alias offset of this batch of examples for writing out
         merged_entity_emb_file: input memmap file after merge sentences
         merged_storage_type: input file storage type
         sent_idx2row: Dict of sentence idx to row relevant to this subbatch
@@ -1009,7 +993,6 @@ def write_data_labels(
         entity_dump: entity dump
         train_in_candidates: whether NC entities are not in candidate lists
         max_candidates: maximum number of candidates
-        dump_embs: whether to dump embeddings or not
         trie_candidate_map_folder: folder where trie of alias->candidate map is stored for parallel proccessing
         trie_qid2eid_file: file where trie of qid->eid map is stored for parallel proccessing
     """
@@ -1020,7 +1003,7 @@ def write_data_labels(
     total_input = len(sent_idx2row)
     if num_processes == 1:
         filt_emb_data = np.memmap(
-            merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+            merged_entity_emb_file, dtype=merged_storage_type, mode="r"
         )
         write_data_labels_single(
             sentidx2row=sent_idx2row,
@@ -1029,10 +1012,8 @@ def write_data_labels(
             sental2embid=sental2embid,
             alias_cand_map=entity_dump.get_alias2qids_dict(),
             qid2eid=entity_dump.get_qid2eid_dict(),
-            result_alias_offset=result_alias_offset,
             train_in_cands=train_in_candidates,
             max_cands=max_candidates,
-            dump_embs=dump_embs,
         )
     else:
         assert (
@@ -1090,10 +1071,8 @@ def write_data_labels(
                 merged_entity_emb_file,
                 merged_storage_type,
                 trie_file,
-                result_alias_offset,
                 train_in_candidates,
                 max_candidates,
-                dump_embs,
                 trie_candidate_map_folder,
                 trie_qid2eid_file,
             ],
@@ -1120,10 +1099,8 @@ def write_data_labels_initializer(
     merged_entity_emb_file,
     merged_storage_type,
     sental2embid_file,
-    result_alias_offset,
     train_in_candidates,
     max_cands,
-    dump_embs,
     trie_candidate_map_folder,
     trie_qid2eid_file,
 ):
@@ -1134,16 +1111,14 @@ def write_data_labels_initializer(
         merged_entity_emb_file: flattened embedding input file
         merged_storage_type: mmap storage type
         sental2embid_file: sentence, alias -> embedding id mapping
-        result_alias_offset: alias offset of this batch of results
         train_in_candidates: train in candidates flag
         max_cands: max candidates
-        dump_embs: dump embedding flag
         trie_candidate_map_folder: alias trie folder
         trie_qid2eid_file: qid to eid trie file
     """
     global filt_emb_data_global
     filt_emb_data_global = np.memmap(
-        merged_entity_emb_file, dtype=merged_storage_type, mode="r+"
+        merged_entity_emb_file, dtype=merged_storage_type, mode="r"
     )
     global sental2embid_global
     sental2embid_global = utils.load_single_item_trie(sental2embid_file)
@@ -1153,14 +1128,10 @@ def write_data_labels_initializer(
     )
     global qid2eid_global
     qid2eid_global = VocabularyTrie(load_dir=trie_qid2eid_file)
-    global result_alias_offset_global
-    result_alias_offset_global = result_alias_offset
     global train_in_candidates_global
     train_in_candidates_global = train_in_candidates
     global max_cands_global
     max_cands_global = max_cands
-    global dump_embs_global
-    dump_embs_global = dump_embs
 
 
 def write_data_labels_hlp(args):
@@ -1178,10 +1149,8 @@ def write_data_labels_hlp(args):
         sental2embid_global,
         alias_cand_trie_global,
         qid2eid_global,
-        result_alias_offset_global,
         train_in_candidates_global,
         max_cands_global,
-        dump_embs_global,
     )
 
 
@@ -1192,10 +1161,8 @@ def write_data_labels_single(
     sental2embid,
     alias_cand_map,
     qid2eid,
-    result_alias_offset,
     train_in_cands,
     max_cands,
-    dump_embs,
 ):
     """Write data labels single subprocess function.
 
@@ -1208,10 +1175,8 @@ def write_data_labels_single(
         sental2embid: sentence index, alias index -> embedding row id
         alias_cand_map: alias to candidate map
         qid2eid: qid to entity id map
-        result_alias_offset: alias offset of this batch of results
         train_in_cands: training in candidates flag
         max_cands: maximum candidates
-        dump_embs: dump embedding flag
     """
     with open(output_file, "w") as f_out:
         for sent_idx in sentidx2row:
@@ -1241,7 +1206,7 @@ def write_data_labels_single(
                     # Get from Trie
                     emb_idx = sental2embid[sent_idx_key][0][0]
                 # We will concatenate all contextualized embeddings at the end and need the row id to be offset here
-                ctx_emb_ids.append(emb_idx + result_alias_offset)
+                ctx_emb_ids.append(emb_idx)
                 prob = filt_emb_data[emb_idx]["final_loss_prob"]
                 prob = prob if not math.isnan(prob) else None
                 cand_prob = strip_nan(filt_emb_data[emb_idx]["final_loss_cand_probs"])
@@ -1259,6 +1224,4 @@ def write_data_labels_single(
             line["cand_probs"] = cand_probs
             line["entity_ids"] = entity_ids
             line["char_spans"] = char_spans
-            if dump_embs:
-                line["ctx_emb_ids"] = ctx_emb_ids
             f_out.write(ujson.dumps(line) + "\n")
