@@ -89,7 +89,7 @@ class VocabularyTrie:
     """String (vocabulary) to int trie.
 
     This is basically a marisa trie except that we maintain the original indexes given in the input dict.
-    This helps keep indexes the same even if underlying tri is different.
+    This helps keep indexes the same even if underlying trie is different.
     """
 
     def __init__(
@@ -189,7 +189,7 @@ class VocabularyTrie:
 class TwoLayerVocabularyScoreTrie:
     """TwoLayerVocabularyScoreTrie.
 
-    This creates a record tri from a string to a list of string candidates. These candidates are either a single
+    This creates a record trie from a string to a list of string candidates. These candidates are either a single
     list of string items. Or a list of pairs [string item, float score].
     """
 
@@ -309,7 +309,7 @@ class ThreeLayerVocabularyTrie:
     """ThreeLayerVocabularyTrie.
 
     This creates a dict from query -> key -> list of values but
-    saves as tri with query -> flatten lower level dict.
+    saves as trie with query -> flatten lower level dict.
 
     Note that max_value is the maximum number of values for each possible key.
     """
