@@ -13,15 +13,15 @@ import time
 from collections import defaultdict
 
 import jsonlines
-import marisa_trie
 import nltk
 import numpy as np
 import spacy
-import ujson
 from spacy.cli.download import download as spacy_download
 from tqdm import tqdm
 
 from bootleg.symbols.constants import ANCHOR_KEY
+from bootleg.symbols.entity_symbols import EntitySymbols
+from bootleg.utils.classes.nested_vocab_tries import VocabularyTrie
 from bootleg.utils.utils import get_lnrm
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def parse_args():
         help="File to write extracted mentions to",
     )
     parser.add_argument(
-        "--cand_map", type=str, required=True, help="Alias table to use"
+        "--entity_db_dir", type=str, required=True, help="Path to entity db"
     )
     parser.add_argument("--min_alias_len", type=int, default=1)
     parser.add_argument("--max_alias_len", type=int, default=6)
@@ -94,26 +94,6 @@ def create_out_line(sent_obj, final_aliases, final_spans):
     # sent_obj["qids"] = [alias2qids[alias][0] for alias in final_aliases]
     sent_obj[ANCHOR_KEY] = [True] * len(final_aliases)
     return sent_obj
-
-
-def get_all_aliases(alias2qidcands, verbose):
-    """Load all aliases.
-
-    Args
-        alias2qidcands: Dict of alias to list of QID candidates with score
-        verbose: verbose boolean flag
-
-    Returns: marisa trie of all aliases
-    """
-    # Load alias2qids
-    global alias2qids
-    alias2qids = {}
-    logger.debug("Loading candidate mapping...")
-    for al in tqdm(alias2qidcands, disable=not verbose, desc="Reading candidate map"):
-        alias2qids[al] = [c[0] for c in alias2qidcands[al]]
-    logger.debug(f"Loaded candidate mapping with {len(alias2qids)} aliases.")
-    all_aliases = marisa_trie.Trie(alias2qids.keys())
-    return all_aliases
 
 
 def get_new_to_old_dict(split_sentence):
@@ -149,7 +129,7 @@ def find_aliases_in_sentence_tag(
 
     Args:
         sentence: text
-        all_aliases: Trie of all aliases in our save
+        all_aliases: VocabTrie of all aliases in our save
         min_alias_len: minimum length (in words) of an alias
         max_alias_len: maximum length (in words) of an alias
 
@@ -350,7 +330,7 @@ def subprocess(args):
     min_alias_len = args["min_alias_len"]
     max_alias_len = args["max_alias_len"]
     verbose = args["verbose"]
-    all_aliases = marisa_trie.Trie().load(args["all_aliases_trie_f"])
+    all_aliases = VocabularyTrie(load_dir=args["all_aliases_trie_f"])
     num_lines = sum(1 for _ in open(in_file))
     with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, "w") as f_out:
         for line in tqdm(
@@ -383,7 +363,7 @@ def merge_files(chunk_outfiles, out_filepath):
 def extract_mentions(
     in_filepath,
     out_filepath,
-    cand_map_file,
+    entity_db_dir,
     min_alias_len=1,
     max_alias_len=6,
     num_workers=8,
@@ -395,7 +375,7 @@ def extract_mentions(
     Args:
         in_filepath: input file
         out_filepath: output file
-        cand_map_file: alias to candidate file
+        entity_db_dir: path to entity db
         min_alias_len: minimum alias length (in words)
         max_alias_len: maximum alias length (in words)
         num_workers: number of multiprocessing workers
@@ -403,8 +383,8 @@ def extract_mentions(
         verbose: verbose boolean
     """
     assert os.path.exists(in_filepath), f"{in_filepath} does not exist"
-    candidate_map = ujson.load(open(cand_map_file))
-    all_aliases_trie = get_all_aliases(candidate_map, verbose)
+    entity_symbols: EntitySymbols = EntitySymbols.load_from_cache(entity_db_dir)
+    all_aliases_trie: VocabularyTrie = entity_symbols.get_all_alias_vocabtrie()
     if num_chunks is None:
         num_chunks = num_workers
     start_time = time.time()
@@ -414,7 +394,7 @@ def extract_mentions(
         os.makedirs(prep_dir, exist_ok=True)
 
         all_aliases_trie_f = os.path.join(prep_dir, "mention_extract_alias.marisa")
-        all_aliases_trie.save(all_aliases_trie_f)
+        all_aliases_trie.dump(all_aliases_trie_f)
 
         # chunk file for multiprocessing
         num_lines = get_num_lines(in_filepath)
@@ -453,10 +433,19 @@ def extract_mentions(
         logger.debug("Removing temporary files...")
         # clean up and remove chunked files
         for file in chunk_infiles:
-            os.remove(file)
+            try:
+                os.remove(file)
+            except PermissionError:
+                pass
         for file in chunk_outfiles:
-            os.remove(file)
-        os.remove(all_aliases_trie_f)
+            try:
+                os.remove(file)
+            except PermissionError:
+                pass
+        try:
+            os.remove(all_aliases_trie_f)
+        except PermissionError:
+            pass
 
     # single process
     else:
@@ -491,7 +480,7 @@ def main():
     extract_mentions(
         in_file,
         out_file,
-        cand_map_file=args.cand_map,
+        entity_db_dir=args.entity_db_dir,
         min_alias_len=args.min_alias_len,
         max_alias_len=args.max_alias_len,
         num_workers=args.num_workers,

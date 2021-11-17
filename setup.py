@@ -20,10 +20,11 @@ REQUIRED = [
     "emmental @ git+ssh://git@github.com/senwu/emmental.git@master",
     "faiss-cpu>=1.6.8, <1.7.1",
     "jsonlines==2.0.0",
-    "marisa_trie_m==0.7.6",
+    "marisa_trie>=0.7.7, <0.8",
     "mock==4.0.3",
     "nltk>=3.6.4, <4.0.0",
     "notebook>=6.4.1, <7.0.0",
+    "numba>=0.50.0, <0.55.0",
     "numpy~=1.19.0",
     "pandas~=1.2.3",
     "progressbar==2.5",
@@ -38,6 +39,7 @@ REQUIRED = [
     "tqdm>=4.27",
     "transformers>=4.0.0, <5.0.0",
     "ujson~=4.1",
+    "wandb>=0.10.0, <0.13.0",
 ]
 
 EXTRAS = {

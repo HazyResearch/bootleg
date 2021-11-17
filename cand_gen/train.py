@@ -7,11 +7,13 @@ import subprocess
 import sys
 from copy import copy
 
+import emmental
 import torch
+from emmental.learner import EmmentalLearner
+from emmental.model import EmmentalModel
 from rich.logging import RichHandler
 from transformers import AutoTokenizer
 
-import emmental
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.data import get_slicedatasets
 from bootleg.symbols.constants import DEV_SPLIT, TEST_SPLIT, TRAIN_SPLIT
@@ -28,8 +30,6 @@ from cand_gen.data import get_dataloaders
 from cand_gen.task_config import CANDGEN_TASK
 from cand_gen.tasks import candgen_task
 from cand_gen.utils.parser.parser_utils import parse_boot_and_emm_args
-from emmental.learner import EmmentalLearner
-from emmental.model import EmmentalModel
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ def parse_cmdline_args():
         "E.g., --train_config.batch_size 5",
     )
 
+    cli_parser.add_argument("--local_rank", type=int, default=-1)
+
     # you can add other args that will override those in the config_script
     # parse_known_args returns 'args' that are the same as what parse_args() returns
     # and 'unknown' which are args that the parser doesn't recognize but you want to keep.
@@ -68,7 +70,7 @@ def parse_cmdline_args():
     config = parse_boot_and_emm_args(cli_args.config_script, unknown)
 
     #  Modify the local rank param from the cli args
-    config.learner_config.local_rank = int(os.getenv("LOCAL_RANK", -1))
+    config.learner_config.local_rank = int(os.getenv("LOCAL_RANK", cli_args.local_rank))
     return config, cli_args.config_script
 
 
@@ -195,8 +197,8 @@ def run_model(config, run_config_path=None):
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_file=config.data_config.alias_cand_map,
-        alias_idx_file=config.data_config.alias_idx_map,
+        alias_cand_map_dir=config.data_config.alias_cand_map,
+        alias_idx_dir=config.data_config.alias_idx_map,
     )
     # Create tasks
     tasks = [CANDGEN_TASK]

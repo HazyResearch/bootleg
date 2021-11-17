@@ -38,7 +38,7 @@ class RangedEmmentalDataset(EmmentalDataset):
         if data_range is not None:
             self.data_range = data_range
         else:
-            self.data_range = list(next(iter(self.X_dict.values())))
+            self.data_range = list(range(len(next(iter(self.X_dict.values())))))
 
     def __getitem__(
         self, index: int

@@ -104,7 +104,6 @@ class EntityProfileTest(unittest.TestCase):
             "Q123": {"sibling": ["Q345", "Q567"]},
             "Q345": {"sibling": ["Q123"]},
             "Q567": {"sibling": ["Q123"]},
-            "Q789": {},
         }
         (
             qid2title,
@@ -135,6 +134,55 @@ class EntityProfileTest(unittest.TestCase):
                     break
             assert found_other_obj is not None
             self.assertDictEqual(qid_obj, found_other_obj)
+
+        data = [
+            {
+                "entity_id": "Q123",
+                "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+                "title": "Dog",
+                "description": "Dog",
+                "types": {"hyena": ["animal"], "wiki": ["dog"]},
+                "relations": [
+                    {"relation": "sibling", "object": "Q345"},
+                    {"relation": "sibling", "object": "Q567"},
+                ],
+            },
+            # Extra QID
+            {
+                "entity_id": "Q123",
+                "mentions": [["cat", 10.0], ["catt", 7.0], ["animal", 3.0]],
+                "title": "Cat",
+                "description": "Cat",
+                "types": {"hyena": ["animal"], "wiki": ["cat"]},
+                "relations": [{"relation": "sibling", "object": "Q123"}],
+            },
+        ]
+        self.write_data(self.profile_file, data)
+        with self.assertRaises(ValueError) as context:
+            EntityProfile._read_profile_file(self.profile_file)
+        assert type(context.exception) is ValueError
+        assert "is already in our dump" in str(context.exception)
+
+        data = [
+            # Relation in wrong format
+            {
+                "entity_id": "Q123",
+                "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+                "title": "Dog",
+                "description": "Dog",
+                "types": {"hyena": ["animal"], "wiki": ["dog"]},
+                "relations": [
+                    {"relationnn": "sibling", "objject": "Q345"},
+                ],
+            }
+        ]
+        self.write_data(self.profile_file, data)
+        with self.assertRaises(ValueError) as context:
+            EntityProfile._read_profile_file(self.profile_file)
+        assert type(context.exception) is ValueError
+        assert "it must be a JSON with keys relation and object" in str(
+            context.exception
+        )
 
     def test_profile_load_jsonl_errors(self):
         """Test profile load from jsonl."""
@@ -200,9 +248,9 @@ class EntityProfileTest(unittest.TestCase):
                 set(entity_profile2.get_all_types(type_sys)),
             )
         for qid in entity_profile.get_all_qids():
-            self.assertSetEqual(
-                set(entity_profile.get_all_connections(qid)),
-                set(entity_profile2.get_all_connections(qid)),
+            self.assertDictEqual(
+                entity_profile.get_relations_tails_for_qid(qid),
+                entity_profile2.get_relations_tails_for_qid(qid),
             )
 
         # Test load with no types or kgs
@@ -217,7 +265,7 @@ class EntityProfileTest(unittest.TestCase):
         self.assertIsNone(entity_profile2._kg_symbols)
 
         # Testing that the functions still work despite not loading them
-        assert len(entity_profile2.get_all_connections("Q123")) == 0
+        assert entity_profile2.get_relations_tails_for_qid("Q123") is None
 
         # Test load with no types or kgs
         entity_profile2 = EntityProfile.load_from_cache(
@@ -295,6 +343,58 @@ class EntityProfileTest(unittest.TestCase):
         assert type(context.exception) is ValueError
         assert "type system blah is not one" in str(context.exception)
 
+    def test_getters(self):
+        """Test getters."""
+        data = [
+            {
+                "entity_id": "Q123",
+                "mentions": [["dog", 10.0], ["dogg", 7.0], ["animal", 4.0]],
+                "title": "Dog",
+                "description": "Dog",
+                "types": {"hyena": ["animal"], "wiki": ["dog"]},
+                "relations": [
+                    {"relation": "sibling", "object": "Q345"},
+                    {"relation": "sibling", "object": "Q567"},
+                ],
+            },
+            {
+                "entity_id": "Q345",
+                "mentions": [["cat", 10.0], ["catt", 7.0], ["animal", 3.0]],
+                "title": "Cat",
+                "types": {"hyena": ["animal"], "wiki": ["cat"]},
+                "relations": [
+                    {"relation": "sibling", "object": "Q123"},
+                    {"relation": "sibbbling", "object": "Q123"},
+                ],
+            },
+        ]
+        self.write_data(self.profile_file, data)
+        entity_profile = EntityProfile.load_from_jsonl(
+            self.profile_file, max_candidates=3, edit_mode=True
+        )
+        self.assertEqual(entity_profile.get_eid("Q345"), 2)
+        self.assertTrue(entity_profile.mention_exists("cat"))
+        self.assertFalse(entity_profile.mention_exists("dat"))
+        self.assertListEqual(entity_profile.get_qid_cands("cat"), ["Q345"])
+        self.assertListEqual(
+            entity_profile.get_qid_count_cands("cat"), [["Q345", 10.0]]
+        )
+        self.assertSetEqual(
+            set(entity_profile.get_all_mentions()),
+            {"dog", "dogg", "animal", "cat", "catt"},
+        )
+        self.assertSetEqual(
+            set(entity_profile.get_mentions("Q345")), {"animal", "cat", "catt"}
+        )
+        self.assertSetEqual(
+            set(entity_profile.get_entities_of_type("cat", "wiki")), {"Q345"}
+        )
+        self.assertEqual(entity_profile.num_entities_with_pad_and_nocand, 4)
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q345", "Q123"),
+            {"sibling", "sibbbling"},
+        )
+
     def test_add_entity(self):
         """Test add entity."""
         data = [
@@ -354,6 +454,12 @@ class EntityProfileTest(unittest.TestCase):
             "relations": [{"relation": "sibling", "object": "Q123"}],
         }
 
+        # Test can't update qid not in dump
+        with self.assertRaises(ValueError) as context:
+            entity_profile.update_entity(new_entity)
+        assert type(context.exception) is ValueError
+        assert "The entity Q789 is not in our dump" in str(context.exception)
+
         # Test new type system
         with self.assertRaises(ValueError) as context:
             entity_profile.add_entity(new_entity)
@@ -381,26 +487,30 @@ class EntityProfileTest(unittest.TestCase):
         )
 
         new_entity = {
-            "entity_id": "Q789",
+            "entity_id": "Q790",
             "mentions": [["snake", 10.0], ["animal", 3.0]],
             "title": "Snake",
             "description": "Snake",
             "types": {"hyena": ["animal"]},
             "relations": [{"relation": "sibbbling", "object": "Q123"}],
         }
-
-        # Test new relation
-        with self.assertRaises(ValueError) as context:
-            entity_profile.add_entity(new_entity)
-        assert type(context.exception) is ValueError
-        assert (
-            "When adding a new entity, you must use the same set of relations."
-            in str(context.exception)
+        entity_profile.add_entity(new_entity)
+        self.assertTrue(entity_profile.qid_exists("Q790"))
+        self.assertEqual(entity_profile.get_title("Q790"), "Snake")
+        self.assertEqual(entity_profile.get_desc("Q790"), "Snake")
+        self.assertListEqual(
+            entity_profile.get_mentions_with_scores("Q790"),
+            [["snake", 10.0], ["animal", 3.0]],
+        )
+        self.assertListEqual(entity_profile.get_types("Q790", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile.get_types("Q790", "wiki"), [])
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q790", "Q123"), {"sibbbling"}
         )
 
         new_entity = {
             "entity_id": "Q789",
-            "mentions": [["snake", 10.0], ["animal", 3.0]],
+            "mentions": [["snakke", 10.0], ["animal", 3.0]],
             "title": "Snake",
             "description": "Snake",
             "types": {"hyena": ["animal"]},
@@ -413,12 +523,36 @@ class EntityProfileTest(unittest.TestCase):
         self.assertEqual(entity_profile.get_desc("Q789"), "Snake")
         self.assertListEqual(
             entity_profile.get_mentions_with_scores("Q789"),
+            [["snakke", 10.0], ["animal", 3.0]],
+        )
+        self.assertListEqual(entity_profile.get_types("Q789", "hyena"), ["animal"])
+        self.assertListEqual(entity_profile.get_types("Q789", "wiki"), [])
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q789", "Q123"), {"sibling"}
+        )
+
+        # Update entity
+        new_entity = {
+            "entity_id": "Q789",
+            "mentions": [["snake", 10.0], ["animal", 3.0]],
+            "title": "Snake",
+            "description": "Snake",
+            "types": {"hyena": ["animal"]},
+            "relations": [{"relation": "sibling", "object": "Q123"}],
+        }
+        # Assert it is added
+        entity_profile.update_entity(new_entity)
+        self.assertTrue(entity_profile.qid_exists("Q789"))
+        self.assertEqual(entity_profile.get_title("Q789"), "Snake")
+        self.assertEqual(entity_profile.get_desc("Q789"), "Snake")
+        self.assertListEqual(
+            entity_profile.get_mentions_with_scores("Q789"),
             [["snake", 10.0], ["animal", 3.0]],
         )
         self.assertListEqual(entity_profile.get_types("Q789", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q789", "wiki"), [])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q789", "sibling"), ["Q123"]
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q789", "Q123"), {"sibling"}
         )
 
         # Check that no_kg still works with load_from_cache
@@ -435,8 +569,8 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q789", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q789", "wiki"), [])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q789", "sibling"), []
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q789", "Q123"), {"sibling"}
         )
 
     def test_reindentify_entity(self):
@@ -487,9 +621,11 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q911", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q911", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q911", "sibling"),
-            ["Q345", "Q567"],
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q911", "Q345"), {"sibling"}
+        )
+        self.assertSetEqual(
+            entity_profile.get_relations_between("Q911", "Q567"), {"sibling"}
         )
 
         # Check that no_kg still works with load_from_cache
@@ -507,10 +643,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q911", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q911", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q911", "sibling"),
-            [],
-        )
+        self.assertIsNone(entity_profile2.get_relations_between("Q911", "Q345"))
 
     def test_prune_to_entities(self):
         """Test prune to entities."""
@@ -554,10 +687,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile.get_types("Q123", "hyena"), ["animal"])
         self.assertListEqual(entity_profile.get_types("Q123", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile.get_connections_by_relation("Q123", "sibling"),
-            [],
-        )
+        self.assertSetEqual(entity_profile.get_relations_between("Q123", "Q567"), set())
 
         # Check that no_kg still works with load_from_cache
         entity_profile2 = EntityProfile.load_from_cache(
@@ -572,10 +702,7 @@ class EntityProfileTest(unittest.TestCase):
         )
         self.assertListEqual(entity_profile2.get_types("Q123", "hyena"), ["animal"])
         self.assertListEqual(entity_profile2.get_types("Q123", "wiki"), ["dog"])
-        self.assertListEqual(
-            entity_profile2.get_connections_by_relation("Q123", "sibling"),
-            [],
-        )
+        self.assertSetEqual(entity_profile.get_relations_between("Q123", "Q567"), set())
 
     def test_end2end(self):
         """Test end2end."""
@@ -718,6 +845,70 @@ class EntityProfileTest(unittest.TestCase):
         gold_alias2entity_table1 = torch.tensor(
             [
                 [
+                    1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                ],
+                [
+                    1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                ],
+                [
                     4,
                     1,
                     3,
@@ -813,72 +1004,9 @@ class EntityProfileTest(unittest.TestCase):
                     -1,
                     -1,
                 ],
-                [
-                    1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                ],
-                [
-                    1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                ],
             ]
         )
+
         assert torch.equal(alias2entity_table1, gold_alias2entity_table1)
         # The change is the "cat" alias has entity 1 added to the beginning
         # It used to only point to Q345 which is entity 2
@@ -893,6 +1021,70 @@ class EntityProfileTest(unittest.TestCase):
         gold_alias2entity_table2 = torch.tensor(
             [
                 [
+                    1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                ],
+                [
+                    1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                    -1,
+                ],
+                [
                     4,
                     1,
                     3,
@@ -988,72 +1180,9 @@ class EntityProfileTest(unittest.TestCase):
                     -1,
                     -1,
                 ],
-                [
-                    1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                ],
-                [
-                    1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                    -1,
-                ],
             ]
         )
+
         assert torch.equal(alias2entity_table2, gold_alias2entity_table2)
 
 

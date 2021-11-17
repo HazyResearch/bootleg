@@ -13,7 +13,6 @@ from itertools import chain, islice
 import marisa_trie
 import ujson
 import yaml
-from tqdm import tqdm
 
 from bootleg import log_rank_0_info
 from bootleg.utils.classes.dotted_dict import DottedDict
@@ -118,22 +117,6 @@ def recurse_redict(d):
     return d
 
 
-def assert_keys_in_dict(allowable_keys, d):
-    """
-    Check that all keys in d are in allowable keys.
-
-    Args:
-        allowable_keys: Set or List of allowable keys
-        d: Dict
-
-    Returns: Boolean if satisfied, None if correct/key that is not in allowable keys
-    """
-    for k in d:
-        if k not in allowable_keys:
-            return False, k
-    return True, None
-
-
 def write_to_file(filename, value):
     """
     Write generic value to a file.
@@ -152,23 +135,6 @@ def write_to_file(filename, value):
     fout = open(filename, "w")
     fout.write(value + "\n")
     fout.close()
-
-
-def load_jsonl(filepath):
-    """
-    Load jsonlines data from jsonl file.
-
-    Args:
-        filepath: file to read from
-
-    Returns: List[Dict] of data
-    """
-    lines = []
-    num_lines = sum([1 for _ in open(filepath)])
-    with open(filepath, "r") as in_f:
-        for line in tqdm(in_f, total=num_lines):
-            lines.append(ujson.loads(line))
-    return lines
 
 
 def write_jsonl(filepath, values):

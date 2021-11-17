@@ -6,6 +6,7 @@ Changed
 * To support larger files for dumping predictions over, we support adding an ``entity_emb_file`` to the model (extracted from ``extract_all_entities.py``. This will make evaluation faster. Further, we added ``dump_preds_num_data_splits`` to split a file before dumping. As each file pass gets a new dataload object, this can mitiage any torch dataloader memory issues that happens over large files.
 * Renamed ``eval_accumulation_steps`` to ``dump_preds_accumulation_steps``.
 * Removed option to ``dump_embs``.  Users should use ``dump_preds`` instead. The output file will have ``entity_ids`` attribute that will index into the extracted entity embeddings.
+* Restructured our ``entity_db`` data for faster loading. It uses Tries rather than jsons to store the data for read only mode. The KG relations are not backwards compatible.
 
 Added
 ^^^^^^

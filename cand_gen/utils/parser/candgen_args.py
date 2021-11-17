@@ -58,11 +58,11 @@ config_args = {
             "directory where entity json mappings are saved inside entity_dir",
         ),
         "alias_cand_map": (
-            "alias2qids.json",
+            "alias2qids",
             "name of alias candidate map file, should be saved in entity_dir/entity_map_dir",
         ),
         "alias_idx_map": (
-            "alias2id.json",
+            "alias2id",
             "name of alias index map file, should be saved in entity_dir/entity_map_dir",
         ),
         "qid_cnt_map": (

@@ -20,7 +20,6 @@ Text Datasets
 Requirements
 ~~~~~~~~~~~~
 
-
 #. Text data for training and dev datasets, and if desired, a test dataset, is available. For simplicity, in this tutorial, we just assume there is a dev dataset available.
 #. Known aliases (also known as mentions) and linked entities are available. This information can be obtained for Wikipedia, for instance, by using anchor text on Wikipedia pages as aliases and the linked pages as the entity label.
 
@@ -56,122 +55,7 @@ We also provide sample `training <https://github.com/HazyResearch/bootleg/tree/m
 Entities and Aliases
 ^^^^^^^^^^^^^^^^^^^^
 
-Our `Entity Profile`_ page details how to create the correct metadata for the entities and aliases and the structural files. Here we list the requirements of the mappings and inputs.
-
-Requirements
-~~~~~~~~~~~~
-
-#. There is a set of entities to consider as candidates for training and evaluation. There are entity ids (i.e. QIDs) and titles available for these entities. For instance, quantifier ids may be Wikidata QIDs or Unified Medical Language System (UMLS) Concept Unique Identifiers (CUI). For this tutorial, we refer to the entitiy ids by QID.
-#. There is a candidate mapping from aliases to entity candidates. The candidates must be in the set of entities above. If this is not provided, we apply a simple mining technique to generate this from the provided training dataset.
-
-QID-to-Title Mapping
-~~~~~~~~~~~~~~~~~~~~
-
-We assume that the set of entity QIDs and their corresponding titles are stored in a JSON file as a dictionary of QID to title pairs. Again, this is all generated for you in `Entity Profile`_. For example,
-
-.. code-block:: JSON
-
-   {
-       "Q60036": "Heidi Klum",
-       "Q218091": "Seal (musician)",
-       "Q23768": "Las Vegas"
-   }
-
-
-The QID-to-title mapping for the sample Wikipedia dataset in `data/sample_entity_data/entity_mappings/qid2title.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/entity_mappings/qid2title.json>`_.
-
-Candidate Mapping
-~~~~~~~~~~~~~~~~~
-
-We assume that the candidate mapping is stored in a JSON file as a dictionary of alias to list of [QID, sort_value] pairs, where the sort_value can be any numeric quantity to sort the candidate lists. The sort_value is necessary to choose the candidates when the number of candidates is greater than the maximum allowed (max candidates is a settable parameter). For example (candidates are cut short to display),
-
-.. code-block:: JSON
-
-   {
-       "heidi": [["Q60036", 10286], ["Q66019", 10027], ... ]
-       "seal": [["Q218091", 10416], ["Q9458", 4504], ... ]
-       "vegas": [["Q23768", 7613], ["Q2624848", 3191], ... ]
-   }
-
-
-We provide an example candidate mapping in `data/sample_entity_data/entity_mappings/alias2qids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/entity_mappings/alias2qids.json>`_. We assume that all aliases are lowercased.
-
-Entity Mappings
-~~~~~~~~~~~~~~~
-
-Bootleg also requires additional mappings to indices in internal Bootleg embeddings. For example, our mapping for entity QID to internal entity index. These are all also generated and explained in `Entity Profile`_.
-
-Type and Knowledge Graph (KG) Data
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-One of the key insights from Bootleg is that leveraging type and knowledge graph information in a simple attention-based network can improve performance on tail entities. However, to leverage this information, we need to provide type and/or knowledge graph information to the model.
-
-Requirements
-~~~~~~~~~~~~
-
-
-#. Type labels from a type ontology (e.g. Wikidata or HYENA types from YAGO) is available for the candidate entities. While we do not need types assigned to all entities, the higher the coverage, the better.
-#. Knowledge graph connectivity information, such as whether two entities are connected in knowledge graph, is available between pairs of entities. Furthermore, similar to the type labels, there is a mapping from entities to the knowledge graph relations they participate in.
-
-Type Information
-~~~~~~~~~~~~~~~~
-
-We assume that the type data is provided in a JSON file as a dictionary of pairs of QIDs to a list of type ids. If there are *N* distinct types, the type ids should range from 1 to *N*. As multiple types may be associated with an entity, we store the list of type ids with each QID. The maximum number of types considered per an entity is a settable parameter. These are generated also in `Entity Profile`_.
-
-For instance, if we have a type vocabulary of
-
-.. code-block::
-
-   {
-       "place": 1,
-       "person": 2,
-       "city": 3
-   }
-
-
-then we may have an associated QID-to-type mapping of
-
-.. code-block::
-
-   {
-       "Q60036": [2],
-       "Q218091": [2],
-       "Q23768": [1, 3]
-   }
-
-
-An example of the QID-to-type mapping can be found in `data/sample_entity_data/type_mappings/wiki/qid2typeids.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/wiki/qid2typeids.json>`_ with the associated type vocabulary in `data/sample_entity_data/type_mappings/wiki/type_vocab.json <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/type_mappings/wiki/type_vocab.json>`_.
-
-KG Information
-~~~~~~~~~~~~~~
-
-We assume the KG information, like the type information, is provided in a JSON file representing KG triples such that for each subject entity, we have a dictionary of its relationships and the objects of those relationships. We also have a relaiton vocab mapping to map from the relation in the triples to any human readible output for the entity encoder.
-
-For instance, if we have a relation vocabulary of
-
-.. code-block::
-
-   {
-       "head of government": "P6",
-       "vessel class": "P289",
-       "member of sports team": "P54"
-   }
-
-
-then we may have an associated QID-to-relation mapping of
-
-.. code-block::
-
-   {
-       "Q60036": {"P289": ["Q31"]},
-       "Q218091": {"P289": ["Q893", "Q923"], "P54": ["Q1245"]},
-       "Q23768": {"P6": ["Q64"]}
-   }
-
-We also provide KG connectivity information in the entity profile although it is not used in the model at this time. This adjacency information is a simple text file where each line is a tab-separated QID pair, if an edge exists between the two QIDs in a relevant knowledge graph. For instance, Q60036 (Heidi Klum) and Q218091 (Seal) share an edge (spouse), so we would have the line below in the connectivity data.
-
-Check out `data/sample_entity_data/kg_mappings/kg_adj.txt <https://github.com/HazyResearch/bootleg/tree/master/data/sample_entity_data/kg_mappings/kg_adj.txt>`_ as an example of QID connectivity from Wikidata.
-
+You need an entity profile dump for training. Our `Entity Profile`_ page details how to create the correct metadata for the entities and aliases and the structural files. The path is added to the config in the ``entity_data_dir`` param (see below).
 
 Directory Structure
 ^^^^^^^^^^^^^^^^^^^
@@ -188,26 +72,18 @@ We assume the data above is saved in the following directory structure, where th
    entity_db/
         type_mappings/
             wiki/
-                type_vocab.json
-                qid2typenames.json
+                qid2typenames/
                 config.json
-                qid2typeids.json
-            relations/
-                qid2typeids.json
-                config.json
-                type_vocab.json
-                qid2typenames.json
         kg_mappings/
             config.json
-            qid2relations.json
-            relation_vocab.json
+            qid2relations/
             kg_adj.txt
         entity_mappings/
-            alias2qids.json
-            qid2eid.json
+            alias2qids/
+            qid2eid/
             qid2title.json
             qid2desc.json
-            alias2id.json
+            alias2id/
             config.json
 
 Preparing the Config
@@ -257,13 +133,11 @@ As described in the _Bootleg Model, Bootleg generates an embedding entity from a
         use_entity_desc: true
         entity_type_data:
           use_entity_types: true
-          type_labels: type_mappings/wiki/qid2typeids.json
-          type_vocab: type_mappings/wiki/type_vocab.json
+          type_symbols_dir: type_mappings/wiki
           max_ent_type_len: 20
         entity_kg_data:
           use_entity_kg: true
-          kg_labels: kg_mappings/qid2relations.json
-          kg_vocab: kg_mappings/relation_vocab.json
+          kg_symbols_dir: kg_mappings
           max_ent_kg_len: 60
         max_seq_len: 128
         max_seq_window_len: 64

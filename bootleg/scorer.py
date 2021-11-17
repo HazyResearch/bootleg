@@ -124,38 +124,3 @@ class BootlegSlicedScorer:
                 else correct_pop_cand_in_cand[slice_name] / total_in_cand[slice_name]
             )
         return res
-
-    def type_pred_score(
-        self,
-        golds: ndarray,
-        probs: ndarray,
-        preds: Optional[ndarray],
-        uids: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
-        """Scores the type prediction accuracy.
-
-        Args:
-            golds: gold labels
-            probs: probabilities
-            preds: predicted type
-            uids: unique identifiers
-
-        Returns: dictionary of tensorboard compatible keys and metrics
-        """
-        batch, M = golds.shape
-        NO_MENTION = -1
-
-        res = {}
-        total = 0
-        correct_boot = Counter()
-        for row in range(batch):
-            for col in range(M):
-                gold = golds[row, col]
-                pred = preds[row, col]
-                if gold == NO_MENTION:
-                    continue
-                correct_boot[gold == pred] += 1
-                total += 1
-        # TODO: add prec/recall per type
-        res["acc_boot"] = correct_boot[True] / total
-        return res

@@ -41,7 +41,6 @@ An example training config is shown below
       log_path: logs/wiki
       l2: 0.01
       grad_clip: 1.0
-      distributed_backend: nccl
       fp16: true
     run_config:
       eval_batch_size: 32
@@ -50,19 +49,17 @@ An example training config is shown below
     train_config:
       batch_size: 32
     model_config:
-      hidden_size: 512
+      hidden_size: 200
     data_config:
       data_dir: bootleg-data/data/wiki_title_0122
       data_prep_dir: prep
       use_entity_desc: true
       entity_type_data:
         use_entity_types: true
-        type_labels: type_mappings/wiki/qid2typeids.json
-        type_vocab: type_mappings/wiki/type_vocab.json
+        type_symbols_dir: type_mappings/wiki
       entity_kg_data:
         use_entity_kg: true
-        kg_labels: kg_mappings/qid2relations.json
-        kg_vocab: kg_mappings/relation_vocab.json
+        kg_symbols_dir: kg_mappings
       entity_dir: bootleg-data/data/wiki_title_0122/entity_db
       max_seq_len: 128
       max_seq_window_len: 64

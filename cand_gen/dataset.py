@@ -117,8 +117,8 @@ def build_and_save_entity_inputs_initializer(
     global entitysymbols_global
     entitysymbols_global = EntitySymbols.load_from_cache(
         load_dir=os.path.join(data_config.entity_dir, data_config.entity_map_dir),
-        alias_cand_map_file=data_config.alias_cand_map,
-        alias_idx_file=data_config.alias_idx_map,
+        alias_cand_map_dir=data_config.alias_cand_map,
+        alias_idx_dir=data_config.alias_idx_map,
     )
 
 
@@ -693,6 +693,7 @@ class CandGenDataset(RangedEmmentalDataset):
         Returns:
           Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
         """
+        index = self.data_range[index]
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         y_dict = {name: label[index] for name, label in self.Y_dict.items()}
 
@@ -981,6 +982,7 @@ class CandGenContextDataset(CandGenDataset):
         Returns:
           Tuple[Dict[str, Any], Dict[str, Tensor]]: Tuple of x_dict and y_dict
         """
+        index = self.data_range[index]
         x_dict = {name: feature[index] for name, feature in self.X_dict.items()}
         return x_dict
 

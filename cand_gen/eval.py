@@ -247,10 +247,10 @@ def run_model(
         load_dir=os.path.join(
             config.data_config.entity_dir, config.data_config.entity_map_dir
         ),
-        alias_cand_map_file=config.data_config.alias_cand_map,
-        alias_idx_file=config.data_config.alias_idx_map,
+        alias_cand_map_dir=config.data_config.alias_cand_map,
+        alias_idx_dir=config.data_config.alias_idx_map,
     )
-    qid2eid = entity_symbols.get_qid2eid()
+    qid2eid = entity_symbols.get_qid2eid_dict()
     eid2qid = {v: k for k, v in qid2eid.items()}
     assert len(qid2eid) == len(eid2qid), "Duplicate EIDs detected"
 
@@ -263,6 +263,9 @@ def run_model(
 
     out_emb_file = entity_embs_path
     if entity_embs_path is None:
+        log_rank_0_info(
+            logger, "Gathering embeddings for all entities. Will save for reuse."
+        )
         preds, _, _ = gen_entity_embeddings(config, context_tokenizer, entity_symbols)
 
         final_out_emb_file = os.path.join(
@@ -282,9 +285,8 @@ def run_model(
     if entity_embs_only:
         return out_emb_file
 
+    log_rank_0_info(logger, "Loading embeddings for cand gen.")
     entity_embs = np.load(out_emb_file)
-
-    print("Feature shape:", entity_embs.shape)
 
     log_rank_0_info(logger, "Building index...")
     if torch.cuda.device_count() > 0 and config["model_config"]["device"] >= 0:
@@ -319,7 +321,6 @@ def run_model(
     for i in range(int(np.ceil(total_samples / nn_chunk))):
         st = i * nn_chunk
         ed = min((i + 1) * nn_chunk, total_samples)
-        print("DATASET RANGE", st, ed, "NUM", total_samples, "CH", nn_chunk)
         context_preds, context_dataloader, context_model = gen_context_embeddings(
             config,
             context_tokenizer,
@@ -335,7 +336,8 @@ def run_model(
         # +1 as index will return
         D, Is = faiss_index.search(res["context_features"], topk)
         for j in range(Is.shape[0]):
-            example = context_dataloader.dataset[st + j]
+            # No need to offset by st+j as the range offset is accounted for in dataset
+            example = context_dataloader.dataset[j]
             sent_id = int(example["sent_idx"])
             alias_id = int(example["alias_orig_list_pos"])
             gt_eid = int(example["for_dump_gold_eid"])
@@ -364,7 +366,9 @@ def run_model(
         cnt_k[k] /= total_cnt
     print(cnt_k, total_cnt)
 
-    metrics_file = Path(emmental.Meta.log_path) / "candgen_metrics.txt"
+    # Get test dataset filename
+    file_name = Path(config.data_config.test_dataset.file).stem
+    metrics_file = Path(emmental.Meta.log_path) / f"{file_name}_candgen_metrics.txt"
     write_to_file(
         metrics_file,
         cnt_k,
@@ -381,7 +385,10 @@ def run_model(
         v = sorted(v, key=lambda x: x[1])
         sent2output[sent_id] = v
 
-    candidates_file = Path(emmental.Meta.log_path) / f"{topk}_candidates.jsonl"
+    candidates_file = (
+        Path(emmental.Meta.log_path) / f"{file_name}_{topk}_candidates.jsonl"
+    )
+    log_rank_0_info(logger, f"Saving to {candidates_file}")
     with open(candidates_file, "w") as f:
         for sent_id, list_of_values in sent2output.items():
             sent_ids, alias_ids, gts, cands, probs = list(zip(*list_of_values))

@@ -11,7 +11,7 @@ from bootleg.utils.utils import load_yaml_file
 console = Console(soft_wrap=True)
 bert_dir = tempfile.TemporaryDirectory().name
 
-checkpoint_regex = re.compile("checkpoint_(\d+\.{0,1}\d*).model.pth")
+checkpoint_regex = re.compile(r"checkpoint_(\d+\.{0,1}\d*).model.pth")
 
 
 def find_latest_checkpoint(path):
@@ -22,7 +22,7 @@ def find_latest_checkpoint(path):
         if res:
             possible_checkpoints.append([res.group(1), fld])
     if len(possible_checkpoints) <= 0:
-        return None
+        return possible_checkpoints
     newest_sort = sorted(possible_checkpoints, key=lambda x: float(x[0]), reverse=True)
     return newest_sort[0][-1]
 
@@ -31,22 +31,25 @@ def find_latest_checkpoint(path):
 @argh.arg("--num_gpus", help="Num gpus")
 @argh.arg("--batch", help="Batch size")
 @argh.arg("--grad_accum", help="Grad accum")
+@argh.arg("--cand_gen_run", help="Launch cand get")
 def main(
     config="configs/gcp/bootleg_test.yaml",
     num_gpus=4,
     batch=None,
     grad_accum=None,
+    cand_gen_run=False,
 ):
     config = Path(config)
     config_d = load_yaml_file(config)
     save_path = Path(config_d["emmental"]["log_path"])
     seed = config_d["emmental"].get("seed", 1234)
+    call_file = "bootleg/run.py" if not cand_gen_run else "cand_gen/train.py"
     to_call = [
         "python3",
         "-m",
         "torch.distributed.run",
         f"--nproc_per_node={num_gpus}",
-        "bootleg/run.py",
+        call_file,
         "--config",
         str(config),
     ]
@@ -59,9 +62,9 @@ def main(
         else 0,
         reverse=True,
     )
-    save_path = latest_save_path[0]
+    save_path = latest_save_path[0] if len(latest_save_path) > 0 else None
 
-    if save_path.exists() and save_path.is_dir():
+    if save_path is not None and save_path.exists() and save_path.is_dir():
         last_checkpoint = find_latest_checkpoint(save_path)
         if last_checkpoint is not None:
             to_call.append("--emmental.model_path")

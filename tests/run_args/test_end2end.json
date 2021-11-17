@@ -30,14 +30,12 @@
         "entity_type_data": {
             "use_entity_types": false,
             "max_ent_type_len": 10,
-            "type_labels": "type_pred_mapping.json",
-            "type_vocab": "type_pred_vocab.json"
+            "type_symbols_dir": "type_mappings/wiki",
         },
         "entity_kg_data": {
             "use_entity_kg": false,
             "max_ent_kg_len": 10,
-            "kg_labels": "qid2relations.json",
-            "kg_vocab": "relation_vocab.json"
+            "kg_symbols_dir": "kg_mappings"
         },
         "word_embedding":
         {
