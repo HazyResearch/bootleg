@@ -30,4 +30,7 @@ class EntityEmbedding(torch.nn.Module):
 
         Returns: B x M x K x dim tensor of entity embeddings
         """
-        return self.embeddings(entity_cand_eid)
+        training_bool = (
+            torch.tensor([1], device=entity_cand_eid.device) * self.training
+        ).bool()
+        return self.embeddings(entity_cand_eid), training_bool
