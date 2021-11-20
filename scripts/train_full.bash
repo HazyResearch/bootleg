@@ -1,3 +1,4 @@
+source ../venv/bin/activate
 source ./envs.bash
 
 BOOTLEG_TRAIN_DATA_DIR=$BOOTLEG_BASE_DIR/output/full_wiki_0_-1_final
