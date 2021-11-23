@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import warnings
 from copy import copy
 
 import emmental
@@ -34,6 +35,7 @@ from bootleg.utils.utils import (
     write_to_file,
 )
 
+warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
 

@@ -171,7 +171,10 @@ def flatten_nested_args_for_parser(args, new_args, groups, prefix):
             else:
                 new_args.append(f"--{prefix}{key}")
                 # print("HERE2", vars(args))
-                new_args.append(f"{ujson.dumps(args[key])}")
+                if isinstance(args, dict):
+                    new_args.append(f"{ujson.dumps(args[key])}")
+                else:
+                    new_args.append(f"{ujson.dumps(vars(args)[key])}")
         elif isinstance(args[key], list):
             for v in args[key]:
                 new_args.append(f"--{prefix}{key}")

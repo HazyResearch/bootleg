@@ -23,8 +23,8 @@ sys.path.insert(0, os.path.abspath("."))
 # -- Project information -----------------------------------------------------
 
 project = "Bootleg"
-copyright = "2021, Laurel Orr and Megan Leszczynski"
-author = "Laurel Orr and Megan Leszczynski"
+copyright = "2021, Laurel Orr"
+author = "Laurel Orr"
 
 # The full version, including alpha/beta/rc tags
 release = "v1.1.0"

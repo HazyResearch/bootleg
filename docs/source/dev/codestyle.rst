@@ -3,7 +3,7 @@ Code Style
 
 For code consistency, we have a `pre-commit`_ configuration file so that you can easily install pre-commit hooks to run style checks before you commit your files. You can setup our pre-commit hooks by running::
 
-    $ pip install -r requirements-dev.txt
+    $ pip install .[dev]
     $ pre-commit install
 
 Or, just run::
