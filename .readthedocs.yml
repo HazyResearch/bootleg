@@ -16,8 +16,6 @@ formats: all
 python:
   version: 3.8
   install:
-    - requirements: requirements-dev.txt
     - method: pip
       path: .
   system_packages: true
-
