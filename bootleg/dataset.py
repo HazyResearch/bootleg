@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 # Removes warnings about TOKENIZERS_PARALLELISM
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-model_has_token_types = True
 class InputExample(object):
     """A single training/test example for prediction."""
 
@@ -834,7 +833,7 @@ def convert_examples_to_features_and_save_single(
         inputs = tokenizer(
             example.phrase.split(),
             is_split_into_words=True,
-            return_token_type_ids=True if model_has_token_types else False,
+            return_token_type_ids=True,
             padding="max_length",
             add_special_tokens=True,
             truncation=True,
@@ -853,7 +852,7 @@ def convert_examples_to_features_and_save_single(
             inputs = tokenizer(
                 new_phrase,
                 is_split_into_words=True,
-                return_token_type_ids=True if model_has_token_types else False,
+                return_token_type_ids=True,
                 padding="max_length",
                 add_special_tokens=True,
                 truncation=True,
@@ -889,10 +888,7 @@ def convert_examples_to_features_and_save_single(
         candidate_sentence_attn_msks[: len(inputs["attention_mask"])] = inputs[
             "attention_mask"
         ]
-        if model_has_token_types:
-            candidate_sentence_token_type_ids[: len(inputs["token_type_ids"])] = inputs["token_type_ids"]
-        else:
-            candidate_sentence_token_type_ids[: len(inputs["input_ids"])] = [0] * len(inputs["input_ids"])
+        candidate_sentence_token_type_ids[: len(inputs["token_type_ids"])] = inputs["token_type_ids"]
 
         # this stores the true entity pos in the candidate list we use to compute loss -
         # all anchors for train and true anchors for dev/test
@@ -1091,19 +1087,19 @@ def build_and_save_entity_inputs(
     # we need to set the values. These get a single [SEP] for title [SEP] rest of entity
     empty_ent = tokenizer(
         "[SEP]",
-        return_token_type_ids=True if model_has_token_types else False,
+        return_token_type_ids=True,
         padding="max_length",
         add_special_tokens=True,
         truncation=True,
         max_length=data_config.max_ent_len,
     )
     memfile["entity_input_ids"][0] = empty_ent["input_ids"][:]
-    memfile["entity_token_type_ids"][0] = empty_ent["token_type_ids"][:] if model_has_token_types else [0] * len(empty_ent["input_ids"])
+    memfile["entity_token_type_ids"][0] = empty_ent["token_type_ids"][:]
     memfile["entity_attention_mask"][0] = empty_ent["attention_mask"][:]
     memfile["entity_to_mask"][0] = [0 for _ in range(len(empty_ent["input_ids"]))]
 
     memfile["entity_input_ids"][-1] = empty_ent["input_ids"][:]
-    memfile["entity_token_type_ids"][-1] = empty_ent["token_type_ids"][:] if model_has_token_types else [0] * len(empty_ent["input_ids"])
+    memfile["entity_token_type_ids"][-1] = empty_ent["token_type_ids"][:]
     memfile["entity_attention_mask"][-1] = empty_ent["attention_mask"][:]
     memfile["entity_to_mask"][-1] = [0 for _ in range(len(empty_ent["input_ids"]))]
 
@@ -1229,7 +1225,7 @@ def build_and_save_entity_inputs_single(
         )
         inputs = tokenizer(
             ent_str.split(),
-            return_token_type_ids=True if model_has_token_types else False,
+            return_token_type_ids=True,
             is_split_into_words=True,
             padding="max_length",
             add_special_tokens=True,
@@ -1260,8 +1256,6 @@ def build_and_save_entity_inputs_single(
         eid = entity_symbols.get_eid(qid)
         for k, value in inputs.items():
             memfile[f"entity_{k}"][eid] = value
-        if not model_has_token_types:
-            memfile[f"entity_token_type_ids"][eid] = [0] * len(inputs["input_ids"])
         memfile["entity_to_mask"][eid] = to_mask
     memfile.flush()
     return len(input_qids), num_overflow

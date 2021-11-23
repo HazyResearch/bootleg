@@ -21,11 +21,9 @@ class Encoder(nn.Module):
         self.linear = nn.Linear(transformer_output_dim, out_dim)
         self.activation = nn.Tanh()
         self.transformer = transformer
-        # print(f'SHAPE:{transformer.embeddings.token_type_embeddings.weight.shape}')
 
     def forward(self, token_ids, segment_ids=None, attention_mask=None):
         """BERT Encoder forward."""
-        # print(f'FORWARD: {token_ids}, {segment_ids}, {attention_mask}')
         encoded_layers, pooled_output = self.transformer(
             input_ids=token_ids.reshape(-1, token_ids.shape[-1]),
             token_type_ids=segment_ids.reshape(-1, segment_ids.shape[-1]),

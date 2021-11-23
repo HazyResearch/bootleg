@@ -270,10 +270,10 @@ class TwoLayerVocabularyScoreTrie:
         trie = marisa_trie.RecordTrie(
             self._get_fmt_string(max_value), zip(all_keys, all_values)
         )
-        # print(
-        #     f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
-        #     f" was too small."
-        # )
+        print(
+            f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
+            f" was too small."
+        )
         return trie
 
     def get_value(self, key, keep_score=True):

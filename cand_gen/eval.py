@@ -106,7 +106,9 @@ def setup(config, run_config_path=None):
 
     Returns:
     """
-    torch.multiprocessing.set_sharing_strategy("file_system")
+    if "mp_sharing_strategy" in config.data_config:
+        torch.multiprocessing.set_sharing_strategy(config["mp_sharing_strategy"])
+
     # spawn method must be fork to work with Meta.config
     torch.multiprocessing.set_start_method("fork", force=True)
     """

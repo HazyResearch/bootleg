@@ -17,5 +17,5 @@ cat /tmp/base_config.yaml
 echo ''
 echo 'Starting to train...'
 echo ''
-cd $BOOTLEG_CODE_DIR
-python3 ./bootleg/run.py --config_script /tmp/base_config.yaml
+cd $BOOTLEG_BASE_DIR
+python3 ./bootleg/run.py --config_script /tmp/base_config.yaml 2>&1 | tee $BOOTLEG_LOGS_DIR/train_kore50.log

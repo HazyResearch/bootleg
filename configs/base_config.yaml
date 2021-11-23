@@ -1,14 +1,14 @@
 emmental:
   lr: 2e-5
-  n_steps: 50
-  steps_learned: 20
-  evaluation_freq: 10
+  n_epochs: 10
+  evaluation_freq: 400
   checkpoint_freq: 1
   counter_unit: batch
   checkpoint_all: true
   clear_intermediate_checkpoints: false
   lr_scheduler: linear
   grad_clip: 1.0
+  warmup_percentage: 0.1
   l2: 0.01
   log_path: BOOTLEG_LOGS_DIR
   device: 0
@@ -16,11 +16,12 @@ run_config:
   eval_batch_size: 16
   dataloader_threads: BOOTLEG_PROCESS_COUNT
   dataset_threads: BOOTLEG_PROCESS_COUNT
+  mp_sharing_strategy: file_system
   log_level: info
 train_config:
   batch_size: 16
 model_config:
-  hidden_size: 64
+  hidden_size: 128
 data_config:
   data_dir: BOOTLEG_TRAIN_DATA_DIR
   data_prep_dir: prep
@@ -47,5 +48,5 @@ data_config:
   word_embedding:
     bert_model: BOOTLEG_BERT_MODEL
     cache_dir: BOOTLEG_BERT_CACHE_DIR
-    context_layers: 1
-    entity_layers: 1
+    context_layers: 6
+    entity_layers: 6

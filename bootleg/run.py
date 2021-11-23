@@ -38,11 +38,6 @@ from bootleg.utils.utils import (
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 
-I_love_warnings = False
-if not I_love_warnings:
-    import warnings
-    warnings.filterwarnings("ignore")
-
 def parse_cmdline_args():
     """
     Take an input config file and parse it into the correct subdictionary groups for the model.
@@ -103,7 +98,9 @@ def setup(config, run_config_path=None):
         config: config
         run_config_path: path for original run config
     """
-    torch.multiprocessing.set_sharing_strategy("file_system")
+    if "mp_sharing_strategy" in config.data_config:
+        torch.multiprocessing.set_sharing_strategy(config["mp_sharing_strategy"])
+
     # spawn method must be fork to work with Meta.config
     torch.multiprocessing.set_start_method("fork", force=True)
     """
@@ -204,7 +201,6 @@ def run_model(mode, config, run_config_path=None, entity_emb_file=None):
         run_config_path: original config path (for saving)
         entity_emb_file: file for dumped entity embeddings
     """
-    torch.multiprocessing.set_sharing_strategy("file_system")
     # Set up distributed backend and save configuration files
     setup(config, run_config_path)
 

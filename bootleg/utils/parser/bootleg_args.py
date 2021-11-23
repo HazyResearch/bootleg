@@ -37,6 +37,10 @@ config_args = {
             "bootleg_embs.npy",
             "file name to save contextualized embs in",
         ),
+        "mp_sharing_strategy": (
+            "",
+            "setting this to 'file_system' when training on machine with less RAM solves pytorch issues",
+        ),
     },
     # Parameters for hyperparameter tuning
     "train_config": {
