@@ -17,5 +17,5 @@ python:
   version: 3.8
   install:
     - method: pip
-      path: .
+      path: .[dev]
   system_packages: true
