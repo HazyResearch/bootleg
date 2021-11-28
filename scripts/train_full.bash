@@ -1,7 +1,7 @@
 source ../venv/bin/activate
 source ./envs.bash
 
-BOOTLEG_TRAIN_DATA_DIR=$BOOTLEG_BASE_DIR/output/full_wiki_0_-1_final
+BOOTLEG_TRAIN_DATA_DIR=$BOOTLEG_DATA_DIR/output/full_wiki_0_-1_final
 BASE_CONFIG=$BOOTLEG_CONFIGS_DIR/base_config.yaml
 BOOTLEG_ENTITYDB_DIR=$BOOTLEG_TRAIN_DATA_DIR/entity_db
 
@@ -17,5 +17,5 @@ cat /tmp/base_config.yaml
 echo ''
 echo 'Starting to train...'
 echo ''
-cd $BOOTLEG_BASE_DIR
+cd $BOOTLEG_CODE_DIR
 python3 ./bootleg/run.py --config_script /tmp/base_config.yaml

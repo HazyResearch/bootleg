@@ -1,5 +1,6 @@
 """Nested vocab tries."""
 import itertools
+import logging
 import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Set, Tuple, Union
@@ -270,7 +271,7 @@ class TwoLayerVocabularyScoreTrie:
         trie = marisa_trie.RecordTrie(
             self._get_fmt_string(max_value), zip(all_keys, all_values)
         )
-        print(
+        logging.debug(
             f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
             f" was too small."
         )
@@ -419,7 +420,7 @@ class ThreeLayerVocabularyTrie:
         trie = marisa_trie.RecordTrie(
             self._get_fmt_string(max_value), zip(all_keys, all_values)
         )
-        print(
+        logging.debug(
             f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
             f" was too small."
         )
