@@ -17,7 +17,7 @@ VERSION = main_ns["__version__"]
 REQUIRED = [
     "argh>=0.26.2, <1.0.0",
     "click>=7.1.2, <7.5.0",
-    "emmental==1.0.0",
+    "emmental==0.1.0",
     "faiss-cpu>=1.6.8, <1.7.1",
     "jsonlines>=2.0.0, <2.4.0",
     "marisa_trie>=0.7.7, <0.8",
