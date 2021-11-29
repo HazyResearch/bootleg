@@ -70,7 +70,7 @@ def create_config(model_path, data_path, model_name):
 
     # set the path for the entity db and candidate map
     config_args["data_config"]["entity_dir"] = str(data_path / "entity_db")
-    config_args["data_config"]["alias_cand_map"] = "alias2qids.json"
+    config_args["data_config"]["alias_cand_map"] = "alias2qids"
 
     # set the embedding paths
     config_args["data_config"]["word_embedding"]["cache_dir"] = str(
