@@ -1,7 +1,7 @@
 emmental:
   lr: 2e-5
   n_epochs: 10
-  evaluation_freq: 400
+  evaluation_freq: 220000
   checkpoint_freq: 1
   counter_unit: batch
   checkpoint_all: true
@@ -10,12 +10,11 @@ emmental:
   grad_clip: 1.0
   warmup_percentage: 0.1
   l2: 0.01
-  log_path: BOOTLEG_LOGS_DIR
+  log_path: /data/logs
   device: 0
 run_config:
   eval_batch_size: 16
-  dataloader_threads: BOOTLEG_PROCESS_COUNT
-  dataset_threads: BOOTLEG_PROCESS_COUNT
+  dataset_threads: 8
   mp_sharing_strategy: file_system
   log_level: info
   dataloader_threads: 0
@@ -24,10 +23,10 @@ train_config:
 model_config:
   hidden_size: 128
 data_config:
-  data_dir: BOOTLEG_TRAIN_DATA_DIR
+  data_dir: /data/output/full_wiki_0_-1_final
   data_prep_dir: prep
-  entity_dir: BOOTLEG_ENTITYDB_DIR
-  overwrite_preprocessed_data: true
+  entity_dir: /data/output/full_wiki_0_-1_final/entity_db
+  overwrite_preprocessed_data: false
   use_entity_desc: false
   entity_type_data:
     use_entity_types: true
@@ -47,7 +46,7 @@ data_config:
     use_weak_label: false
   train_in_candidates: true
   word_embedding:
-    bert_model: BOOTLEG_BERT_MODEL
-    cache_dir: BOOTLEG_BERT_CACHE_DIR
+    bert_model: avichr/heBERT
+    cache_dir: /data/bert_cache
     context_layers: 6
     entity_layers: 6

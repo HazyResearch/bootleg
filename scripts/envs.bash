@@ -9,7 +9,9 @@
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 UP_SCRIPT_DIR=$(builtin cd $SCRIPT_DIR/..; pwd)
 export BOOTLEG_CODE_DIR=$UP_SCRIPT_DIR
+export PYTHONPATH=$BOOTLEG_CODE_DIR
 export BOOTLEG_CONFIGS_DIR=$BOOTLEG_CODE_DIR/configs
 export BOOTLEG_LOGS_DIR=$BOOTLEG_DATA_DIR/logs
 export BOOTLEG_BERT_CACHE_DIR=$BOOTLEG_DATA_DIR/bert_cache
 
+qid2title.json
