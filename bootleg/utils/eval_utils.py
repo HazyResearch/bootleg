@@ -222,10 +222,10 @@ def get_sent_idx2num_mens(data_file):
     sent_idx2num_mens = {}
     sent_idx2row = {}
     total_num_mentions = 0
-    with open(data_file) as f:
+    with open(data_file, encoding="utf-8") as f:
         for line in tqdm(
             f,
-            total=sum([1 for _ in open(data_file)]),
+            total=sum([1 for _ in open(data_file, encoding="utf-8")]),
             desc="Getting sentidx2line mapping",
         ):
             line = ujson.loads(line)
@@ -1043,7 +1043,7 @@ def write_data_labels(
         i = 0
         cur_lines = 0
         file_split = os.path.join(create_ex_indir, f"out{i}.jsonl")
-        open_file = open(file_split, "w")
+        open_file = open(file_split, "w", encoding="utf-8")
         for s_idx in sent_idx2row:
             if cur_lines >= chunk_input:
                 open_file.close()
@@ -1051,7 +1051,7 @@ def write_data_labels(
                 cur_lines = 0
                 i += 1
                 file_split = os.path.join(create_ex_indir, f"out{i}.jsonl")
-                open_file = open(file_split, "w")
+                open_file = open(file_split, "w", encoding="utf-8")
             line = sent_idx2row[s_idx]
             open_file.write(ujson.dumps(line) + "\n")
             cur_lines += 1
@@ -1138,7 +1138,7 @@ def write_data_labels_hlp(args):
     """Write data labels multiprocess helper function."""
     input_file, output_file = args
     s_idx2row = {}
-    with open(input_file) as in_f:
+    with open(input_file, encoding="utf-8") as in_f:
         for line in in_f:
             line = ujson.loads(line)
             s_idx2row[str(line["sent_idx_unq"])] = line
@@ -1178,7 +1178,7 @@ def write_data_labels_single(
         train_in_cands: training in candidates flag
         max_cands: maximum candidates
     """
-    with open(output_file, "w") as f_out:
+    with open(output_file, "w", encoding="utf-8") as f_out:
         for sent_idx in sentidx2row:
             line = sentidx2row[sent_idx]
             aliases = line["aliases"]

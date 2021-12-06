@@ -75,7 +75,7 @@ def get_slice_stats(num_processes, file):
     temp_out_dir = os.path.join(os.path.dirname(file), "_temp")
     os.mkdir(temp_out_dir)
 
-    all_lines = [li for li in open(file)]
+    all_lines = [li for li in open(file, encoding="utf-8")]
     num_lines = len(all_lines)
     chunk_size = int(np.ceil(num_lines / num_processes))
     line_chunks = [
@@ -188,12 +188,12 @@ def main():
 
     out_file = os.path.join(args.data_dir, args.out_file_name)
     print(f"Outputting results to {out_file}")
-    num_lines = sum([1 for _ in open(in_file)])
+    num_lines = sum([1 for _ in open(in_file, encoding="utf-8")])
     final_cnt = 0
     final_slice_cnts = defaultdict(int)
-    with open(out_file, "w") as out_f:
+    with open(out_file, "w", encoding="utf-8") as out_f:
         for line in tqdm(
-            [ujson.loads(li.strip()) for li in open(in_file)],
+            [ujson.loads(li.strip()) for li in open(in_file, encoding="utf-8")],
             desc="Writing out file",
             total=num_lines,
         ):

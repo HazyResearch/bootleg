@@ -50,7 +50,7 @@ def dump_json_file(filename, contents):
     """
     filename = pathlib.Path(filename)
     filename.parent.mkdir(exist_ok=True, parents=True)
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         try:
             ujson.dump(contents, f)
         except OverflowError:
@@ -67,7 +67,7 @@ def dump_yaml_file(filename, contents):
     """
     filename = pathlib.Path(filename)
     filename.parent.mkdir(exist_ok=True, parents=True)
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         yaml.dump(contents, f)
 
 
@@ -80,7 +80,7 @@ def load_json_file(filename):
 
     Returns: Dict
     """
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         contents = ujson.load(f)
     return contents
 
@@ -94,7 +94,7 @@ def load_yaml_file(filename):
 
     Returns: Dict
     """
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         contents = yaml.load(f, Loader=yaml.FullLoader)
     return contents
 
@@ -132,7 +132,7 @@ def write_to_file(filename, value):
     ensure_dir(os.path.dirname(filename))
     if not isinstance(value, str):
         value = str(value)
-    fout = open(filename, "w")
+    fout = open(filename, "w", encoding="utf-8")
     fout.write(value + "\n")
     fout.close()
 
@@ -146,7 +146,7 @@ def write_jsonl(filepath, values):
         values: list of dictionary data to write
 
     """
-    with open(filepath, "w") as out_f:
+    with open(filepath, "w", encoding="utf-8") as out_f:
         for val in values:
             out_f.write(ujson.dumps(val) + "\n")
     return
@@ -188,7 +188,7 @@ def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
     out_files = {}
     total_lines = 0
     ending = os.path.splitext(in_file)[1]
-    with open(in_file) as bigfile:
+    with open(in_file, encoding="utf-8") as bigfile:
         i = 0
         while True:
             try:
@@ -200,7 +200,7 @@ def chunk_file(in_file, out_dir, num_lines, prefix="out_"):
             file_split = os.path.join(out_dir, f"{prefix}{i}{ending}")
             total_file_lines = 0
             i += 1
-            with open(file_split, "w") as f:
+            with open(file_split, "w", encoding="utf-8") as f:
                 while True:
                     try:
                         line = next(lines)

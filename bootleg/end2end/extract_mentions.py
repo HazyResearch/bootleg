@@ -301,7 +301,7 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
     chunk_id = 0
     num_lines_in_chunk = 0
     # keep track of what files are written
-    out_file = open(chunk_files[chunk_id], "w")
+    out_file = open(chunk_files[chunk_id], "w", encoding="utf-8")
     with open(input_src, "r", encoding="utf-8") as in_file:
         for i, line in enumerate(in_file):
             out_file.write(line)
@@ -313,7 +313,7 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
                 num_lines_in_chunk = 0
                 out_file.close()
                 if i < (num_lines - 1):
-                    out_file = open(chunk_files[chunk_id], "w")
+                    out_file = open(chunk_files[chunk_id], "w", encoding="utf-8")
     out_file.close()
     logger.debug(f"Wrote out data chunks in {round(time.time() - start, 2)}s")
 
@@ -332,7 +332,7 @@ def subprocess(args):
     verbose = args["verbose"]
     all_aliases = VocabularyTrie(load_dir=args["all_aliases_trie_f"])
     num_lines = sum(1 for _ in open(in_file))
-    with jsonlines.open(in_file) as f_in, jsonlines.open(out_file, "w") as f_out:
+    with jsonlines.open(in_file, encoding="utf-8") as f_in, jsonlines.open(out_file, "w", encoding="utf-8") as f_out:
         for line in tqdm(
             f_in, total=num_lines, disable=not verbose, desc="Processing data"
         ):
@@ -350,9 +350,9 @@ def merge_files(chunk_outfiles, out_filepath):
         out_filepath: final output file path
     """
     sent_idx_unq = 0
-    with jsonlines.open(out_filepath, "w") as f_out:
+    with jsonlines.open(out_filepath, "w", encoding="utf-8") as f_out:
         for file in chunk_outfiles:
-            with jsonlines.open(file) as f_in:
+            with jsonlines.open(file, encoding="utf-8") as f_in:
                 for line in f_in:
                     if "sent_idx_unq" not in line:
                         line["sent_idx_unq"] = sent_idx_unq
@@ -450,8 +450,8 @@ def extract_mentions(
     # single process
     else:
         logger.debug("Using 1 worker...")
-        with jsonlines.open(in_filepath, "r") as in_file, jsonlines.open(
-            out_filepath, "w"
+        with jsonlines.open(in_filepath, "r", encoding="utf-8") as in_file, jsonlines.open(
+            out_filepath, "w", encoding="utf-8"
         ) as out_file:
             sent_idx_unq = 0
             for line in in_file:

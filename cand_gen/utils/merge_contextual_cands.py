@@ -95,8 +95,8 @@ def merge_data(
     )
     utils.ensure_dir(create_ex_outdir)
     print("Counting lines")
-    total_input = sum(1 for _ in open(file_pairs[0]))
-    total_input_cands = sum(1 for _ in open(file_pairs[1]))
+    total_input = sum(1 for _ in open(file_pairs[0], encoding="utf-8"))
+    total_input_cands = sum(1 for _ in open(file_pairs[1], encoding="utf-8"))
     assert (
         total_input_cands == total_input
     ), f"{total_input} lines of orig data != {total_input_cands} of cand data"
@@ -188,7 +188,7 @@ def merge_data_hlp(args):
     sent2cands = {}
     sent2probs = {}
     new_alias2qids = {}
-    with open(input_cand_file, "r") as f_in:
+    with open(input_cand_file, "r", encoding="utf-8") as f_in:
         for line in track(f_in, total=total_input, description="Processing cand data"):
             line = ujson.loads(line)
             sent2probs[line["sent_idx_unq"]] = line["probs"]
@@ -196,7 +196,7 @@ def merge_data_hlp(args):
     total_dropped = 0
     total_seen = 0
     total_len = 0
-    with open(input_file) as f_in, open(output_file, "w") as f_out:
+    with open(input_file, encoding="utf-8") as f_in, open(output_file, "w", encoding="utf-8") as f_out:
         tag = os.path.splitext(os.path.basename(input_file))[0]
         for line in track(f_in, total=total_input, description="Processing data"):
             line = ujson.loads(line)

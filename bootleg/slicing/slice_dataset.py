@@ -265,13 +265,13 @@ def create_examples_single(in_file_name, in_file_lines, out_file_name, constants
     split = constants_dict["split"]
     use_weak_label = constants_dict["use_weak_label"]
     slice_names = constants_dict["slice_names"]
-    with open(out_file_name, "w") as out_f:
+    with open(out_file_name, "w", encoding="utf-8") as out_f:
         total_subsents = 0
         # The memmap stores things differently when you have two integers and we want to keep a2p as an array
         # Therefore for force max the minimum max_a2p to be 2
         max_a2pred = 2
         for ex in tqdm(
-            open(in_file_name), total=in_file_lines, desc=f"Reading in {in_file_name}"
+            open(in_file_name, encoding="utf-8"), total=in_file_lines, desc=f"Reading in {in_file_name}"
         ):
             line = ujson.loads(ex)
             assert "sent_idx_unq" in line
@@ -495,7 +495,7 @@ def convert_examples_to_features_and_save_single(input_dict, mmap_file):
     slice_names = input_dict["slice_names"]
     total_saved_features = 0
     for idx, in_line in tqdm(
-        enumerate(open(file_name)),
+        enumerate(open(file_name, encoding="utf-8")),
         total=in_file_lines,
         desc=f"Processing slice {file_name}",
     ):

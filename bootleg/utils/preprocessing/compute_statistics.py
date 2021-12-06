@@ -89,7 +89,7 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
     chunk_id = 0
     num_lines_in_chunk = 0
     # keep track of what files are written
-    out_file = open(chunk_files[chunk_id], "w")
+    out_file = open(chunk_files[chunk_id], "w", encoding="utf-8")
     with open(input_src, "r", encoding="utf-8") as in_file:
         for i, line in enumerate(in_file):
             out_file.write(line)
@@ -101,7 +101,7 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
                 num_lines_in_chunk = 0
                 out_file.close()
                 if i < (num_lines - 1):
-                    out_file = open(chunk_files[chunk_id], "w")
+                    out_file = open(chunk_files[chunk_id], "w", encoding="utf-8")
     out_file.close()
     logging.info(f"Wrote out data chunks in {round(time.time() - start, 2)}s")
 
@@ -109,8 +109,8 @@ def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
 def compute_occurrences_single(args, max_alias_len=6):
     """Compute statistics single process."""
     data_file, aliases_file, lower, strip = args
-    num_lines = sum(1 for _ in open(data_file))
-    all_aliases = ujson.load(open(aliases_file))
+    num_lines = sum(1 for _ in open(data_file, encoding="utf-8"))
+    all_aliases = ujson.load(open(aliases_file, encoding="utf-8"))
     all_aliases = marisa_trie.Trie(all_aliases)
     # entity histogram
     ent_occurrences = Counter()
@@ -122,7 +122,7 @@ def compute_occurrences_single(args, max_alias_len=6):
     alias_pair_occurrences = Counter()
     # alias|entity histogram
     alias_entity_pair = Counter()
-    with open(data_file, "r") as in_file:
+    with open(data_file, "r", encoding="utf-8") as in_file:
         for line in tqdm(in_file, total=num_lines):
             line = json.loads(line.strip())
             for n in range(max_alias_len + 1, 0, -1):
@@ -155,7 +155,7 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
     chunk_file_path = os.path.join(save_dir, "tmp")
     all_aliases_f = os.path.join(chunk_file_path, "all_aliases.json")
     utils.ensure_dir(chunk_file_path)
-    ujson.dump(all_aliases, open(all_aliases_f, "w"))
+    ujson.dump(all_aliases, open(all_aliases_f, "w", encoding="utf-8"))
     # divide up data into chunks
     num_lines = get_num_lines(data_file)
     num_processes = min(num_workers, int(multiprocessing.cpu_count()))

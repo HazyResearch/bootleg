@@ -124,14 +124,14 @@ class VocabularyTrie:
         """Dump."""
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
-        ujson.dump({"max_id": self._max_id}, open(save_dir / "config.json", "w"))
+        ujson.dump({"max_id": self._max_id}, open(save_dir / "config.json", "w", encoding="utf-8"))
         self._stoi.save(str(save_dir / "vocabulary_trie.marisa"))
         np.save(str(save_dir / "itoexti.npy"), self._itoexti)
 
     def load(self, load_dir):
         """Load."""
         load_dir = Path(load_dir)
-        self._max_id = ujson.load(open(load_dir / "config.json"))["max_id"]
+        self._max_id = ujson.load(open(load_dir / "config.json", encoding="utf-8"))["max_id"]
         self._stoi = marisa_trie.Trie().mmap(str(load_dir / "vocabulary_trie.marisa"))
         self._itoexti = np.load(str(load_dir / "itoexti.npy")).astype(int)
 

@@ -391,7 +391,7 @@ def run_model(
         Path(emmental.Meta.log_path) / f"{file_name}_{topk}_candidates.jsonl"
     )
     log_rank_0_info(logger, f"Saving to {candidates_file}")
-    with open(candidates_file, "w") as f:
+    with open(candidates_file, "w", encoding="utf-8") as f:
         for sent_id, list_of_values in sent2output.items():
             sent_ids, alias_ids, gts, cands, probs = list(zip(*list_of_values))
             json_obj = {

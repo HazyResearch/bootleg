@@ -105,7 +105,7 @@ def build_and_save_entity_inputs_initializer(
     tokenizer,
 ):
     global qid2alternatenames_global
-    qid2alternatenames_global = ujson.load(open(qid2alternatenames_file))
+    qid2alternatenames_global = ujson.load(open(qid2alternatenames_file, encoding="utf-8"))
     global mmap_entity_file_global
     mmap_entity_file_global = np.memmap(
         save_entity_dataset_name, dtype=X_entity_storage, mode="r+"
@@ -201,7 +201,7 @@ def build_and_save_entity_inputs(
         )
     else:
         qid2alternatenames_file = tempfile.NamedTemporaryFile()
-        with open(qid2alternatenames_file.name, "w") as out_f:
+        with open(qid2alternatenames_file.name, "w", encoding="utf-8") as out_f:
             ujson.dump(qid2alternatenames, out_f)
 
         input_qids = list(entity_symbols.get_all_qids())

@@ -219,7 +219,7 @@ class EntityProfile:
         qid2relations: Dict[str, Dict[str, List[str]]] = {}
 
         num_lines = sum(1 for _ in open(profile_file))
-        with open(profile_file, "r") as in_f:
+        with open(profile_file, "r", encoding="utf-8") as in_f:
             for line in tqdm(in_f, total=num_lines, desc="Reading profile"):
                 line = ujson.loads(line)
 
@@ -289,7 +289,7 @@ class EntityProfile:
         Args:
             profile_file: file to save the data
         """
-        with open(profile_file, "w") as out_f:
+        with open(profile_file, "w", encoding="utf-8") as out_f:
             for qid in tqdm(self.get_all_qids(), disable=not self.verbose):
                 mentions = self.get_mentions_with_scores(qid)
                 title = self.get_title(qid)

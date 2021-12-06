@@ -38,10 +38,10 @@ def parse_args():
 def get_counts(num_processes, file):
     """Get true anchor slice counts."""
     pool = multiprocessing.Pool(processes=num_processes)
-    num_lines = sum(1 for _ in open(file))
+    num_lines = sum(1 for _ in open(file, encoding="utf-8"))
     qid_cnts = defaultdict(int)
     for res in tqdm(
-        pool.imap_unordered(get_counts_hlp, open(file), chunksize=1000),
+        pool.imap_unordered(get_counts_hlp, open(file, encoding="utf-8"), chunksize=1000),
         total=num_lines,
         desc="Gathering counts",
     ):
