@@ -83,7 +83,7 @@ def setup(config, run_config_path=None):
 
     Returns:
     """
-    if "mp_sharing_strategy" in config.data_config:
+    if config.data_config["mp_sharing_strategy"]:
         torch.multiprocessing.set_sharing_strategy(config["mp_sharing_strategy"])
     # spawn method must be fork to work with Meta.config
     torch.multiprocessing.set_start_method("fork", force=True)

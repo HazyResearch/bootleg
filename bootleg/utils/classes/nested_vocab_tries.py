@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from bootleg.utils.utils import dump_json_file, load_json_file
 
+logger = logging.getLogger(__name__)
 
 def flatten(arr):
     """Flatten array."""
@@ -271,7 +272,7 @@ class TwoLayerVocabularyScoreTrie:
         trie = marisa_trie.RecordTrie(
             self._get_fmt_string(max_value), zip(all_keys, all_values)
         )
-        logging.debug(
+        logger.debug(
             f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
             f" was too small."
         )
@@ -420,7 +421,7 @@ class ThreeLayerVocabularyTrie:
         trie = marisa_trie.RecordTrie(
             self._get_fmt_string(max_value), zip(all_keys, all_values)
         )
-        logging.debug(
+        logger.debug(
             f"There were {total_overflow/len(all_keys)}% of items that lost information because max_connections"
             f" was too small."
         )
