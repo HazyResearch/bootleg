@@ -38,7 +38,7 @@ config_args = {
             "file name to save contextualized embs in",
         ),
         "mp_sharing_strategy": (
-            None,
+            "",
             "setting this to 'file_system' when training on machine with less RAM solves pytorch issues",
         ),
     },
