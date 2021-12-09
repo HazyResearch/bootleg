@@ -14,6 +14,7 @@ from tqdm import tqdm
 from bootleg.utils.utils import dump_json_file, load_json_file
 
 logger = logging.getLogger(__name__)
+logging.getLogger('numba').setLevel(logging.WARNING)
 
 def flatten(arr):
     """Flatten array."""
