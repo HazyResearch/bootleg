@@ -353,6 +353,10 @@ def create_examples(
         "max_seq_len": data_config.max_seq_len,
         "max_seq_window_len": data_config.max_seq_window_len,
     }
+    if not os.path.exists(qidcnt_file):
+        log_rank_0_debug(
+            logger, f"{qidcnt_file} does not exist. Using uniform counts..."
+        )
     if num_processes == 1:
         out_file_name = os.path.join(create_ex_outdir, os.path.basename(dataset))
         res = create_examples_single(
@@ -450,7 +454,7 @@ def create_examples_single(
     qidcnt_file = constants_dict["qidcnt_file"]
     qid2cnt = {}
     quantile_buckets = [float(i / 100) for i in list(range(0, 101, 5))]
-    # If not qid2cnt, the quantile_bucket will be 100
+    # If not qid2cnt, the quantile_bucket will be 1.0
     quants = np.array([-1 for _ in quantile_buckets])
     quants[-1] = 0
     if os.path.exists(qidcnt_file):
@@ -519,7 +523,8 @@ def create_examples_single(
                 )
                 # Set mention to be MASKed by popularity
                 mention_toks = tokens[span[0] : span[1]]
-                # Get the percentile bucket between [0, 100]
+                # Get the percentile bucket between [0, 1]
+                # Large counts will be closer to 1
                 qid_cnt_mask_score = quantile_buckets[sum(qid2cnt.get(qid, 0) > quants)]
                 assert 0 <= qid_cnt_mask_score <= 100
 
@@ -1716,15 +1721,15 @@ class BootlegDataset(EmmentalDataset):
         probability_matrix = torch.full(cnt_ratio.shape, 0.0)
         fill_v = 0.0
         if torch.any((0.0 <= cnt_ratio) & (cnt_ratio < 0.5)):
-            fill_v = 0.95
+            fill_v = 0.5
         elif torch.any((0.5 <= cnt_ratio) & (cnt_ratio < 0.65)):
-            fill_v = 0.84
+            fill_v = 0.62
         elif torch.any((0.65 <= cnt_ratio) & (cnt_ratio < 0.8)):
             fill_v = 0.73
         elif torch.any((0.8 <= cnt_ratio) & (cnt_ratio < 0.95)):
-            fill_v = 0.62
+            fill_v = 0.84
         elif torch.any(0.95 <= cnt_ratio):
-            fill_v = 0.5
+            fill_v = 0.95
         probability_matrix.masked_fill_(cnt_ratio >= 0.0, value=fill_v)
         masked_indices = torch.bernoulli(probability_matrix).bool()
         input_ids.masked_fill_(
@@ -1770,15 +1775,15 @@ class BootlegDataset(EmmentalDataset):
         ).float()
         fill_v = 0.0
         if torch.any((0.0 <= cnt_ratio) & (cnt_ratio < 0.5)):
-            fill_v = 0.95
+            fill_v = 0.5
         elif torch.any((0.5 <= cnt_ratio) & (cnt_ratio < 0.65)):
-            fill_v = 0.84
+            fill_v = 0.62
         elif torch.any((0.65 <= cnt_ratio) & (cnt_ratio < 0.8)):
             fill_v = 0.73
         elif torch.any((0.8 <= cnt_ratio) & (cnt_ratio < 0.95)):
-            fill_v = 0.62
+            fill_v = 0.84
         elif torch.any(0.95 <= cnt_ratio):
-            fill_v = 0.5
+            fill_v = 0.95
         probability_matrix.masked_fill_(probability_matrix > 0.0, value=fill_v)
         masked_indices = torch.bernoulli(probability_matrix).bool()
         entity_input_ids.masked_fill_(
