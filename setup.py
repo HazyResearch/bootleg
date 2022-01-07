@@ -35,6 +35,8 @@ REQUIRED = [
     "scipy>=1.6.1, <1.9.0",
     "sentencepiece==0.1.*",
     "spacy==3.0.1",
+    "stanza==1.3.0",
+    "spacy-stanza==1.0.1",
     "tagme>=0.1.3, <0.2.0",
     "torch>=1.7.0, <1.10.0",
     "tqdm>=4.27",

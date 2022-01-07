@@ -16,6 +16,8 @@ import jsonlines
 import nltk
 import numpy as np
 import spacy
+import spacy_stanza
+import stanza
 from spacy.cli.download import download as spacy_download
 from tqdm import tqdm
 
@@ -26,30 +28,58 @@ from bootleg.utils.utils import get_lnrm
 
 logger = logging.getLogger(__name__)
 
-try:
-    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-except OSError:
-    logger.warning(
-        "Spacy models en_core_web_sm not found.  Downloading and installing."
-    )
-    try:
-        spacy_download("en_core_web_sm")
-        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-    except OSError:
-        nlp = None
-
-# We want this to pass gracefully in the case Readthedocs is trying to build.
-# This will fail later on if a user is actually trying to run Bootleg without mention extraction
-if nlp is not None:
-    ALL_STOPWORDS = nlp.Defaults.stop_words
-else:
-    ALL_STOPWORDS = {}
+nlp = None
+ALL_STOPWORDS = {}
 PUNC = string.punctuation
 KEEP_POS = {"PROPN", "NOUN"}  # ADJ, VERB, ADV, SYM
-PLURAL = {"s", "'s"}
-table = str.maketrans(
+PLURAL = {}
+PUNC_TO_NONE_TABLE = str.maketrans(
     dict.fromkeys(PUNC)
 )  # OR {key: None for key in string.punctuation}
+
+def init(lang, spacy_model=None, use_stanza=False):
+    """Initialize language constructs
+    Args:
+        lang: the language code to use to locate language model
+        spacy_model: if spacy 3.X supports the requested language out of the box. Then provide the name of the model to download and use
+        use_stanza: if spacy does not support the requested language out of the box set this to True (and ignore the spacy_model argument)
+    """
+    global nlp, ALL_STOPWORDS, PLURAL
+    if use_stanza:
+        try:
+            nlp = spacy_stanza.load_pipeline(lang, disable=["parser", "ner"])
+        except OSError:
+            logger.warning(
+                "Spacy-stanza model not found. Downloading and installing..."
+            )
+            try:
+                stanza.download(lang)
+                nlp = spacy_stanza.load_pipeline(lang, disable=["parser", "ner"])
+            except OSError:
+                nlp = None
+    else:
+        if not spacy_model:
+            raise Exception('If use_stanza==False you must provide name of spacy model to load')
+        try:
+            nlp = spacy.load(spacy_model, disable=["parser", "ner"])
+        except OSError:
+            logger.warning(
+                "Spacy models en_core_web_sm not found.  Downloading and installing."
+            )
+            try:
+                spacy_download(spacy_model)
+                nlp = spacy.load(spacy_model, disable=["parser", "ner"])
+            except OSError:
+                nlp = None
+
+    # We want this to pass gracefully in the case Readthedocs is trying to build.
+    # This will fail later on if a user is actually trying to run Bootleg without mention extraction
+    if nlp is not None:
+        ALL_STOPWORDS = nlp.Defaults.stop_words
+    else:
+        ALL_STOPWORDS = {}
+    if lang == 'en':
+        PLURAL = {"s", "'s"}
 
 
 def parse_args():
@@ -217,7 +247,7 @@ def find_aliases_in_sentence_tag(
             # If 's in alias, make sure we remove the space and try that alias, too
             joined_gram_merged_plural = joined_gram.replace(" 's", "'s")
             # If PUNC in alias, make sure we remove the space and try that alias, too
-            joined_gram_merged_nopunc = joined_gram_merged_plural.translate(table)
+            joined_gram_merged_nopunc = joined_gram_merged_plural.translate(PUNC_TO_NONE_TABLE)
             gram_attempt = get_lnrm(joined_gram, strip=True, lower=True)
             gram_attempt_merged_plural = get_lnrm(
                 joined_gram_merged_plural, strip=True, lower=True
@@ -474,7 +504,7 @@ def main():
     args = parse_args()
     in_file = args.in_file
     out_file = args.out_file
-
+    init('en', 'en_core_web_sm')
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     print(args)
     extract_mentions(

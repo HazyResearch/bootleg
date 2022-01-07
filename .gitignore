@@ -118,3 +118,4 @@ venv.bak/
 *.tsv
 *.7z
 .DS_Store
+/emmental/

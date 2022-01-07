@@ -8,6 +8,8 @@ from pathlib import Path
 import emmental
 import numpy as np
 import torch
+
+from bootleg.end2end import extract_mentions
 from emmental.model import EmmentalModel
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -31,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 BOOTLEG_MODEL_PATHS = {
     "bootleg_uncased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
+    "bootleg_hebrew": "https://drive.google.com/file/d/1t6StyKWIQiopenP5uous6eWyak-XZ8FC/view?usp=sharing",
 }
 
 
@@ -62,6 +65,7 @@ def create_config(model_path, data_path, model_name):
     """
     config_file = model_path / model_name / "bootleg_config.yaml"
     config_args = load_yaml_file(config_file)
+    extract_mentions.init('he', use_stanza=True)
 
     # set the model checkpoint path
     config_args["emmental"]["model_path"] = str(
@@ -181,6 +185,7 @@ class BootlegAnnotator(object):
 
         assert model_name in {
             "bootleg_uncased",
+            "bootleg_hebrew"
         }, f"model_name must be bootleg_uncased. You have {model_name}."
 
         if not config:
