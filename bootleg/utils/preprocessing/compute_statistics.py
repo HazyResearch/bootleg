@@ -155,7 +155,7 @@ def compute_occurrences(save_dir, data_file, entity_dump, lower, strip, num_work
     chunk_file_path = os.path.join(save_dir, "tmp")
     all_aliases_f = os.path.join(chunk_file_path, "all_aliases.json")
     utils.ensure_dir(chunk_file_path)
-    ujson.dump(all_aliases, open(all_aliases_f, "w"))
+    ujson.dump(all_aliases, open(all_aliases_f, "w"), ensure_ascii=False)
     # divide up data into chunks
     num_lines = get_num_lines(data_file)
     num_processes = min(num_workers, int(multiprocessing.cpu_count()))

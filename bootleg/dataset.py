@@ -561,7 +561,8 @@ def create_examples_single(
                             alias=alias,
                             qid=qid,
                             qid_cnt_mask_score=qid_cnt_mask_score,
-                        ).to_dict()
+                        ).to_dict(),
+                        ensure_ascii=False,
                     )
                     + "\n"
                 )

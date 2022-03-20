@@ -1053,7 +1053,7 @@ def write_data_labels(
                 file_split = os.path.join(create_ex_indir, f"out{i}.jsonl")
                 open_file = open(file_split, "w")
             line = sent_idx2row[s_idx]
-            open_file.write(ujson.dumps(line) + "\n")
+            open_file.write(ujson.dumps(line, ensure_ascii=False) + "\n")
             cur_lines += 1
         open_file.close()
         input_files.append(file_split)
@@ -1224,4 +1224,4 @@ def write_data_labels_single(
             line["cand_probs"] = cand_probs
             line["entity_ids"] = entity_ids
             line["char_spans"] = char_spans
-            f_out.write(ujson.dumps(line) + "\n")
+            f_out.write(ujson.dumps(line, ensure_ascii=False) + "\n")

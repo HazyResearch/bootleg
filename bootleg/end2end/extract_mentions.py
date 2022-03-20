@@ -218,13 +218,9 @@ def find_aliases_in_sentence_tag(
             joined_gram_merged_plural = joined_gram.replace(" 's", "'s")
             # If PUNC in alias, make sure we remove the space and try that alias, too
             joined_gram_merged_nopunc = joined_gram_merged_plural.translate(table)
-            gram_attempt = get_lnrm(joined_gram, strip=True, lower=True)
-            gram_attempt_merged_plural = get_lnrm(
-                joined_gram_merged_plural, strip=True, lower=True
-            )
-            gram_attempt_merged_nopunc = get_lnrm(
-                joined_gram_merged_nopunc, strip=True, lower=True
-            )
+            gram_attempt = get_lnrm(joined_gram)
+            gram_attempt_merged_plural = get_lnrm(joined_gram_merged_plural)
+            gram_attempt_merged_nopunc = get_lnrm(joined_gram_merged_nopunc)
             # Remove numbers
             if (
                 gram_attempt.isnumeric()

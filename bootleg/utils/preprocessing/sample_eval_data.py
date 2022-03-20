@@ -198,7 +198,7 @@ def main():
             total=num_lines,
         ):
             if int(line["sent_idx_unq"]) in final_sentences:
-                out_f.write(ujson.dumps(line) + "\n")
+                out_f.write(ujson.dumps(line, ensure_ascii=False) + "\n")
                 for sl_name in line.get("slices", {}):
                     for al_idx in line["slices"][sl_name]:
                         if (
