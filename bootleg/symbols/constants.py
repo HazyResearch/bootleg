@@ -1,6 +1,21 @@
 """Constants."""
 
+import logging
+import os
 from functools import wraps
+
+from bootleg import log_rank_0_info
+
+logger = logging.getLogger(__name__)
+
+USE_STRIP = os.environ.get("BOOTLEG_STRIP", True)
+USE_LOWER = os.environ.get("BOOTLEG_LOWER", True)
+
+log_rank_0_info(
+    logger,
+    f"Setting BOOTLEG_STRIP to {USE_STRIP} and BOOTLEG_LOWER to {USE_LOWER}. "
+    f"Set these enviorn variables to change behavior.",
+)
 
 PAD = "<pad>"
 UNK_ID = 0

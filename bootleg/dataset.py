@@ -416,6 +416,7 @@ def create_examples(
             total_output += res["total_lines"]
             files_and_counts[res["output_filename"]] = res["total_lines"]
         pool.close()
+        pool.join()
     utils.dump_json_file(
         meta_file, {"num_mentions": total_output, "files_and_counts": files_and_counts}
     )
@@ -561,7 +562,8 @@ def create_examples_single(
                             alias=alias,
                             qid=qid,
                             qid_cnt_mask_score=qid_cnt_mask_score,
-                        ).to_dict()
+                        ).to_dict(),
+                        ensure_ascii=False,
                     )
                     + "\n"
                 )

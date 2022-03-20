@@ -107,6 +107,8 @@ def get_slice_stats(num_processes, file):
             final_slice_to_sent[k].update(set(slice_to_sent[k]))
         for k in sent_to_slices:
             final_sent_to_slices[k].update(sent_to_slices[k])
+    pool.close()
+    pool.join()
     shutil.rmtree(temp_out_dir)
     return dict(final_counts), dict(final_slice_to_sent), dict(final_sent_to_slices)
 
@@ -198,7 +200,7 @@ def main():
             total=num_lines,
         ):
             if int(line["sent_idx_unq"]) in final_sentences:
-                out_f.write(ujson.dumps(line) + "\n")
+                out_f.write(ujson.dumps(line, ensure_ascii=False) + "\n")
                 for sl_name in line.get("slices", {}):
                     for al_idx in line["slices"][sl_name]:
                         if (

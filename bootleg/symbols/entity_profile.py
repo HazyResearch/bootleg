@@ -247,7 +247,7 @@ class EntityProfile:
                 # For each [mention, score] value, create a value of mention -> [qid, score] in the alias2qid dict
                 for men_pair in ent.mentions:
                     # Lower case mentions for mention extraction
-                    new_men = get_lnrm(men_pair[0], strip=True, lower=True)
+                    new_men = get_lnrm(men_pair[0])
                     if new_men not in alias2qids:
                         alias2qids[new_men] = []
                     alias2qids[new_men].append([ent.entity_id, men_pair[1]])
@@ -316,7 +316,7 @@ class EntityProfile:
                     ent_obj["types"] = ent_type_sys
                 if len(relations) > 0:
                     ent_obj["relations"] = relations
-                out_f.write(ujson.dumps(ent_obj) + "\n")
+                out_f.write(ujson.dumps(ent_obj, ensure_ascii=False) + "\n")
 
     # ============================================================
     # GETTERS
@@ -577,9 +577,7 @@ class EntityProfile:
                 parsed_rels[rel_pair["relation"]] = []
             parsed_rels[rel_pair["relation"]].append(rel_pair["object"])
         # Lower case mentions for mention extraction
-        mentions = [
-            [get_lnrm(men[0], strip=True, lower=True), men[1]] for men in ent.mentions
-        ]
+        mentions = [[get_lnrm(men[0]), men[1]] for men in ent.mentions]
         self._entity_symbols.add_entity(
             ent.entity_id, mentions, ent.title, ent.description
         )
@@ -647,7 +645,7 @@ class EntityProfile:
             self._entity_symbols.remove_mention(ent.entity_id, men)
         for men in ent.mentions:
             # Lower case mentions for mention extraction
-            men = [get_lnrm(men[0], strip=True, lower=True), men[1]]
+            men = [get_lnrm(men[0]), men[1]]
             self._entity_symbols.add_mention(ent.entity_id, *men)
         # Update title
         self._entity_symbols.set_title(ent.entity_id, ent.title)

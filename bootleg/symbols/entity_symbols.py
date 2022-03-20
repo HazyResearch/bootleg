@@ -602,7 +602,7 @@ class EntitySymbols:
             score: score
         """
         # Cast to lower and stripped for aliases
-        mention = utils.get_lnrm(mention, strip=True, lower=True)
+        mention = utils.get_lnrm(mention)
 
         # If mention is in mapping, make sure the qid is not
         if mention in self._alias2qids:

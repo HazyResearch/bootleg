@@ -15,6 +15,7 @@ import ujson
 import yaml
 
 from bootleg import log_rank_0_info
+from bootleg.symbols.constants import USE_LOWER, USE_STRIP
 from bootleg.utils.classes.dotted_dict import DottedDict
 
 logger = logging.getLogger(__name__)
@@ -40,21 +41,22 @@ def exists_dir(d):
     return pathlib.Path(d).exists()
 
 
-def dump_json_file(filename, contents):
+def dump_json_file(filename, contents, ensure_ascii=False):
     """
     Dump dictionary to json file.
 
     Args:
         filename: file to write to
         contents: dictionary to save
+        ensure_ascii: ensure ascii
     """
     filename = pathlib.Path(filename)
     filename.parent.mkdir(exist_ok=True, parents=True)
     with open(filename, "w") as f:
         try:
-            ujson.dump(contents, f)
+            ujson.dump(contents, f, ensure_ascii=ensure_ascii)
         except OverflowError:
-            json.dump(contents, f)
+            json.dump(contents, f, ensure_ascii=ensure_ascii)
 
 
 def dump_yaml_file(filename, contents):
@@ -137,18 +139,19 @@ def write_to_file(filename, value):
     fout.close()
 
 
-def write_jsonl(filepath, values):
+def write_jsonl(filepath, values, ensure_ascii=False):
     """
     Write List[Dict] data to jsonlines file.
 
     Args:
         filepath: file to write to
         values: list of dictionary data to write
+        ensure_ascii: ensure_ascii for json
 
     """
     with open(filepath, "w") as out_f:
         for val in values:
-            out_f.write(ujson.dumps(val) + "\n")
+            out_f.write(ujson.dumps(val, ensure_ascii=ensure_ascii) + "\n")
     return
 
 
@@ -253,7 +256,7 @@ def load_single_item_trie(file):
     return marisa_trie.RecordTrie("<l").mmap(file)
 
 
-def get_lnrm(s, strip, lower):
+def get_lnrm(s, strip=USE_STRIP, lower=USE_LOWER):
     """
     Convert to lnrm form.
 

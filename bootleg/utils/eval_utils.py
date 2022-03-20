@@ -835,6 +835,8 @@ def merge_subsentences(
                     emb_id not in seen_ids
                 ), f"{emb_id} already seen, something went wrong with sub-sentences"
                 seen_ids.add(emb_id)
+        pool.close()
+        pool.join()
     filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
     # for i in range(len(filt_emb_data)):
     #     si = filt_emb_data[i]["sent_idx"]
@@ -1053,7 +1055,7 @@ def write_data_labels(
                 file_split = os.path.join(create_ex_indir, f"out{i}.jsonl")
                 open_file = open(file_split, "w")
             line = sent_idx2row[s_idx]
-            open_file.write(ujson.dumps(line) + "\n")
+            open_file.write(ujson.dumps(line, ensure_ascii=False) + "\n")
             cur_lines += 1
         open_file.close()
         input_files.append(file_split)
@@ -1083,7 +1085,8 @@ def write_data_labels(
         total = 0
         for res in pool.imap(write_data_labels_hlp, input_args, chunksize=1):
             total += 1
-
+        pool.close()
+        pool.join()
         # Merge output files to final file
         log_rank_0_debug(logger, "Merging output files")
         with open(out_file, "wb") as outfile:
@@ -1224,4 +1227,4 @@ def write_data_labels_single(
             line["cand_probs"] = cand_probs
             line["entity_ids"] = entity_ids
             line["char_spans"] = char_spans
-            f_out.write(ujson.dumps(line) + "\n")
+            f_out.write(ujson.dumps(line, ensure_ascii=False) + "\n")

@@ -122,7 +122,10 @@ class VocabularyTrie:
         """Dump."""
         save_dir = Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
-        ujson.dump({"max_id": self._max_id}, open(save_dir / "config.json", "w"))
+        dump_json_file(
+            filename=(save_dir / "config.json"),
+            contents={"max_id": self._max_id},
+        )
         self._stoi.save(str(save_dir / "vocabulary_trie.marisa"))
         np.save(str(save_dir / "itoexti.npy"), self._itoexti)
 

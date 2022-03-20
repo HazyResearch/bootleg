@@ -10,6 +10,7 @@ Changed
 
 Added
 ^^^^^^
+* ``BOOTLEG_STRIP`` and ``BOOTLEG_LOWER`` environment variables for ``get_lnrm``.
 * ``extract_all_entities.py`` as a way to extract all entity embeddings. These entity embeddings can be used in eval and be used downstream. Uses can use ``get_eid`` from the ``EntityProfile`` to extract the row id for a specific entity.
 
 1.0.5 - 2021-08-20

@@ -236,6 +236,7 @@ def build_and_save_entity_inputs(
             cnt += c
             overflowed += overfl
         pool.close()
+        pool.join()
         qid2alternatenames_file.close()
 
     log_rank_0_debug(

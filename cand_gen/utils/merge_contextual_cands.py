@@ -155,6 +155,8 @@ def merge_data(
         for k in temp_alias2qids:
             assert k not in new_alias2qids, f"{k}"
             new_alias2qids[k] = temp_alias2qids[k]
+    pool.close()
+    pool.join()
     print(
         f"Overall Recall for {file_pairs[0]}: {(total_seen - total_dropped) / total_seen} for seeing {total_seen}"
     )

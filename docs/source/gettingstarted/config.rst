@@ -11,6 +11,8 @@ This will override all default values. Further, if a user wishes to overwrite a 
 
 Bootleg will save the run config (as well as a fully parsed verison with all defaults) in the log directory.
 
+Finally, when evaluating Bootleg using the annotator, Bootleg processes possible mentions in text with two environment flags: ``BOOTLEG_STRIP`` and ``BOOTLEG_LOWER``. For first is if the user wants to strip punctuation on mentions (set to False by default). The second is if the user wants to call ``.lower()`` (set to True by default).
+
 Emmental Config
 ________________
 

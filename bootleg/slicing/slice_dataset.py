@@ -236,6 +236,7 @@ def create_examples(
             max_alias2pred = max(max_alias2pred, res["max_alias2pred"])
             files_and_counts[res["output_filename"]] = res["total_lines"]
         pool.close()
+        pool.join()
     utils.dump_json_file(
         meta_file,
         {
@@ -456,6 +457,7 @@ def convert_examples_to_features_and_save(
         ):
             total_output += res
         pool.close()
+        pool.join()
 
     # Verify that sentences are unique and saved correctly
     mmap_file = np.memmap(save_dataset_name, dtype=storage, mode="r")
