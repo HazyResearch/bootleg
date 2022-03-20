@@ -107,6 +107,8 @@ def get_slice_stats(num_processes, file):
             final_slice_to_sent[k].update(set(slice_to_sent[k]))
         for k in sent_to_slices:
             final_sent_to_slices[k].update(sent_to_slices[k])
+    pool.close()
+    pool.join()
     shutil.rmtree(temp_out_dir)
     return dict(final_counts), dict(final_slice_to_sent), dict(final_sent_to_slices)
 

@@ -47,6 +47,8 @@ def get_counts(num_processes, file):
     ):
         for qid in res:
             qid_cnts[qid] += res[qid]
+    pool.close()
+    pool.join()
     return qid_cnts
 
 

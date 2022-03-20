@@ -835,6 +835,8 @@ def merge_subsentences(
                     emb_id not in seen_ids
                 ), f"{emb_id} already seen, something went wrong with sub-sentences"
                 seen_ids.add(emb_id)
+        pool.close()
+        pool.join()
     filt_emb_data = np.memmap(to_save_file, dtype=to_save_storage, mode="r")
     # for i in range(len(filt_emb_data)):
     #     si = filt_emb_data[i]["sent_idx"]
@@ -1083,7 +1085,8 @@ def write_data_labels(
         total = 0
         for res in pool.imap(write_data_labels_hlp, input_args, chunksize=1):
             total += 1
-
+        pool.close()
+        pool.join()
         # Merge output files to final file
         log_rank_0_debug(logger, "Merging output files")
         with open(out_file, "wb") as outfile:
