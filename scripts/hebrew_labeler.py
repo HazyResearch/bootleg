@@ -1,45 +1,19 @@
 import json
 
 import regex as re
-
-import spacy.parts_of_speech as spos
-from bootleg.end2end.bootleg_annotator import BootlegAnnotator
-# print(ann.label_mentions("בא לי לאכול במסעדת מצה איזו עוגית אוראו")["titles"])
-
-from pathlib import Path
-from bootleg.utils.utils import load_yaml_file
-import time
-import string
-from bootleg.utils.utils import get_lnrm
-import ujson
-from tqdm import tqdm
-
-
-# ann = BootlegAnnotator(model_name='bootleg_hebrew', device=-1, return_embs=False, verbose=False)
-
 import stanza
-# stanza.download('he')
-# import spacy_stanza
-# nlp = spacy_stanza.load_pipeline('he', processors='tokenize,lemma,mwt,pos', verbose=True, use_gpu=False)
 
-nlp = stanza.Pipeline('he', processors='tokenize,lemma,mwt,pos', verbose=True, use_gpu=False)
+from bootleg.symbols.entity_profile import EntityProfile
 
-# import spacy_udpipe
-# spacy_udpipe.download('he')
-# nlp = spacy_udpipe.load('he')
+stanza.download('he')
+nlp = stanza.Pipeline('he', processors='tokenize,lemma,mwt,pos', verbose=True, use_gpu=True)
 
 test_sentences = '''בפני אלף צופים באצטדיון שוני, הזמר סיפר כי הוא ובעלו, חבר הכנסת עידן רול, מרחיבים את המשפחה ובעוד כמה חודשים תצטרף תינוקת למשפחה, אחות קטנה לארי. צפו ברגע המרגש לסיפור המלא...
 בהיריון שלישי עם בת בבטן, מנחת הטלוויזיה מצטלמת לקמפיין אופנה ועונה לכל מי שטוען שהיא תיזמנה את תאריך החשיפה. "זה נושא אישי ושלושת החודשים הראשונים הם מצב חרדתי, המון דברים יכולים להשתבש". צפו
 המלכה מציינת יום הולדת בודד במיוחד, ימים ספורים לאחר הלוויה של בעלה, הנסיך פיליפ. חברה הקרוב ומנהל האורוות שלה הלך לעולמו, בנה ונכדה לא מתוכננים להגיע לארמון והארי כבר חזר לאמריקה. לסיפור המלא...
 בריאיון לקראת סרטה החדש שצפוי לצאת לאקרנים, סיפרה השחקנית ל-Entertainment Weekly על הוויתורים שנאלצה לעשות בעקבות השינוי במצב המשפחתי. "הייתי צריכה לעשות רק עבודות קצרות כדי להיות יותר בבית, זו האמת". לסיפור המלא...
 הזמר ואשתו, יהודית באומן, נתפסו בעדשת הפפראצי באזור ביתם שבתל אביב. תבורי יצא ראשון מהרכב ומיד ניגש לפתוח את הדלת לאשתו, שזיהתה אותנו במהרה ושלחה לעברנו נשיקה. לסיפור המלא...
-דור רפאלי: "אנשים לא יודעים עליי כלום"
-פגשנו את המאורסת הטרייה באירוע השקה ושמענו ממנה על התכנונים לחתונה הקרובה עם בן הזוג איתי פז, איך מערכת היחסים שלו עם בנה, יאן, ומה הסטטוס עם האקס, אייל גולן. צפו
-מצלמת הפפראצי שלנו נתקלה במגישת הטלוויזיה ובבן זוגה החדש, השף יובל בן נריה, בזמן שסעדו במסעדה בתל אביב. בן נריה נראה נבוך מעט מנוכחותנו, אך התאושש במהרה והשניים המשיכו בבילוי המשותף. לסיפור המלא...
-החזרה לשגרה מביאה עמה גל גדול של אירועים והשקות, והפעם היה זה תורם של כוכבי "מקיף מילאנו", דרמת הנוער של "כאן" חינוכית, להשיק את תוכניתם החדשה. לצד אבני ואזולאי נכחו במקום גם כוכבים ותיקים כמו לירון וייסמן, משה אשכנזי ובועז קונפורטי, ואיתם השחקנים הצעירים שבקרוב יהפכו כנראה למוכרים מאוד. לסיפור המלא...
-כוכבת הסדרה "90210" סיפרה כי לאורך השנים היו לה מספר זהויות שצצו בתוכה מדי פעם: "רגע אחד הייתי קשוחה עם פאה שחורה, ובפעם אחרת הייתי ילדת פרחים", אמרה. בעבר חשפה מקורד כי בילדותה עברה שרשרת תקיפות מיניות, וכי נאנסה כשהייתה בת 18. לסיפור המלא...
-פרמיירת העונה התשיעית של "מחוברים" קיבצה את כוכביה: לוסי אהריש, עברי לידר, דורין אטיאס, מיכל אנסקי ודור רפאלי, ואם להאמין לדבריהן של אנסקי ואהריש - רפאלי הוא זה שהולך לגנוב את ההצגה: "הוא נכנס לי לנשמה, הוא ההפתעה של העונה". אטיאס מצידה, הצהירה: "אנשים לא יודעים עליי את האמת. הם חושבים שאני הכלבה מפינס". לסיפור המלא...
-הדוכסית מקיימברידג' הצליחה לאחד בין האחים הנסיכים וויליאם והארי בסוף הלוויה של הנסיך פיליפ, וברגע אחד השכיחה את הטענות הקשות שהפנו אליה הארי ומייגן וחזרה להיות הנסיכה האהובה של העם. לסיפור המלא...'''
+'''
 
 test_sentences = test_sentences.split('\n')
 
@@ -78,11 +52,11 @@ regexs = [
 regexs_compiled = [re.compile(rx) for rx in regexs]
 
 class Chunk:
-    def __init__(self, tokens):
-        first_token = tokens[0]
-        last_token = tokens[-1]
-        self.start = first_token.parent.start_char
-        self.end = last_token.parent.end_char
+    def __init__(self, tokens, start_token, end_token):
+        self.start_token = start_token
+        self.end_token = end_token
+        self.start = tokens[0].parent.start_char
+        self.end = tokens[-1].parent.end_char
         self.tokens = tokens
 
     def __eq__(self, other):
@@ -130,7 +104,7 @@ def hebrew_noun_chunks(doc):
     candidates = []
     for rx in regexs_compiled:
         for x in rx.finditer(pos_string, overlapped=True):
-            chunk = Chunk(doc_sub_tokens[x.start():x.end()])
+            chunk = Chunk(doc_sub_tokens[x.start():x.end()], x.start(), x.end())
             # perms = chunk.permutations()
             # for perm in perms:
             #     print(f'{chunk.start}, {chunk.end}: {perm}')
@@ -142,7 +116,6 @@ def hebrew_noun_chunks(doc):
 #     chunks = hebrew_noun_chunks(nlp(sentence))
 
 def hebrew_labeler(sentence, all_aliases, min_alias_len=0, max_alias_len=7):
-    used_aliases = []
     # Remove multiple spaces and replace with single - tokenization eats multiple spaces but
     # ngrams doesn't which can cause parse issues
     split_sent = sentence.strip().split()
@@ -150,27 +123,32 @@ def hebrew_labeler(sentence, all_aliases, min_alias_len=0, max_alias_len=7):
     doc = nlp(sentence)
     used_aliases = []
     spans = []
+    char_spans = []
     for chunk in hebrew_noun_chunks(doc):
         for perm in chunk.permutations():
             # print(f'perm: {perm}')
             if perm in all_aliases:
                 # print(f'Found alias: {perm}')
                 used_aliases.append(perm)
-                spans.append((chunk.start, chunk.end))
-    return used_aliases, spans
+                spans.append((chunk.start_token, chunk.end_token))
+                char_spans.append((chunk.start, chunk.end))
+    return used_aliases, spans, char_spans
 
 
 from bootleg.end2end.bootleg_annotator import BootlegAnnotator
 
+# db = EntityProfile.load_from_cache("/home/rubmz/.cache/torch/bootleg/data/entity_db")
+# db.save("/home/rubmz/.cache/torch/bootleg/data/entity_db")
+
 # You can also pass `return_embs=True` to get the embeddings
-ann = BootlegAnnotator(device=-1, return_embs=False, verbose=False, model_name='bootleg_hebrew')
+ann = BootlegAnnotator(device=0, return_embs=False, verbose=False, model_name='bootleg_hebrew')
 all_aliases_trie = ann.all_aliases_trie
 
 # all_of_them = all_aliases_trie.to_dict()
 # for ann in all_of_them:
 #     print(f'{ann}: {all_of_them[ann]}')
 
-for sent in test_sentences[:50]:
+for sent in test_sentences[1:50]:
     print(sent)
     print(json.dumps(ann.label_mentions(sent, hebrew_labeler), indent=4, ensure_ascii=False, default=str))
 

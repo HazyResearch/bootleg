@@ -313,13 +313,19 @@ class BootlegAnnotator(object):
 
         Returns: JSON object of sentence to be used in eval
         """
-        found_aliases, found_spans = label_func(
+        res = label_func(
             text, self.all_aliases_trie, self.min_alias_len, self.max_alias_len
         )
+        if len(res) == 3:
+            found_aliases, found_spans, found_char_spans = res
+        else:
+            found_aliases, found_spans = res
+            found_char_spans = []
         return {
             "sentence": text,
             "aliases": found_aliases,
             "spans": found_spans,
+            "char_spans": found_char_spans,
             "cands": [self.entity_db.get_qid_cands(al) for al in found_aliases],
             # we don't know the true QID
             "qids": ["Q-1" for i in range(len(found_aliases))],
@@ -437,7 +443,10 @@ class BootlegAnnotator(object):
                 sample["qids"] = ["Q-1" for _ in range(len(sample["aliases"]))]
                 sample["gold"] = [True for _ in range(len(sample["aliases"]))]
             total_start_exs += len(sample["aliases"])
-            char_spans_arr = get_char_spans(sample["spans"], sample["sentence"])
+            if "char_spans" in sample:
+                char_spans_arr = sample["char_spans"]
+            else:
+                char_spans_arr = get_char_spans(sample["spans"], sample["sentence"])
             for men_idx in range(len(sample["aliases"])):
                 # ====================================================
                 # GENERATE TEXT INPUTS
