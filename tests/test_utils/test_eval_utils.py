@@ -327,13 +327,13 @@ class EvalUtils(unittest.TestCase):
         data = [
             {
                 "aliases": ["a", "b"],
-                "spans": [[0, 1], [1, 2]],
+                "char_spans": [[0, 1], [2, 3]],
                 "sentence": "a b c d e f   g",
                 "sent_idx_unq": 0,
             },
             {
                 "aliases": ["c", "d", "e", "f", "g"],
-                "spans": [[2, 3], [3, 4], [4, 5], [5, 6], [6, 7]],
+                "char_spans": [[4, 5], [6, 7], [8, 9], [10, 11], [14, 15]],
                 "sentence": "a b c d e f   g",
                 "sent_idx_unq": 1,
             },
@@ -406,13 +406,13 @@ class EvalUtils(unittest.TestCase):
         data = [
             {
                 "aliases": ["a", "b"],
-                "spans": [[0, 1], [1, 2]],
+                "char_spans": [[0, 1], [2, 3]],
                 "sentence": "a b c d e f   g",
                 "sent_idx_unq": 0,
             },
             {
                 "aliases": ["c", "d", "e", "f", "g"],
-                "spans": [[2, 3], [3, 4], [4, 5], [5, 6], [6, 7]],
+                "char_spans": [[4, 5], [6, 7], [8, 9], [10, 11], [14, 15]],
                 "sentence": "a b c d e f   g",
                 "sent_idx_unq": 1,
             },
@@ -513,7 +513,6 @@ class EvalUtils(unittest.TestCase):
                 "aliases": ["a", "b"],
                 "char_spans": [[0, 1], [2, 3]],
                 "sentence": "a b c d e f   g",
-                "spans": [[0, 1], [1, 2]],
                 "qids": ["Q4", "Q1"],
                 "probs": [0.9, 0.9],
                 "cands": [["Q1", "Q4"], ["Q2", "Q1"]],
@@ -525,7 +524,6 @@ class EvalUtils(unittest.TestCase):
                 "aliases": ["c", "d", "e", "f", "g"],
                 "char_spans": [[4, 5], [6, 7], [8, 9], [10, 11], [14, 15]],
                 "sentence": "a b c d e f   g",
-                "spans": [[2, 3], [3, 4], [4, 5], [5, 6], [6, 7]],
                 "qids": ["Q1", "Q4", "Q4", "Q1", "Q2"],
                 "probs": [0.9, 0.9, 0.9, 0.9, 0.9],
                 "cands": [

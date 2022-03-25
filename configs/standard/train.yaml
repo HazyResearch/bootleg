@@ -1,35 +1,36 @@
 emmental:
   lr: 2e-5
-  n_steps: 50
-  evaluation_freq: 1
+  n_steps: 5
+  evaluation_freq: 6
   warmup_percentage: 0.1
   lr_scheduler: linear
-  log_path: /dfs/scratch0/lorr1/projects/bootleg-data/logs/logs_temp
+  log_path: bootleg_logs
   checkpointing: true
   checkpoint_all: true
-  checkpoint_freq: 10
+  checkpoint_freq: 1
+  counter_unit: batch
   online_eval: false
   clear_intermediate_checkpoints: false
   checkpoint_metric: NED/Bootleg/dev/final_loss/acc_boot:max
   l2: 0.01
   grad_clip: 1.0
-  gradient_accumulation_steps: 32
+  gradient_accumulation_steps: 4
   fp16: true
 run_config:
   log_level: DEBUG
   eval_batch_size: 32
-  dataloader_threads: 2
-  dataset_threads: 10
+  dataloader_threads: 4
+  dataset_threads: 30
   spawn_method: fork
 train_config:
-  batch_size: 2
+  batch_size: 32
 model_config:
-  hidden_size: 300
-  normalize: false
+  hidden_size: 200
+  normalize: true
   temperature: 0.01
 data_config:
-  data_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_0329
-  train_in_candidates: false
+  data_dir: /lfs/raiders8/0/lorr1/output
+  train_in_candidates: true
   data_prep_dir: prep
   use_entity_desc: true
   context_mask_perc: 0.0
@@ -39,7 +40,7 @@ data_config:
   entity_kg_data:
     use_entity_kg: true
     kg_symbols_dir: kg_mappings
-  entity_dir: /dfs/scratch0/lorr1/projects/bootleg-data/data/korealiases_0329/entity_db
+  entity_dir: /lfs/raiders8/0/lorr1/output/entity_db
   max_seq_len: 128
   max_seq_window_len: 64
   max_ent_len: 128
@@ -48,20 +49,13 @@ data_config:
     file: dev.jsonl
     use_weak_label: true
   test_dataset:
-    file: test_tt.jsonl
+    file: test.jsonl
     use_weak_label: true
   train_dataset:
     file: train.jsonl
     use_weak_label: true
-  eval_slices:
-    - unif_all
-    - unif_NS_all
-    - unif_HD
-    - unif_TO
-    - unif_TL
-    - unif_TS
   word_embedding:
-    cache_dir: /dfs/scratch0/lorr1/projects/bootleg-data/embs/pretrained_bert_models
-    bert_model: bert-base-uncased
+    cache_dir: logs/pretrained_bert_models
+    bert_model: bert-base-chinese
     context_layers: 6
     entity_layers: 6

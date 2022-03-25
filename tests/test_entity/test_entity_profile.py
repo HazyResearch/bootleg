@@ -754,7 +754,7 @@ class EntityProfileTest(unittest.TestCase):
                 "qids": ["Q567", "Q123"],
                 "aliases": ["animal", "dog"],
                 "gold": [True, True],
-                "spans": [[2, 3], [4, 5]],
+                "char_spans": [[7, 14], [19, 23]],
             }
         ]
         self.write_data(self.profile_file, data)

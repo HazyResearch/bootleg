@@ -328,6 +328,12 @@ def main():
         os.path.join(out_dir, "entity_db"),
         dirs_exist_ok=True,
     )
+    # Copying over entity_db
+    shutil.copytree(
+        os.path.join(args.entity_dump),
+        os.path.join(out_dir, "entity_db"),
+        dirs_exist_ok=True,
+    )
     out_dir = os.path.join(out_dir, "entity_db/entity_mappings")
     entity_dump_new.save(out_dir)
     print(f"Finished in {time.time() - gl_start}s")

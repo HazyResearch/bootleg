@@ -96,7 +96,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "spans": [[0, 6], [10, 27]],
                 "slices": {"slice1": {"0": 0.9, "1": 0.3}},
                 "gold": [True, True],
             }
@@ -159,7 +159,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "spans": [[0, 6], [10, 27]],
                 "slices": {"slice1": {"0": 0.9, "1": 0.3}},
                 "gold": [True, True],
             }
@@ -225,7 +225,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -303,7 +303,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -397,7 +397,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -505,7 +505,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -603,7 +603,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -665,7 +665,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -739,7 +739,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},
@@ -824,7 +824,7 @@ class DataSlice(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "spans": [[0, 6], [7, 13], [14, 20]],
                 "slices": {
                     "slice1": {"0": 0.9, "1": 0.3, "2": 0.5},
                     "slice2": {"0": 0.0, "1": 0.0, "2": 1.0},

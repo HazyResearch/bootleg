@@ -2,18 +2,20 @@
 
 import logging
 import os
+from distutils.util import strtobool
 from functools import wraps
 
 from bootleg import log_rank_0_info
 
 logger = logging.getLogger(__name__)
 
-USE_STRIP = os.environ.get("BOOTLEG_STRIP", True)
-USE_LOWER = os.environ.get("BOOTLEG_LOWER", True)
+USE_STRIP = strtobool(os.environ.get("BOOTLEG_STRIP", "true"))
+USE_LOWER = strtobool(os.environ.get("BOOTLEG_LOWER", "true"))
+LANG_CODE = os.environ.get("BOOTLEG_LANG_CODE", "en")
 
 log_rank_0_info(
     logger,
-    f"Setting BOOTLEG_STRIP to {USE_STRIP} and BOOTLEG_LOWER to {USE_LOWER}. "
+    f"Setting BOOTLEG_STRIP to {USE_STRIP} and BOOTLEG_LOWER to {USE_LOWER} and BOOTLEG_LANG_CODE to {LANG_CODE}. "
     f"Set these enviorn variables to change behavior.",
 )
 

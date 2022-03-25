@@ -4,17 +4,18 @@ import os
 import tarfile
 import urllib
 from pathlib import Path
+from typing import Any, Dict, Union
 
 import emmental
 import numpy as np
 import torch
 from emmental.model import EmmentalModel
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
-from bootleg.dataset import extract_context_windows, get_entity_string
+from bootleg.dataset import extract_context, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
-from bootleg.end2end.extract_mentions import find_aliases_in_sentence_tag
+from bootleg.end2end.extract_mentions import MENTION_EXTRACTOR_OPTIONS
 from bootleg.symbols.constants import PAD_ID
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.symbols.kg_symbols import KGSymbols
@@ -22,7 +23,6 @@ from bootleg.symbols.type_symbols import TypeSymbols
 from bootleg.task_config import NED_TASK
 from bootleg.tasks import ned_task
 from bootleg.utils import data_utils
-from bootleg.utils.eval_utils import get_char_spans
 from bootleg.utils.model_utils import get_max_candidates
 from bootleg.utils.parser.parser_utils import parse_boot_and_emm_args
 from bootleg.utils.utils import load_yaml_file
@@ -129,7 +129,7 @@ class BootlegAnnotator(object):
     experimentation, e.g. in notebooks.
 
     Args:
-        config: model config (default None)
+        config: model config or path to config (default None)
         device: model device, -1 for CPU (default None)
         min_alias_len: minimum alias length (default 1)
         max_alias_len: maximum alias length (default 6)
@@ -138,21 +138,23 @@ class BootlegAnnotator(object):
         model_name: model name (default None)
         entity_emb_file: entity embedding file (default None)
         return_embs: whether to return embeddings or not (default False)
+        extract_method: mention extraction method
         verbose: verbose boolean (default False)
     """
 
     def __init__(
         self,
-        config=None,
-        device=None,
-        min_alias_len=1,
-        max_alias_len=6,
-        threshold=0.0,
-        cache_dir=None,
-        model_name=None,
-        entity_emb_file=None,
-        return_embs=False,
-        verbose=False,
+        config: Union[str, Dict[str, Any]] = None,
+        device: int = None,
+        min_alias_len: int = 1,
+        max_alias_len: int = 6,
+        threshold: float = 0.0,
+        cache_dir: str = None,
+        model_name: str = None,
+        entity_emb_file: str = None,
+        return_embs: bool = False,
+        extract_method: str = "ngram_spacy",
+        verbose: bool = False,
     ):
         """Bootleg annotator initializer."""
         self.min_alias_len = min_alias_len
@@ -161,6 +163,7 @@ class BootlegAnnotator(object):
         self.threshold = threshold
         self.return_embs = return_embs
         self.entity_emb_file = entity_emb_file
+        self.extract_method = extract_method
 
         if self.entity_emb_file is not None:
             assert Path(
@@ -190,6 +193,8 @@ class BootlegAnnotator(object):
             create_sources(self.model_path, self.data_path, model_name)
             self.config = create_config(self.model_path, self.data_path, model_name)
         else:
+            if isinstance(config, str):
+                config = load_yaml_file(config)
             if "emmental" in config:
                 config = parse_boot_and_emm_args(config)
             self.config = config
@@ -298,23 +303,21 @@ class BootlegAnnotator(object):
         self.model.load(self.config["model_config"]["model_path"])
         self.model.eval()
 
-    def extract_mentions(self, text, label_func):
+    def extract_mentions(self, text):
         """Mention extraction wrapper.
 
         Args:
             text: text to extract mentions from
-            label_func: function that performs extraction (input is (text, alias trie, max alias length) ->
-                        output is list of found aliases and found spans
 
         Returns: JSON object of sentence to be used in eval
         """
-        found_aliases, found_spans = label_func(
-            text, self.all_aliases_trie, self.min_alias_len, self.max_alias_len
-        )
+        found_aliases, found_spans, found_char_spans = MENTION_EXTRACTOR_OPTIONS[
+            self.extract_method
+        ](text, self.all_aliases_trie, self.min_alias_len, self.max_alias_len)
         return {
             "sentence": text,
             "aliases": found_aliases,
-            "spans": found_spans,
+            "char_spans": found_char_spans,
             "cands": [self.entity_db.get_qid_cands(al) for al in found_aliases],
             # we don't know the true QID
             "qids": ["Q-1" for i in range(len(found_aliases))],
@@ -332,7 +335,6 @@ class BootlegAnnotator(object):
     def label_mentions(
         self,
         text_list=None,
-        label_func=find_aliases_in_sentence_tag,
         extracted_examples=None,
     ):
         """Extract mentions and runs disambiguation.
@@ -341,7 +343,6 @@ class BootlegAnnotator(object):
 
         Args:
             text_list: list of text to disambiguate (or single string) (can be None if extracted_examples is not None)
-            label_func: mention extraction funciton (optional)
             extracted_examples: List of Dicts of keys "sentence", "aliases", "spans", "cands" (QIDs) (optional)
 
         Returns: Dict of
@@ -351,7 +352,7 @@ class BootlegAnnotator(object):
             * ``titles``: final predicted titles,
             * ``cands``: all entity candidates,
             * ``cand_probs``: probabilities of all candidates,
-            * ``spans``: final extracted word spans,
+            * ``char_spans``: final extracted char spans,
             * ``aliases``: final extracted aliases,
             * ``embs``: final entity contextualized embeddings (if return_embs is True)
             * ``cand_embs``: final candidate entity contextualized embeddings (if return_embs is True)
@@ -366,14 +367,14 @@ class BootlegAnnotator(object):
             check_ex = extracted_examples[0]
             assert (
                 len(
-                    {"sentence", "aliases", "spans", "cands"}.intersection(
+                    {"sentence", "aliases", "char_spans", "cands"}.intersection(
                         check_ex.keys()
                     )
                 )
                 == 4
             ), (
-                f"You must have keys of sentence, aliases, spans, and cands for extracted_examples. You have"
-                f"{extracted_examples.keys()}"
+                f"You must have keys of sentence, aliases, char_spans, and cands for extracted_examples. You have"
+                f"{extracted_examples[0].keys()}"
             )
         else:
             assert (
@@ -414,7 +415,6 @@ class BootlegAnnotator(object):
         batch_ent_indices = []
         batch_ent_token_types = []
         batch_ent_attention = []
-        batch_spans_arr = []
         batch_char_spans_arr = []
         batch_example_aliases = []
         batch_idx_unq = []
@@ -425,14 +425,13 @@ class BootlegAnnotator(object):
             disable=not self.verbose,
         ):
             if do_extract_mentions:
-                sample = self.extract_mentions(text_list[idx_unq], label_func)
+                sample = self.extract_mentions(text_list[idx_unq])
             else:
                 sample = extracted_examples[idx_unq]
                 # Add the unk qids and gold values
                 sample["qids"] = ["Q-1" for _ in range(len(sample["aliases"]))]
                 sample["gold"] = [True for _ in range(len(sample["aliases"]))]
             total_start_exs += len(sample["aliases"])
-            char_spans_arr = get_char_spans(sample["spans"], sample["sentence"])
             for men_idx in range(len(sample["aliases"])):
                 # ====================================================
                 # GENERATE TEXT INPUTS
@@ -517,9 +516,7 @@ class BootlegAnnotator(object):
                 batch_ent_token_types.append(example_cand_token_type_ids)
                 batch_ent_attention.append(example_cand_attention_mask)
                 batch_example_aliases.append(sample["aliases"][men_idx])
-                # Add the orginal sample spans because spans_arr is w.r.t BERT subword token
-                batch_spans_arr.append(sample["spans"][men_idx])
-                batch_char_spans_arr.append(char_spans_arr[men_idx])
+                batch_char_spans_arr.append(sample["char_spans"][men_idx])
                 batch_idx_unq.append(idx_unq)
 
         batch_example_eid_cands = torch.tensor(batch_example_eid_cands).long()
@@ -532,7 +529,6 @@ class BootlegAnnotator(object):
         final_entity_embs = [[] for _ in range(num_exs)]
         final_entity_cand_embs = [[] for _ in range(num_exs)]
         final_titles = [[] for _ in range(num_exs)]
-        final_spans = [[] for _ in range(num_exs)]
         final_char_spans = [[] for _ in range(num_exs)]
         final_aliases = [[] for _ in range(num_exs)]
         for b_i in tqdm(
@@ -585,7 +581,7 @@ class BootlegAnnotator(object):
                 idx_unq = batch_idx_unq[b_i + ex_i]
                 entity_cands = batch_example_qid_cands[b_i + ex_i]
                 # batch size is 1 so we can reshape
-                probs_ex = probs[ex_i]
+                probs_ex = probs[ex_i].tolist()
                 true_entity_pos_idx = batch_example_true_entities[b_i + ex_i]
                 if true_entity_pos_idx != PAD_ID:
                     pred_idx = max_probs_indices[ex_i]
@@ -602,7 +598,6 @@ class BootlegAnnotator(object):
                             )
                             final_entity_cand_embs[idx_unq].append(output_embs[ex_i])
                         final_aliases[idx_unq].append(batch_example_aliases[b_i + ex_i])
-                        final_spans[idx_unq].append(batch_spans_arr[b_i + ex_i])
                         final_char_spans[idx_unq].append(
                             batch_char_spans_arr[b_i + ex_i]
                         )
@@ -624,7 +619,6 @@ class BootlegAnnotator(object):
             "titles": final_titles,
             "cands": final_all_cands,
             "cand_probs": final_cand_probs,
-            "spans": final_spans,
             "char_spans": final_char_spans,
             "aliases": final_aliases,
         }
@@ -643,19 +637,13 @@ class BootlegAnnotator(object):
 
         Returns: Dict of tokenized outputs
         """
-        span = sample["spans"][men_idx]
-        tokens = sample["sentence"].split()
-        prev_context, next_context = extract_context_windows(
-            span, tokens, self.config.data_config.max_seq_window_len
+        span = sample["char_spans"][men_idx]
+        context = extract_context(
+            span,
+            sample["sentence"],
+            self.config.data_config.max_seq_window_len,
+            self.tokenizer,
         )
-        context_tokens = (
-            prev_context
-            + ["[ent_start]"]
-            + tokens[span[0] : span[1]]
-            + ["[ent_end]"]
-            + next_context
-        )
-        context = " ".join(context_tokens)
         inputs = self.tokenizer(
             context,
             padding="max_length",

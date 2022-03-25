@@ -92,47 +92,43 @@ class UtilClasses(unittest.TestCase):
 
             save_path.cleanup()
 
-        def test_dict_vocab_trie():
-            """Test paired vocab trie."""
-            raw_input_dict = {
-                "q1": {"a": ["1", "4", "5"], "b": ["3", "5"]},
-                "q2": {"b": ["5", "2"], "c": []},
-            }
-            key_vocabulary = {"a": 1, "b": 2, "c": 3}
-            value_vocabulary = {"1": 1, "2": 2, "4": 3, "5": 4}
+    def test_dict_vocab_trie(self):
+        """Test paired vocab trie."""
+        raw_input_dict = {
+            "q1": {"a": ["1", "4", "5"], "b": ["3", "5"]},
+            "q2": {"b": ["5", "2"]},
+        }
+        key_vocabulary = {"a": 1, "b": 2, "c": 3}
+        value_vocabulary = {"1": 1, "2": 2, "3": 3, "4": 4, "5": 5}
 
-            tri = ThreeLayerVocabularyTrie(
-                input_dict=raw_input_dict,
-                key_vocabulary=key_vocabulary,
-                value_vocabulary=value_vocabulary,
-                max_value=6,
-            )
+        tri = ThreeLayerVocabularyTrie(
+            input_dict=raw_input_dict,
+            key_vocabulary=key_vocabulary,
+            value_vocabulary=value_vocabulary,
+            max_value=6,
+        )
 
-            self.assertDictEqual(tri.to_dict(), raw_input_dict)
-            self.assertDictEqual(tri.get_value("q1"), raw_input_dict["q1"])
-            self.assertTrue(tri.is_key_in_trie("q2"))
-            self.assertFalse(tri.is_key_in_trie("q3"))
-            self.assertSetEqual(set(raw_input_dict.keys()), set(tri.keys()))
-            self.assertSetEqual(set(key_vocabulary.keys()), set(tri.key_vocab_keys()))
-            self.assertSetEqual(
-                set(value_vocabulary.keys()), set(tri.value_vocab_keys())
-            )
+        self.assertDictEqual(tri.to_dict(), raw_input_dict)
+        self.assertDictEqual(tri.get_value("q1"), raw_input_dict["q1"])
+        self.assertTrue(tri.is_key_in_trie("q2"))
+        self.assertFalse(tri.is_key_in_trie("q3"))
+        self.assertSetEqual(set(raw_input_dict.keys()), set(tri.keys()))
+        self.assertSetEqual(set(key_vocabulary.keys()), set(tri.key_vocab_keys()))
+        self.assertSetEqual(set(value_vocabulary.keys()), set(tri.value_vocab_keys()))
 
-            save_path = tempfile.TemporaryDirectory()
-            tri.dump(save_path.name)
-            tri2 = ThreeLayerVocabularyTrie(load_dir=save_path.name)
+        save_path = tempfile.TemporaryDirectory()
+        tri.dump(save_path.name)
+        tri2 = ThreeLayerVocabularyTrie(load_dir=save_path.name)
 
-            self.assertDictEqual(tri2.to_dict(), raw_input_dict)
-            self.assertDictEqual(tri2.get_value("q1"), raw_input_dict["q1"])
-            self.assertTrue(tri2.is_key_in_tri2e("q2"))
-            self.assertFalse(tri2.is_key_in_tri2e("q3"))
-            self.assertSetEqual(set(raw_input_dict.keys()), set(tri2.keys()))
-            self.assertSetEqual(set(key_vocabulary.keys()), set(tri2.key_vocab_keys()))
-            self.assertSetEqual(
-                set(value_vocabulary.keys()), set(tri2.value_vocab_keys())
-            )
+        self.assertDictEqual(tri2.to_dict(), raw_input_dict)
+        self.assertDictEqual(tri2.get_value("q1"), raw_input_dict["q1"])
+        self.assertTrue(tri2.is_key_in_trie("q2"))
+        self.assertFalse(tri2.is_key_in_trie("q3"))
+        self.assertSetEqual(set(raw_input_dict.keys()), set(tri2.keys()))
+        self.assertSetEqual(set(key_vocabulary.keys()), set(tri2.key_vocab_keys()))
+        self.assertSetEqual(set(value_vocabulary.keys()), set(tri2.value_vocab_keys()))
 
-            save_path.cleanup()
+        save_path.cleanup()
 
     def test_download_progress_bar(self):
         """Test download progress bar."""

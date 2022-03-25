@@ -67,7 +67,7 @@ config_args = {
         ),
         "qid_cnt_map": (
             "qid2cnt.json",
-            "name of alias index map file, should be saved in entity_dir/entity_map_dir",
+            "name of alias index map file, should be saved in data_dir",
         ),
         "max_seq_len": (128, "max token length sentences"),
         "max_seq_window_len": (64, "max window around an entity"),

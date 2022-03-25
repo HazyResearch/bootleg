@@ -15,7 +15,7 @@ import torch
 import torch.nn.functional as F
 import ujson
 from emmental.utils.utils import array_to_numpy, prob_to_pred
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.task_config import NED_TASK
@@ -132,37 +132,6 @@ def get_eval_folder(file):
             os.path.basename(emmental.Meta.config["model_config"]["model_path"])
         )[0],
     )
-
-
-def get_char_spans(spans, text):
-    """
-    Get character spans instead of default word spans.
-
-    Args:
-        spans: word spans
-        text: text
-
-    Returns: character spans
-    """
-    word_i = 0
-    prev_is_space = True
-    char2word = {}
-    word2char = defaultdict(list)
-    for char_i, c in enumerate(text):
-        if c.isspace():
-            if not prev_is_space:
-                word_i += 1
-                prev_is_space = True
-        else:
-            prev_is_space = False
-            char2word[char_i] = word_i
-            word2char[word_i].append(char_i)
-    char_spans = []
-    for span in spans:
-        char_l = min(word2char[span[0]])
-        char_r = max(word2char[span[1] - 1]) + 1
-        char_spans.append([char_l, char_r])
-    return char_spans
 
 
 def write_disambig_metrics_to_csv(file_path, dictionary):
@@ -1185,7 +1154,7 @@ def write_data_labels_single(
         for sent_idx in sentidx2row:
             line = sentidx2row[sent_idx]
             aliases = line["aliases"]
-            char_spans = get_char_spans(line["spans"], line["sentence"])
+            char_spans = line["char_spans"]
             assert sent_idx == str(line["sent_idx_unq"])
             qids = []
             ctx_emb_ids = []

@@ -181,7 +181,7 @@ class DataEntityLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]
@@ -275,7 +275,7 @@ class DataEntityLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]
@@ -392,7 +392,7 @@ class DataEntityLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]
@@ -491,7 +491,7 @@ class DataEntityLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]
@@ -585,7 +585,7 @@ class DataEntityLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]

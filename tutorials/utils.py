@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 import tagme
 import ujson
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.symbols.entity_profile import EntityProfile
 
@@ -88,7 +88,7 @@ def load_train_data(train_file, title_map, entity_profile=None):
                             gold_qids[alias_idx], gold_qids[alias_idx2]
                         ):
                             connected_pairs_gld.append(gold_qids[alias_idx2])
-                    res[f"kg_gld"] = connected_pairs_gld
+                    res["kg_gld"] = connected_pairs_gld
                 rows.append(res)
     return pd.DataFrame(rows)
 
@@ -213,8 +213,8 @@ def score_line(
                         pred_qids[alias_idx], pred_qids[alias_idx2]
                     ):
                         connected_pairs_pred.append(pred_qids[alias_idx2])
-                res[f"kg_gld"] = connected_pairs_gld
-                res[f"kg_pred"] = connected_pairs_pred
+                res["kg_gld"] = connected_pairs_gld
+                res["kg_pred"] = connected_pairs_pred
         rows.append(res)
     return rows
 
@@ -267,13 +267,13 @@ def tagme_annotate(in_file, out_file, threshold=0.1):
                 mention = ann.mention
                 try:
                     qid = enwiki_title_to_wikidata_id(ann.entity_title)
-                except:
+                except Exception:
                     print(f"No wikidata id found for {ann.entity_title}")
                     continue
                 span_start = text_span_indices.index(ann.begin)
                 try:
                     span_end = text_span_indices.index(ann.end + 1)
-                except:
+                except Exception:
                     span_end = len(text_spans)
                 aliases.append(mention)
                 spans.append([span_start, span_end])

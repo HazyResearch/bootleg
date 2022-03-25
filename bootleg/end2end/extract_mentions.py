@@ -8,48 +8,26 @@ import argparse
 import logging
 import multiprocessing
 import os
-import string
 import time
-from collections import defaultdict
 
 import jsonlines
-import nltk
 import numpy as np
-import spacy
-from spacy.cli.download import download as spacy_download
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.symbols.constants import ANCHOR_KEY
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils.classes.nested_vocab_tries import VocabularyTrie
-from bootleg.utils.utils import get_lnrm
+from bootleg.utils.mention_extractor_utils import (
+    ngram_spacy_extract_aliases,
+    spacy_extract_aliases,
+)
 
 logger = logging.getLogger(__name__)
 
-try:
-    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-except OSError:
-    logger.warning(
-        "Spacy models en_core_web_sm not found.  Downloading and installing."
-    )
-    try:
-        spacy_download("en_core_web_sm")
-        nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-    except OSError:
-        nlp = None
-
-# We want this to pass gracefully in the case Readthedocs is trying to build.
-# This will fail later on if a user is actually trying to run Bootleg without mention extraction
-if nlp is not None:
-    ALL_STOPWORDS = nlp.Defaults.stop_words
-else:
-    ALL_STOPWORDS = {}
-PUNC = string.punctuation
-KEEP_POS = {"PROPN", "NOUN"}  # ADJ, VERB, ADV, SYM
-PLURAL = {"s", "'s"}
-table = str.maketrans(
-    dict.fromkeys(PUNC)
-)  # OR {key: None for key in string.punctuation}
+MENTION_EXTRACTOR_OPTIONS = {
+    "ngram_spacy": ngram_spacy_extract_aliases,
+    "spacy": spacy_extract_aliases,
+}
 
 
 def parse_args():
@@ -67,6 +45,12 @@ def parse_args():
     parser.add_argument(
         "--entity_db_dir", type=str, required=True, help="Path to entity db"
     )
+    parser.add_argument(
+        "--extract_method",
+        type=str,
+        choices=list(MENTION_EXTRACTOR_OPTIONS.keys()),
+        default="ngram_spacy",
+    )
     parser.add_argument("--min_alias_len", type=int, default=1)
     parser.add_argument("--max_alias_len", type=int, default=6)
     parser.add_argument("--num_workers", type=int, default=8)
@@ -75,18 +59,20 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_out_line(sent_obj, final_aliases, final_spans):
+def create_out_line(sent_obj, final_aliases, final_spans, found_char_spans):
     """Create JSON output line.
 
     Args:
         sent_obj: input sentence JSON
         final_aliases: list of final aliases
         final_spans: list of final spans
+        found_char_spans: list of final char spans
 
     Returns: JSON object
     """
     sent_obj["aliases"] = final_aliases
     sent_obj["spans"] = final_spans
+    sent_obj["char_spans"] = found_char_spans
     # we don't know the true QID (or even if there is one) at this stage
     # we assign to the most popular candidate for now so models w/o NIL can also evaluate this data
     sent_obj["qids"] = ["Q-1"] * len(final_aliases)
@@ -94,192 +80,6 @@ def create_out_line(sent_obj, final_aliases, final_spans):
     # sent_obj["qids"] = [alias2qids[alias][0] for alias in final_aliases]
     sent_obj[ANCHOR_KEY] = [True] * len(final_aliases)
     return sent_obj
-
-
-def get_new_to_old_dict(split_sentence):
-    """Return a mapped dictionary from new tokenized words with Spacy to old.
-
-    (Spacy sometimes splits words with - and other punc).
-
-    Args:
-        split_sentence: list of words in sentence
-
-    Returns: Dict of new word id -> old word id
-    """
-    old_w = 0
-    new_w = 0
-    new_to_old = defaultdict(list)
-    while old_w < len(split_sentence):
-        old_word = split_sentence[old_w]
-        tokenized_word = nlp(old_word)
-        new_w_ids = list(range(new_w, new_w + len(tokenized_word)))
-        for i in new_w_ids:
-            new_to_old[i] = old_w
-        new_w = new_w + len(tokenized_word)
-        old_w += 1
-    new_to_old[new_w] = old_w
-    new_to_old = dict(new_to_old)
-    return new_to_old
-
-
-def find_aliases_in_sentence_tag(
-    sentence, all_aliases, min_alias_len=1, max_alias_len=6
-):
-    """Extract function.
-
-    Args:
-        sentence: text
-        all_aliases: VocabTrie of all aliases in our save
-        min_alias_len: minimum length (in words) of an alias
-        max_alias_len: maximum length (in words) of an alias
-
-    Returns: list of aliases, list of span offsets
-    """
-    used_aliases = []
-    # Remove multiple spaces and replace with single - tokenization eats multiple spaces but
-    # ngrams doesn't which can cause parse issues
-    sentence = " ".join(sentence.strip().split())
-
-    doc = nlp(sentence)
-    split_sent = sentence.split()
-    new_to_old_span = get_new_to_old_dict(split_sent)
-    # find largest aliases first
-    for n in range(max_alias_len, min_alias_len - 1, -1):
-        grams = nltk.ngrams(doc, n)
-        j_st = -1
-        j_end = n - 1
-        for gram_words in grams:
-            j_st += 1
-            j_end += 1
-            if j_st not in new_to_old_span or j_end not in new_to_old_span:
-                print("BAD")
-                print(sentence)
-                return [], []
-            j_st_adjusted = new_to_old_span[j_st]
-            j_end_adjusted = new_to_old_span[j_end]
-            # Check if nlp has split the word and we are looking at a subword mention - which we don't want
-            is_subword = j_st_adjusted == j_end_adjusted
-            if j_st > 0:
-                is_subword = is_subword | (j_st_adjusted == new_to_old_span[j_st - 1])
-            # j_end is exclusive and should be a new word from the previous j_end-1
-            is_subword = is_subword | (j_end_adjusted == new_to_old_span[j_end - 1])
-            if is_subword:
-                continue
-            # Assert we are a full word
-            assert (
-                j_st_adjusted != j_end_adjusted
-            ), f"Something went wrong getting mentions for {sentence}"
-            # If single word and not in a POS we care about, skip
-            if len(gram_words) == 1 and gram_words[0].pos_ not in KEEP_POS:
-                continue
-            # If multiple word and not any word in a POS we care about, skip
-            if len(gram_words) > 1 and not any(g.pos_ in KEEP_POS for g in gram_words):
-                continue
-            # print("@", gram_words, [g.pos_ for g in gram_words])
-            # If we are part of a proper noun, make sure there isn't another part of the proper noun to the
-            # left or right - this means we didn't have the entire name in our alias and we should skip
-            if len(gram_words) == 1 and gram_words[0].pos_ == "PROPN":
-                if j_st > 0 and doc[j_st - 1].pos_ == "PROPN":
-                    continue
-                # End spans are exclusive so no +1
-                if j_end < len(doc) and doc[j_end].pos_ == "PROPN":
-                    continue
-            # print("3", j_st, gram_words, [g.pos_ for g in gram_words])
-            # We don't want punctuation words to be used at the beginning/end unless it's capitalized
-            # or first word of sentence
-            if (
-                gram_words[-1].text in PLURAL
-                or gram_words[0].text in PLURAL
-                or (
-                    gram_words[0].text.lower() in ALL_STOPWORDS
-                    and (not gram_words[0].text[0].isupper() or j_st == 0)
-                )
-            ):
-                continue
-            # If the word starts with punctuation and there is a space in between, also continue; keep
-            # if punctuation is part of the word boundary
-            # print("4", j_st, gram_words, [g.pos_ for g in gram_words])
-            if (
-                gram_words[0].text in PUNC
-                and (
-                    j_st + 1 >= len(doc)
-                    or new_to_old_span[j_st] != new_to_old_span[j_st + 1]
-                )
-            ) or (
-                gram_words[-1].text in PUNC
-                and (
-                    j_end - 2 < 0
-                    or new_to_old_span[j_end - 1] != new_to_old_span[j_end - 2]
-                )
-            ):
-                continue
-            joined_gram = " ".join(split_sent[j_st_adjusted:j_end_adjusted])
-            # If 's in alias, make sure we remove the space and try that alias, too
-            joined_gram_merged_plural = joined_gram.replace(" 's", "'s")
-            # If PUNC in alias, make sure we remove the space and try that alias, too
-            joined_gram_merged_nopunc = joined_gram_merged_plural.translate(table)
-            gram_attempt = get_lnrm(joined_gram)
-            gram_attempt_merged_plural = get_lnrm(joined_gram_merged_plural)
-            gram_attempt_merged_nopunc = get_lnrm(joined_gram_merged_nopunc)
-            # Remove numbers
-            if (
-                gram_attempt.isnumeric()
-                or joined_gram_merged_plural.isnumeric()
-                or gram_attempt_merged_nopunc.isnumeric()
-            ):
-                continue
-            final_gram = None
-            # print("4", gram_attempt, [g.pos_ for g in gram_words])
-            if gram_attempt in all_aliases:
-                final_gram = gram_attempt
-            elif gram_attempt_merged_plural in all_aliases:
-                final_gram = gram_attempt_merged_plural
-            elif gram_attempt_merged_nopunc in all_aliases:
-                final_gram = gram_attempt_merged_nopunc
-                # print("5", final_gram, [g.pos_ for g in gram_words])
-            # print("FINAL GRAM", final_gram)
-            if final_gram is not None:
-                keep = True
-                # We start from the largest n-grams and go down in size. This prevents us from adding an alias that
-                # is a subset of another. For example: "Tell me about the mother on how I met you mother" will find
-                # "the mother" as alias and "mother". We want to only take "the mother" and not "mother" as it's
-                # likely more descriptive of the real entity.
-                for u_al in used_aliases:
-                    u_j_st = u_al[1]
-                    u_j_end = u_al[2]
-                    if j_st_adjusted < u_j_end and j_end_adjusted > u_j_st:
-                        keep = False
-                        break
-                if not keep:
-                    continue
-                used_aliases.append(tuple([final_gram, j_st_adjusted, j_end_adjusted]))
-    # sort based on span order
-    aliases_for_sorting = sorted(used_aliases, key=lambda elem: [elem[1], elem[2]])
-    used_aliases = [a[0] for a in aliases_for_sorting]
-    spans = [[a[1], a[2]] for a in aliases_for_sorting]
-    assert all([sp[1] <= len(doc) for sp in spans]), f"{spans} {sentence}"
-    return used_aliases, spans
-
-
-def get_num_lines(input_src):
-    """Count number of lines in file.
-
-    Args:
-        input_src: input file
-
-    Returns: number of lines
-    """
-    # get number of lines
-    num_lines = 0
-    with open(input_src, "r", encoding="utf-8") as in_file:
-        try:
-            for line in in_file:
-                num_lines += 1
-        except Exception as e:
-            logger.error("ERROR READING IN TRAINING DATA")
-            logger.error(e)
-            return []
-    return num_lines
 
 
 def chunk_text_data(input_src, chunk_files, chunk_size, num_lines):
@@ -323,6 +123,7 @@ def subprocess(args):
     """
     in_file = args["in_file"]
     out_file = args["out_file"]
+    extact_method = args["extract_method"]
     min_alias_len = args["min_alias_len"]
     max_alias_len = args["max_alias_len"]
     verbose = args["verbose"]
@@ -332,10 +133,12 @@ def subprocess(args):
         for line in tqdm(
             f_in, total=num_lines, disable=not verbose, desc="Processing data"
         ):
-            found_aliases, found_spans = find_aliases_in_sentence_tag(
-                line["sentence"], all_aliases, min_alias_len, max_alias_len
+            found_aliases, found_spans, found_char_spans = MENTION_EXTRACTOR_OPTIONS[
+                extact_method
+            ](line["sentence"], all_aliases, min_alias_len, max_alias_len)
+            f_out.write(
+                create_out_line(line, found_aliases, found_spans, found_char_spans)
             )
-            f_out.write(create_out_line(line, found_aliases, found_spans))
 
 
 def merge_files(chunk_outfiles, out_filepath):
@@ -360,6 +163,7 @@ def extract_mentions(
     in_filepath,
     out_filepath,
     entity_db_dir,
+    extract_method="ngram_spacy",
     min_alias_len=1,
     max_alias_len=6,
     num_workers=8,
@@ -372,6 +176,7 @@ def extract_mentions(
         in_filepath: input file
         out_filepath: output file
         entity_db_dir: path to entity db
+        extract_method: mention extraction method
         min_alias_len: minimum alias length (in words)
         max_alias_len: maximum alias length (in words)
         num_workers: number of multiprocessing workers
@@ -393,7 +198,7 @@ def extract_mentions(
         all_aliases_trie.dump(all_aliases_trie_f)
 
         # chunk file for multiprocessing
-        num_lines = get_num_lines(in_filepath)
+        num_lines = sum([1 for _ in open(in_filepath)])
         num_processes = min(num_workers, int(multiprocessing.cpu_count()))
         num_chunks = min(num_lines, num_chunks)
         logger.debug(f"Using {num_processes} workers...")
@@ -413,6 +218,7 @@ def extract_mentions(
             {
                 "in_file": chunk_infiles[i],
                 "out_file": chunk_outfiles[i],
+                "extract_method": extract_method,
                 "min_alias_len": min_alias_len,
                 "max_alias_len": max_alias_len,
                 "all_aliases_trie_f": all_aliases_trie_f,
@@ -451,10 +257,16 @@ def extract_mentions(
         ) as out_file:
             sent_idx_unq = 0
             for line in in_file:
-                found_aliases, found_spans = find_aliases_in_sentence_tag(
+                (
+                    found_aliases,
+                    found_spans,
+                    found_char_spans,
+                ) = MENTION_EXTRACTOR_OPTIONS[extract_method](
                     line["sentence"], all_aliases_trie, min_alias_len, max_alias_len
                 )
-                new_line = create_out_line(line, found_aliases, found_spans)
+                new_line = create_out_line(
+                    line, found_aliases, found_spans, found_char_spans
+                )
                 if "sent_idx_unq" not in new_line:
                     new_line["sent_idx_unq"] = sent_idx_unq
                     sent_idx_unq += 1

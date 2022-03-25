@@ -6,7 +6,7 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg import log_rank_0_debug
 from bootleg.utils import data_utils, utils

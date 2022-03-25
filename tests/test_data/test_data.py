@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer
 
-from bootleg.dataset import BootlegDataset, extract_context_windows
+from bootleg.dataset import BootlegDataset, extract_context
 from bootleg.symbols.constants import SPECIAL_TOKENS
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import utils
@@ -17,22 +17,14 @@ from bootleg.utils.parser import parser_utils
 
 def adjust_sentence(sentence, max_len, max_window_len, span, tokenizer):
     """Tokenize and adjust sentence for max length."""
-    tokens = sentence.split()
-    prev_context, next_context = extract_context_windows(span, tokens, max_window_len)
-    context_tokens = (
-        prev_context
-        + ["[ent_start]"]
-        + tokens[span[0] : span[1]]
-        + ["[ent_end]"]
-        + next_context
-    )
+    context = extract_context(span, sentence, max_window_len, tokenizer)
     new_span = [
-        context_tokens.index("[ent_start]"),
-        context_tokens.index("[ent_end]") + 1,
+        context.index("[ent_start]"),
+        context.index("[ent_end]") + len("[ent_end]"),
     ]
     encoded = tokenizer(
-        context_tokens,
-        is_split_into_words=True,
+        context,
+        is_split_into_words=False,
         padding="max_length",
         add_special_tokens=True,
         truncation=True,
@@ -148,7 +140,7 @@ class DataLoader(unittest.TestCase):
                     inp["sentence"],
                     max_seq_len,
                     max_window_len,
-                    inp["spans"][j],
+                    inp["char_spans"][j],
                     self.tokenizer,
                 )
                 for k in tok_sent:
@@ -171,17 +163,12 @@ class DataLoader(unittest.TestCase):
                 )
 
                 word_mask_scores = [-1 for _ in range(len(tok_sent["input_ids"]))]
-                if tok_sent.word_to_tokens(new_span[0]) is None:
-                    import pdb
-
-                    pdb.set_trace()
-                new_span_start = tok_sent.word_to_tokens(new_span[0]).start + 1
-                # -1 to index the [ent_end] token, not the token after
-                if tok_sent.word_to_tokens(new_span[1] - 1) is None:
-                    # -1 for CLS token
-                    new_span_end = len(tok_sent["input_ids"]) - 1
+                new_span_start = tok_sent.char_to_token(new_span[0]) + 1
+                # -1 to index the [ent_end] characters, not the space after
+                if tok_sent.char_to_token(new_span[1] - 1) is None:
+                    new_span_end = len(tok_sent["input_ids"])
                 else:
-                    new_span_end = tok_sent.word_to_tokens(new_span[1] - 1).start
+                    new_span_end = tok_sent.char_to_token(new_span[1] - 1)
                 word_mask_scores[new_span_start:new_span_end] = [
                     1 for _ in range(new_span_start, new_span_end)
                 ]
@@ -194,16 +181,16 @@ class DataLoader(unittest.TestCase):
         for k in X_dict:
             if k == "guids":
                 X_dict[k] = np.array(X_dict[k])
-                continue
-            X_dict[k] = torch.tensor(X_dict[k])
+            else:
+                X_dict[k] = torch.tensor(X_dict[k])
         for k in Y_dict:
             Y_dict[k] = torch.tensor(Y_dict[k])
         return X_dict, Y_dict
 
     def test_get_sentidx(self):
         """Test get sentidx to row id getter."""
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         use_weak_label = True
         self.args.data_config.max_aliases = max_aliases
@@ -215,7 +202,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
         ]
@@ -250,8 +237,8 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -262,7 +249,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
         ]
@@ -307,9 +294,9 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 10
+        max_seq_len = 30
         max_aliases = 1
-        max_window_len = 7
+        max_window_len = 10
         split = "train"
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -321,7 +308,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
         ]
@@ -350,7 +337,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
         ]
@@ -393,7 +380,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q3"],
                 "sent_idx_unq": 0,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
         ]
@@ -438,8 +425,8 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -450,7 +437,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias0 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 6], [10, 27]],
                 "gold": [True, True],
             }
         ]
@@ -530,8 +517,8 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the sentence is long and has far apart aliases so it gets split up into two subsentences
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -542,7 +529,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 cat cat cat cat cat cat alias4",
-                "spans": [[0, 1], [7, 8]],
+                "char_spans": [[0, 6], [31, 37]],
                 "gold": [True, True],
             }
         ]
@@ -576,8 +563,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 1: the sentence is long but there is only one alias, so the sentence gets windowed
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -588,7 +575,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 cat alias4 cat cat cat cat",
-                "spans": [[0, 1], [2, 3]],
+                "char_spans": [[0, 6], [11, 17]],
                 "gold": [True, True],
             }
         ]
@@ -633,8 +620,8 @@ class DataLoader(unittest.TestCase):
           "alias4":[["Q4",20.0],["Q3",15.0],["Q2",1.0]]
         }
         """
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -645,7 +632,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, True, True],
             }
         ]
@@ -691,8 +678,8 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the gold of False should be untouched for train, with only one True gold
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -703,7 +690,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, False, False],
             }
         ]
@@ -737,8 +724,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 2: the gold of False should be untouched for train, with all False golds
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -749,7 +736,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [False, False, False],
             }
         ]
@@ -784,8 +771,8 @@ class DataLoader(unittest.TestCase):
 
         # Test 3: with the split of "dev", the subsentences should remain unchanged
         # but the true index in Y_dict should be -1
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
@@ -797,7 +784,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, False, False],
             }
         ]
@@ -831,8 +818,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 4: with the split of dev, all true indices should be -1 but the sentences should still be used
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
@@ -844,7 +831,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [False, False, False],
             }
         ]
@@ -890,8 +877,8 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 0: with all TRUE golds, use weak label of FALSE doesn't change anything
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -902,7 +889,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, True, True],
             }
         ]
@@ -936,8 +923,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 1: now that weak label is set to False, the golds of False should be removed for split of "train"
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -948,7 +935,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, False, False],
             }
         ]
@@ -983,8 +970,8 @@ class DataLoader(unittest.TestCase):
 
         # Test 2: now that weak label is set to False, the sentence with all golds of False
         # should be removed for "train".
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -995,7 +982,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [False, False, False],
             },
             {
@@ -1003,7 +990,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1"],
                 "sent_idx_unq": 1,
                 "sentence": "alias3",
-                "spans": [[0, 1]],
+                "char_spans": [[0, 1]],
                 "gold": [True],
             },
         ]
@@ -1037,8 +1024,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 3: with the split of "dev", nothing should change from test 1 above where we were using "train"
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
@@ -1050,7 +1037,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [True, False, False],
             }
         ]
@@ -1084,8 +1071,8 @@ class DataLoader(unittest.TestCase):
         assert_data_dicts_equal(Y_dict, dataset.Y_dict)
 
         # Test 4: with the split of dev, all true indices should be -1 but the sentences should still be used
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         split = "dev"
         self.args.data_config.max_aliases = max_aliases
@@ -1097,7 +1084,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4", "Q1"],
                 "sent_idx_unq": 0,
                 "sentence": "alias3 alias4 alias3",
-                "spans": [[0, 1], [1, 2], [2, 3]],
+                "char_spans": [[0, 6], [7, 13], [14, 20]],
                 "gold": [False, False, False],
             },
             {
@@ -1105,7 +1092,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1"],
                 "sent_idx_unq": 1,
                 "sentence": "alias3",
-                "spans": [[0, 1]],
+                "char_spans": [[0, 1]],
                 "gold": [True],
             },
         ]
@@ -1151,8 +1138,8 @@ class DataLoader(unittest.TestCase):
         }
         """
         # Test 1: the gold of False should be untouched for train
-        max_seq_len = 15
-        max_window_len = 4
+        max_seq_len = 50
+        max_window_len = 10
         max_aliases = 1
         self.args.data_config.max_aliases = max_aliases
         self.args.data_config.max_seq_len = max_seq_len
@@ -1163,7 +1150,7 @@ class DataLoader(unittest.TestCase):
                 "qids": ["Q1", "Q4"],
                 "sent_idx_unq": i,
                 "sentence": "alias'-1 or multi word alias2",
-                "spans": [[0, 1], [2, 5]],
+                "char_spans": [[0, 8], [12, 29]],
                 "gold": [True, True],
             }
             for i in range(53)
