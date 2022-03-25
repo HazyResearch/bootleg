@@ -28,6 +28,7 @@ python3 setup.py install
 
 Checkout out our installation and quickstart guide [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/install.html).
 
+## Using a Trained Model
 ### Models
 Below is the link to download the English Bootleg model. The download comes with the saved model and config to run the model. We show in our [quickstart guide](https://bootleg.readthedocs.io/en/latest/gettingstarted/quickstart.html) and [end-to-end](tutorials/end2end_ned_tutorial.ipynb) tutorial how to load a config and run a model.
 
@@ -48,6 +49,9 @@ Below is the link to download a dump of all entity metadata to use in our entity
 | Metadata               | Description                    | Link     |
 |-------------------  |---------------------------------|----------|
 | 5.8M Wikipedia Entities      | Wikidata metadata for entities. | [Download](https://bootleg-data.s3.us-west-2.amazonaws.com/data/latest/entity_db.tar.gz) |
+
+## Training
+We provide detailed training instructions [here](https://bootleg.readthedocs.io/en/latest/gettingstarted/training.html). We provide a starter config [here](configs/standard/train.yaml). You only need to adjust `data_config.data_dir` and `data_config.entity_dir` to points to your local data. You may need to shrink the model size to fit on your available hardware. The use the training zsh script [here](scripts/train.zsh).
 
 ## Tutorials
 We provide tutorials to help users get familiar with Bootleg [here](tutorials/).

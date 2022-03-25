@@ -7,6 +7,7 @@ Changed
 * Renamed ``eval_accumulation_steps`` to ``dump_preds_accumulation_steps``.
 * Removed option to ``dump_embs``.  Users should use ``dump_preds`` instead. The output file will have ``entity_ids`` attribute that will index into the extracted entity embeddings.
 * Restructured our ``entity_db`` data for faster loading. It uses Tries rather than jsons to store the data for read only mode. The KG relations are not backwards compatible.
+* Moved to character spans for input data. Added utils.preprocessing.convert_to_char_spans as a helper function to convert from word offsets to character offsets.
 
 Added
 ^^^^^^

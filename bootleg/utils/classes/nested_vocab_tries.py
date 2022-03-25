@@ -1,5 +1,6 @@
 """Nested vocab tries."""
 import itertools
+import logging
 import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Set, Tuple, Union
@@ -8,9 +9,12 @@ import marisa_trie
 import numpy as np
 import ujson
 from numba import njit
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.utils.utils import dump_json_file, load_json_file
+
+numba_logger = logging.getLogger("numba")
+numba_logger.setLevel(logging.WARNING)
 
 
 def flatten(arr):
@@ -398,7 +402,7 @@ class ThreeLayerVocabularyTrie:
         all_values = []
         all_keys = sorted(list(input_dict.keys()))
         total_overflow = 0
-        from tqdm import tqdm
+        from tqdm.auto import tqdm
 
         for key in tqdm(all_keys, desc="Prepping trie data"):
             # Extract the QID candidate

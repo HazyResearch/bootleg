@@ -291,13 +291,16 @@ def run_model(
     log_rank_0_info(logger, "Building index...")
     if torch.cuda.device_count() > 0 and config["model_config"]["device"] >= 0:
         if config["model_config"]["dataparallel"]:
+            print("DATAPARALLEL FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             faiss_index = faiss.index_cpu_to_all_gpus(faiss_cpu_index)
         else:
+            print("GPU FAISS")
             faiss_cpu_index = faiss.IndexFlatIP(entity_embs.shape[-1])
             res = faiss.StandardGpuResources()
             faiss_index = faiss.index_cpu_to_gpu(res, 0, faiss_cpu_index)
     else:
+        print("CPU FAISS")
         faiss_index = faiss.IndexFlatIP(entity_embs.shape[-1])
 
     faiss_index.add(entity_embs)

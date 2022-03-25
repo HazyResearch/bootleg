@@ -10,7 +10,7 @@ from collections import defaultdict
 
 import numpy as np
 import ujson
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.symbols.constants import ANCHOR_KEY, FINAL_LOSS

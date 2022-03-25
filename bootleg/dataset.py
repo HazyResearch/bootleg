@@ -14,7 +14,7 @@ import numpy as np
 import torch
 import ujson
 from emmental.data import EmmentalDataset
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.layers.alias_to_ent_encoder import AliasEntityTable
@@ -154,43 +154,74 @@ class InputFeatures(object):
     def from_dict(cls, in_dict):
         """Create pobject from dictionary."""
         return cls(
-            in_dict["alias_idx"],
-            in_dict["word_input_ids"],
-            in_dict["word_token_type_ids"],
-            in_dict["word_attention_mask"],
-            in_dict["word_qid_cnt_mask_score"],
-            in_dict["gold_eid"],
-            in_dict["gold_cand_K_idx"],
-            in_dict["for_dump_gold_cand_K_idx_train"],
-            in_dict["alias_list_pos"],
-            in_dict["sent_idx"],
-            in_dict["subsent_idx"],
-            in_dict["guid"],
+            alias_idx=in_dict["alias_idx"],
+            word_input_ids=in_dict["word_input_ids"],
+            word_token_type_ids=in_dict["word_token_type_ids"],
+            word_attention_mask=in_dict["word_attention_mask"],
+            word_qid_cnt_mask_score=in_dict["word_qid_cnt_mask_score"],
+            gold_eid=in_dict["gold_eid"],
+            for_dump_gold_eid=in_dict["for_dump_gold_eid"],
+            gold_cand_K_idx=in_dict["gold_cand_K_idx"],
+            for_dump_gold_cand_K_idx_train=in_dict["for_dump_gold_cand_K_idx_train"],
+            alias_list_pos=in_dict["alias_list_pos"],
+            sent_idx=in_dict["sent_idx"],
+            subsent_idx=in_dict["subsent_idx"],
+            guid=in_dict["guid"],
         )
 
 
-def extract_context_windows(span, tokens, max_seq_window_len):
+def extract_context(span, sentence, max_seq_window_len, tokenizer):
     """Extract the left and right context window around a span.
 
     Args:
-        span: span (left and right values)
-        tokens: tokens
+        span: character span (left and right values)
+        sentence: sentence
         max_seq_window_len: maximum window length around a span
+        tokenizer: tokenizer
 
-    Returns: left context, right context
+    Returns: context window
     """
+    start_token_pieces = []
+    if span[0] > 0 and sentence[span[0] - 1] != " ":
+        start_token_pieces.append(" ")
+    start_token_pieces.append("[ent_start]")
+    if span[0] < len(sentence) and sentence[span[0]] != " ":
+        start_token_pieces.append(" ")
+    end_token_pieces = []
+    if span[1] > 0 and sentence[span[1] - 1] != " ":
+        end_token_pieces.append(" ")
+    end_token_pieces.append("[ent_end]")
+    if span[1] < len(sentence) and sentence[span[1]] != " ":
+        end_token_pieces.append(" ")
+    char_window_around_mention = (
+        tokenizer.model_max_length * 20
+    )  # Assumes max 20 chars per token
+    with_entity_toks = (
+        f"{sentence[max(0, span[0]-char_window_around_mention):span[0]]}"
+        f"{''.join(start_token_pieces)}"
+        f"{sentence[span[0]:span[1]]}"
+        f"{''.join(end_token_pieces)}"
+        f"{sentence[span[1]:span[1]+char_window_around_mention]}"
+    )
+    tokens = tokenizer.tokenize(with_entity_toks)
+    # New indexes including ent start and end
+    span_tok_l = tokens.index("[ent_start]")
+    span_tok_r = tokens.index("[ent_end]") + 1
     # If more tokens to the right, shift weight there
-    if span[0] < len(tokens) - span[1]:
-        prev_context = tokens[max(0, span[0] - max_seq_window_len // 2) : span[0]]
+    if span_tok_l < len(tokens) - span_tok_r:
+        prev_context = tokens[max(0, span_tok_l - max_seq_window_len // 2) : span_tok_l]
+        # Add in the mention tokens
         next_context = tokens[
-            span[1] : span[1] + max_seq_window_len - len(prev_context)
+            span_tok_l : span_tok_r + max_seq_window_len - len(prev_context)
         ]
     else:
-        next_context = tokens[span[1] : span[1] + max_seq_window_len // 2]
+        next_context = tokens[span_tok_r : span_tok_r + max_seq_window_len // 2]
+        # Add in the mention tokens
         prev_context = tokens[
-            max(0, span[0] - (max_seq_window_len - len(next_context))) : span[0]
+            max(0, span_tok_l - (max_seq_window_len - len(next_context))) : span_tok_r
         ]
-    return prev_context, next_context
+    context = tokenizer.convert_tokens_to_string(prev_context + next_context)
+    return context
 
 
 def get_structural_entity_str(items, max_tok_len, sep_tok):
@@ -306,10 +337,12 @@ def get_entity_string(
     return ent_str, title_spans, over_type_len, over_kg_len
 
 
-def create_examples_initializer(constants_dict):
+def create_examples_initializer(constants_dict, tokenizer):
     """Create examples multiprocessing initializer."""
     global constants_global
     constants_global = constants_dict
+    global tokenizer_global
+    tokenizer_global = tokenizer
 
 
 def create_examples(
@@ -340,9 +373,7 @@ def create_examples(
     """
     start = time.time()
     num_processes = min(dataset_threads, int(0.8 * multiprocessing.cpu_count()))
-    qidcnt_file = os.path.join(
-        data_config.entity_dir, data_config.entity_map_dir, data_config.qid_cnt_map
-    )
+    qidcnt_file = os.path.join(data_config.data_dir, data_config.qid_cnt_map)
     log_rank_0_debug(logger, "Counting lines")
     total_input = sum(1 for _ in open(dataset))
     constants_dict = {
@@ -354,7 +385,7 @@ def create_examples(
         "max_seq_window_len": data_config.max_seq_window_len,
     }
     if not os.path.exists(qidcnt_file):
-        log_rank_0_debug(
+        log_rank_0_info(
             logger, f"{qidcnt_file} does not exist. Using uniform counts..."
         )
     if num_processes == 1:
@@ -365,6 +396,7 @@ def create_examples(
             in_file_lines=total_input,
             out_file_name=out_file_name,
             constants_dict=constants_dict,
+            tokenizer=tokenizer,
         )
         files_and_counts = {}
         total_output = res["total_lines"]
@@ -396,9 +428,7 @@ def create_examples(
         pool = multiprocessing.Pool(
             processes=num_processes,
             initializer=create_examples_initializer,
-            initargs=[
-                constants_dict,
-            ],
+            initargs=[constants_dict, tokenizer],
         )
 
         total_output = 0
@@ -437,15 +467,12 @@ def create_examples_hlp(args):
         in_file_lines,
         out_file_name,
         constants_global,
+        tokenizer_global,
     )
 
 
 def create_examples_single(
-    in_file_idx,
-    in_file_name,
-    in_file_lines,
-    out_file_name,
-    constants_dict,
+    in_file_idx, in_file_name, in_file_lines, out_file_name, constants_dict, tokenizer
 ):
     """Create examples."""
     split = constants_dict["split"]
@@ -476,14 +503,17 @@ def create_examples_single(
             assert "sent_idx_unq" in line
             assert "aliases" in line
             assert "qids" in line
-            assert "spans" in line
+            assert "char_spans" in line, (
+                'Require "char_spans" to be input. '
+                "See utils/preprocessing/convert_to_char_spans.py"
+            )
             assert "sentence" in line
             assert ANCHOR_KEY in line
             sent_idx = line["sent_idx_unq"]
             # aliases are assumed to be lower-cased in candidate map
             aliases = [alias.lower() for alias in line["aliases"]]
             qids = line["qids"]
-            spans = line["spans"]
+            spans = line["char_spans"]
             phrase = line["sentence"]
             assert (
                 len(spans) == len(aliases) == len(qids)
@@ -501,7 +531,7 @@ def create_examples_single(
                     len(span) == 2
                 ), f"Span should be len 2. Your span {span} is {len(span)}"
                 assert span[1] <= len(
-                    phrase.split()
+                    phrase
                 ), f"You have span {span} that is beyond the length of the sentence {phrase}"
             if not use_weak_label:
                 aliases = [aliases[i] for i in range(len(anchor)) if anchor[i] is True]
@@ -518,30 +548,16 @@ def create_examples_single(
                 alias_anchor = anchor[subsent_idx]
                 alias = aliases[subsent_idx]
                 qid = qids[subsent_idx]
-                tokens = phrase.split()
-                prev_context, next_context = extract_context_windows(
-                    span, tokens, max_seq_window_len
-                )
-                # Set mention to be MASKed by popularity
-                mention_toks = tokens[span[0] : span[1]]
+                context = extract_context(span, phrase, max_seq_window_len, tokenizer)
                 # Get the percentile bucket between [0, 1]
                 # Large counts will be closer to 1
                 qid_cnt_mask_score = quantile_buckets[sum(qid2cnt.get(qid, 0) > quants)]
                 assert 0 <= qid_cnt_mask_score <= 100
 
-                context_tokens = (
-                    prev_context
-                    + ["[ent_start]"]
-                    + mention_toks
-                    + ["[ent_end]"]
-                    + next_context
-                )
                 new_span = [
-                    context_tokens.index("[ent_start]"),
-                    context_tokens.index("[ent_end]") + 1,
+                    context.index("[ent_start]"),
+                    context.index("[ent_end]") + len("[ent_end]"),
                 ]
-                context = " ".join(context_tokens)
-
                 # alias_to_predict_arr is an index into idxs_arr/anchor_arr/aliases_arr.
                 # It should only include true anchors if eval dataset.
                 # During training want to backpropagate on false anchors as well
@@ -813,7 +829,8 @@ def convert_examples_to_features_and_save_single(
                 # meaning our model will always get this example incorrect
                 assert split in ["test", "dev"], (
                     f"Expected split of 'test' or 'dev' in sent {example.sent_idx}. If you are training, "
-                    f"the QID {qid} must be in the candidate list for data_args.train_in_candidates to be True"
+                    f"the QID {qid} must be in the candidate list for {alias} for "
+                    f"data_args.train_in_candidates to be True"
                 )
                 gold_cand_K_idx = -2
         else:
@@ -834,8 +851,8 @@ def convert_examples_to_features_and_save_single(
 
         # Create input IDs here to ensure each entity is truncated properly
         inputs = tokenizer(
-            example.phrase.split(),
-            is_split_into_words=True,
+            example.phrase,
+            is_split_into_words=False,
             padding="max_length",
             add_special_tokens=True,
             truncation=True,
@@ -844,41 +861,41 @@ def convert_examples_to_features_and_save_single(
         )
         # In the rare case that the pre-context goes beyond max_seq_len, retokenize strating from
         # ent start to guarantee the start/end tok will be there
-        start_tok = inputs.word_to_tokens(span_start_idx)
+        start_tok = inputs.char_to_token(span_start_idx)
         if start_tok is None:
-            new_phrase = example.phrase.split()[span_start_idx:]
+            new_phrase = example.phrase[span_start_idx:]
             # Adjust spans
             span_dist = span_end_idx - span_start_idx
             span_start_idx = 0
             span_end_idx = span_start_idx + span_dist
             inputs = tokenizer(
                 new_phrase,
-                is_split_into_words=True,
+                is_split_into_words=False,
                 padding="max_length",
                 add_special_tokens=True,
                 truncation=True,
                 max_length=max_seq_len,
                 return_overflowing_tokens=False,
             )
-            if inputs.word_to_tokens(span_start_idx) is None:
+            if inputs.char_to_token(span_start_idx) is None:
                 print("REALLY BAD")
                 print(example)
-            new_span_start = inputs.word_to_tokens(span_start_idx).start + 1
+            new_span_start = inputs.char_to_token(span_start_idx) + 1
         else:
             # Includes the [ent_start]; we do not want to mask that so +1
-            new_span_start = start_tok.start + 1
+            new_span_start = start_tok + 1
         # -1 to index the [ent_end] token, not the token after
-        end_tok = inputs.word_to_tokens(span_end_idx - 1)
+        end_tok = inputs.char_to_token(span_end_idx - 1)
         if end_tok is None:
             # -1 for CLS token
-            new_span_end = len(inputs["input_ids"]) - 1
+            new_span_end = len(inputs["input_ids"])
         else:
-            new_span_end = end_tok.start
+            new_span_end = end_tok
         final_toks = tokenizer.convert_ids_to_tokens(inputs["input_ids"])
         assert (
             final_toks[new_span_start - 1] == "[ent_start]"
         ), f"{final_toks} {new_span_start} {new_span_end} {span_start_idx} {span_end_idx}"
-        assert (new_span_end == len(inputs["input_ids"]) - 1) or final_toks[
+        assert (new_span_end == len(inputs["input_ids"])) or final_toks[
             new_span_end
         ] == "[ent_end]", f"{final_toks} {new_span_start} {new_span_end} {span_start_idx} {span_end_idx}"
         candidate_sentence_input_ids[: len(inputs["input_ids"])] = inputs["input_ids"]

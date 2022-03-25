@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 import torch
 import ujson
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg import log_rank_0_debug, log_rank_0_info
 from bootleg.dataset import convert_examples_to_features_and_save, create_examples

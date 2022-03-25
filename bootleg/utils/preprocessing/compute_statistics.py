@@ -20,7 +20,7 @@ import nltk
 import numpy as np
 import ujson
 import ujson as json
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils import utils

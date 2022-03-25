@@ -4,7 +4,7 @@ import os
 import re
 from typing import Dict, List, Optional, Set, Union
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.symbols.constants import edit_op
 from bootleg.utils import utils

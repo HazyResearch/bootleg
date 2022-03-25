@@ -36,7 +36,7 @@ REQUIRED = [
     "sentencepiece==0.1.*",
     "spacy==3.0.1",
     "tagme>=0.1.3, <0.2.0",
-    "torch>=1.7.0, <1.10.0",
+    "torch>=1.7.0, <1.10.5",
     "tqdm>=4.27",
     "transformers>=4.0.0, <5.0.0",
     "ujson>=4.1.0, <4.2.0",

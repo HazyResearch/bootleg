@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Callable, Dict, Optional, Union
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 import bootleg.utils.utils as utils
 from bootleg.symbols.constants import edit_op

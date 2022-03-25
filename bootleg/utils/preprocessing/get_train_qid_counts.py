@@ -11,7 +11,7 @@ import multiprocessing
 from collections import defaultdict
 
 import ujson
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from bootleg.utils import utils
 
