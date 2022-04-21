@@ -18,6 +18,7 @@ from bootleg.symbols.constants import ANCHOR_KEY
 from bootleg.symbols.entity_symbols import EntitySymbols
 from bootleg.utils.classes.nested_vocab_tries import VocabularyTrie
 from bootleg.utils.mention_extractor_utils import (
+    my_mention_extractor,
     ngram_spacy_extract_aliases,
     spacy_extract_aliases,
 )
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 MENTION_EXTRACTOR_OPTIONS = {
     "ngram_spacy": ngram_spacy_extract_aliases,
     "spacy": spacy_extract_aliases,
+    "custom": my_mention_extractor,
 }
 
 

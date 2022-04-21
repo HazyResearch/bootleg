@@ -25,6 +25,14 @@ except OSError:
     except OSError:
         nlp = None
 
+try:
+    from flair.data import Sentence
+    from flair.models import SequenceTagger
+
+    tagger_fast = SequenceTagger.load("ner-ontonotes-fast")
+except ImportError:
+    tagger_fast = None
+
 # We want this to pass gracefully in the case Readthedocs is trying to build.
 # This will fail later on if a user is actually trying to run Bootleg without mention extraction
 if nlp is not None:
@@ -265,4 +273,65 @@ def spacy_extract_aliases(
     # Backwards Compatibility: convert back to word spans
     spans = [[len(text[: sp[0]].split()), len(text[: sp[1]].split())] for sp in chars]
     assert all([sp[1] <= len(doc) for sp in spans]), f"{spans} {text}"
+    return used_aliases, spans, chars
+
+
+def my_mention_extractor(
+    text, all_aliases, min_alias_len=1, max_alias_len=6
+) -> Tuple[List[str], List[Tuple[int, int]], List[Tuple[int, int]]]:
+    """Given a text document, run a NER on it using flair and return a dataframe with the following columns
+    text: actual raw text input
+    entity: identified entity text
+    entity_start: character start position of entity in raw text
+    entity_end: character end position of entity in raw text
+    """
+
+    sentence = Sentence(text)
+    tagger_fast.predict(sentence, mini_batch_size=16)
+    entities = []
+    for i in range(len(sentence.to_dict(tag_type="ner")["entities"])):
+        str_main = None
+        start_pos = -1
+        end_pos = -1
+        if (
+            str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
+            in "ORG"
+        ):
+            str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
+            start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
+            end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+
+        elif (
+            str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
+            in "PERSON"
+        ):
+            str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
+            start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
+            end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+
+        elif (
+            str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
+            in "GPE"
+        ):
+            str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
+            start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
+            end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+        if str_main is not None and (start_pos != -1 and end_pos != -1):
+            final_gram = None
+            if str_main in all_aliases:
+                final_gram = str_main
+            else:
+                joined_gram_merged_plural = get_lnrm(str_main.replace(" 's", "'s"))
+                if joined_gram_merged_plural in all_aliases:
+                    final_gram = joined_gram_merged_plural
+                else:
+                    joined_gram_merged_noplural = get_lnrm(str_main.replace("'s", ""))
+                    if joined_gram_merged_noplural in all_aliases:
+                        final_gram = joined_gram_merged_noplural
+            if final_gram is not None:
+                entities.append([final_gram, start_pos, end_pos])
+
+    used_aliases = [item[0] for item in entities]
+    chars = [[item[1], item[2]] for item in entities]
+    spans = [[len(text[: sp[0]].split()), len(text[: sp[1]].split())] for sp in chars]
     return used_aliases, spans, chars
