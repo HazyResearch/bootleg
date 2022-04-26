@@ -43,16 +43,17 @@ else:
 PUNC = string.punctuation
 KEEP_POS = {"PROPN", "NOUN"}  # ADJ, VERB, ADV, SYM
 PLURAL = {"s", "'s"}
+## Customizing NER classes for testing
 NER_CLASSES = {
     "PERSON",
-    "NORP",
+    #"NORP",
     "ORG",
     "GPE",
     "LOC",
-    "PRODUCT",
-    "EVENT",
-    "WORK_OF_ART",
-    "LANGUAGE",
+    #"PRODUCT",
+    #"EVENT",
+    #"WORK_OF_ART",
+    #"LANGUAGE",
 }
 table = str.maketrans(
     dict.fromkeys(PUNC)
