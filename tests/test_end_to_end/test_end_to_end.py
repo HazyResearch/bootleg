@@ -112,7 +112,6 @@ class TestEnd2End(unittest.TestCase):
 
         shutil.rmtree("tests/temp", ignore_errors=True)
 
-    # Doubling up a test here to also test long context
     def test_end2end_bert_long_context(self):
         """Test end2end with longer sentence context."""
         self.args.data_config.max_seq_len = 256
@@ -136,6 +135,29 @@ class TestEnd2End(unittest.TestCase):
         assert len([f for li in results for f in li["entity_ids"]]) == 52
 
         shutil.rmtree("tests/temp", ignore_errors=True)
+
+    def test_end2end_train_in_cands_false(self):
+        """End2end base test."""
+        # Just setting this for testing pipelines
+        self.args.data_config.train_in_candidates = False
+        self.args.data_config.train_dataset.file = "end2end_train_not_in_cand.jsonl"
+        scores = run_model(mode="train", config=self.args)
+        assert type(scores) is dict
+        assert len(scores) > 0
+        assert scores["model/all/dev/loss"] < 1.5
+
+        self.args["model_config"][
+            "model_path"
+        ] = f"{emmental.Meta.log_path}/last_model.pth"
+        emmental.Meta.config["model_config"][
+            "model_path"
+        ] = f"{emmental.Meta.log_path}/last_model.pth"
+
+        result_file = run_model(mode="dump_preds", config=self.args)
+        assert os.path.exists(result_file)
+        results = [ujson.loads(li) for li in open(result_file)]
+        assert 19 == len(results)  # 18 total sentences
+        assert len([f for li in results for f in li["entity_ids"]]) == 52
 
 
 if __name__ == "__main__":

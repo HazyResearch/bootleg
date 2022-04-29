@@ -311,7 +311,6 @@ def bootleg_collate_fn(
     all_uniq_eids = []
     all_uniq_eid_idx = []
     label = []
-    # print("BATCH", X_batch["entity_cand_eid"])
     for k, batch_eids in enumerate(X_batch["entity_cand_eid"]):
         for j, eid in enumerate(batch_eids):
             # Skip if already in batch or if it's the unk...we don't use masking in the softmax for batch_cands
@@ -331,7 +330,6 @@ def bootleg_collate_fn(
         else:
             men_label.append(all_uniq_eids.index(eid))
         label.append(men_label)
-
     # Super rare edge case if doing eval during training on small batch sizes and have an entire batch
     # where the alias is -2 (i.e., we don't have it in our dump)
     if len(all_uniq_eids) == 0:
