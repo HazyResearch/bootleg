@@ -126,6 +126,7 @@ class DataLoader(unittest.TestCase):
         gold_cand_idx,
         gold_cand_idx_train,
         use_weak,
+        train_in_cands,
         input_data,
     ):
         """Prep data dicts."""
@@ -157,6 +158,9 @@ class DataLoader(unittest.TestCase):
                     gold_eid = self.entity_symbols.get_eid(inp["qids"][j])
                 else:
                     gold_eid = -1
+                # Set gold EID to NC if cand_idx is 0 and train_in_cands False
+                if gold_cand_idx[i][j] == 0 and not train_in_cands:
+                    gold_eid = 0
                 X_dict["gold_eid"].append(gold_eid)
                 X_dict["for_dump_gold_eid"].append(
                     self.entity_symbols.get_eid(inp["qids"][j])
@@ -262,6 +266,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -351,6 +356,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -394,6 +400,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -450,6 +457,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -542,6 +550,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -588,6 +597,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -645,6 +655,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -703,6 +714,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -749,6 +761,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -797,6 +810,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -844,6 +858,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -902,6 +917,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -948,6 +964,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -1003,6 +1020,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -1050,6 +1068,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -1105,6 +1124,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
@@ -1165,6 +1185,7 @@ class DataLoader(unittest.TestCase):
             gold_cand_idx,
             gold_cand_idx_train,
             use_weak_label,
+            self.args.data_config.train_in_candidates,
             input_data,
         )
 
