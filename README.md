@@ -34,14 +34,14 @@ Below is the link to download the English Bootleg model. The download comes with
 
 | Model               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 110M | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
+| BootlegUncased      | Uses titles, descriptions, types, and KG relations. Trained on uncased data. | 110M | [Download](https://bootleg-ned-data.s3-us-west-1.amazonaws.com/models/latest/bootleg_uncased.tar.gz) |
 
 ### Embeddings
 Below is the link to download a dump of all entity embeddings from our entity encoder. Follow our entity profile tutorial [here](https://github.com/HazyResearch/bootleg/blob/master/tutorials/entity_profile_tutorial.ipynb) to load our EntityProfile. From there, you can use our ```get_eid``` [method](https://bootleg.readthedocs.io/en/latest/apidocs/bootleg.symbols.html#bootleg.symbols.entity_profile.EntityProfile.get_eid) to access the row id for an entity.
 
 | Embeddings               | Description                     | Number Parameters | Link     |
 |-------------------  |---------------------------------|-------------------|----------|
-| 5.8M Wikipedia Entities      | Embeddings from BootlegUncased. | 1.2B | [Download](https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_entity_embeddings.npy.tar.gz) |
+| 5.8M Wikipedia Entities      | Embeddings from BootlegUncased. | 1.2B | [Download](https://bootleg-ned-data.s3-us-west-1.amazonaws.com/models/latest/bootleg_uncased_entity_embeddings.npy.tar.gz) |
 
 ### Metadata
 Below is the link to download a dump of all entity metadata to use in our entity profile tutorial [here](https://github.com/HazyResearch/bootleg/blob/master/tutorials/entity_profile_tutorial.ipynb).
