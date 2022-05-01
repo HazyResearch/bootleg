@@ -30,7 +30,7 @@ from bootleg.utils.utils import load_yaml_file
 logger = logging.getLogger(__name__)
 
 BOOTLEG_MODEL_PATHS = {
-    "bootleg_uncased": "https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
+    "bootleg_uncased": "https://bootleg-ned-data.s3-us-west-1.amazonaws.com/models/latest/bootleg_uncased.tar.gz",
 }
 
 
@@ -110,7 +110,7 @@ def create_sources(model_path, data_path, model_name):
     if not (data_path / "entity_db").exists():
         print(f"{data_path / 'entity_db'} not found. Downloading..")
         urllib.request.urlretrieve(
-            "https://bootleg-data.s3-us-west-2.amazonaws.com/data/latest/entity_db.tar.gz",
+            "https://bootleg-ned-data.s3-us-west-1.amazonaws.com/data/latest/entity_db.tar.gz",
             filename=str(data_path / "entity_db.tar.gz"),
             reporthook=DownloadProgressBar(),
         )

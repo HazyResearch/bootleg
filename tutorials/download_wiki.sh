@@ -8,6 +8,6 @@ fi
 
 mkdir -p $DATA_DIR
 
-wget https://bootleg-data.s3-us-west-2.amazonaws.com/data/latest/wiki.tar.gz -P $DATA_DIR
+wget https://bootleg-ned-data.s3-us-west-1.amazonaws.com/data/latest/wiki.tar.gz -P $DATA_DIR
 
 tar -xzvf $DATA_DIR/wiki.tar.gz -C $DATA_DIR

@@ -28,7 +28,7 @@ Check out our `tutorials <https://github.com/HazyResearch/bootleg/tree/master/tu
 
 Faster Inference
 --------------------
-For improved speed, you can pass in a static matrix of all entity embeddings downloaded from `here <https://bootleg-data.s3-us-west-2.amazonaws.com/models/latest/bootleg_uncased_entity_embs.npy.tar.gz>`_.
+For improved speed, you can pass in a static matrix of all entity embeddings downloaded from `here <https://bootleg-ned-data.s3-us-west-1.amazonaws.com/models/latest/bootleg_uncased_entity_embs.npy.tar.gz>`_.
 
 Then, our annotator can be run as::
 

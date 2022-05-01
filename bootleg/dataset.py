@@ -812,17 +812,20 @@ def convert_examples_to_features_and_save_single(
         else:
             alias_trie_idx = entitysymbols.get_alias_idx(alias)
             alias_qids = entitysymbols.get_qid_cands(alias)
-        # When doing eval, we allow for QID to be "Q-1" so we can predict anyways -
-        # as this QID isn't in our alias_qids, the assert below verifies that this will happen only for test/dev
+        # EID used in generating labels in dataloader - will set to 0 for NC
         eid = -1
+        # EID used in final prediction dumping - keep as gold EID
+        for_dump_eid = -1
         if entitysymbols.qid_exists(qid):
             eid = entitysymbols.get_eid(qid)
+            for_dump_eid = eid
         if qid not in alias_qids:
             # if we are not training in candidates, we only assign 0 correct id if the alias is in our map;
             # otherwise we assign -2
             if not train_in_candidates and alias_trie_idx != -2:
                 # set class label to be "not in candidate set"
                 gold_cand_K_idx = 0
+                eid = 0
             else:
                 # if we are not using a NC (no candidate) but are in eval mode, we let the gold
                 # candidate not be in the candidate set we give in a true index of -2,
@@ -938,7 +941,7 @@ def convert_examples_to_features_and_save_single(
             word_attention_mask=candidate_sentence_attn_msks,
             word_qid_cnt_mask_score=candidate_mention_cnt_ratio,
             gold_eid=example_true_entity_eid,
-            for_dump_gold_eid=eid,  # Store the one that isn't -1 for non-gold aliases
+            for_dump_gold_eid=for_dump_eid,  # Store the one that isn't -1 for non-gold aliases
             gold_cand_K_idx=example_true_cand_positions_for_loss,
             for_dump_gold_cand_K_idx_train=example_true_cand_positions_for_train,
             alias_list_pos=alias_list_pos,

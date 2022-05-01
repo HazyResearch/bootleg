@@ -1,5 +1,8 @@
-Unreleased 1.1.1dev1
+Unreleased 1.1.1dev0
 ---------------------
+Fixed
+^^^^^^^^
+* Corrected training with ``train_in_candidates`` set to False.
 
 1.1.0 - 2022-04-12
 ---------------------
