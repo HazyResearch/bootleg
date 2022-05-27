@@ -20,7 +20,7 @@ def count_parameters(model, requires_grad, logger):
         log_rank_0_debug(
             logger,
             "{:s} {:d} {:.2f} MB".format(
-                p[0], p[1].numel(), p[1].numel() * 4 / 1024 ** 2
+                p[0], p[1].numel(), p[1].numel() * 4 / 1024**2
             ),
         )
     return sum(

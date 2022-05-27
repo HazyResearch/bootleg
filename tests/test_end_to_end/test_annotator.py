@@ -58,7 +58,9 @@ class TestEnd2End(unittest.TestCase):
         ] = f"{emmental.Meta.log_path}/last_model.pth"
         out_emb_file = extract_all_entities.run_model(config=self.args)
 
-        ann = BootlegAnnotator(config=self.args, verbose=True, extract_method="ngram_spacy")
+        ann = BootlegAnnotator(
+            config=self.args, verbose=True, extract_method="ngram_spacy"
+        )
         # TEST SINGLE TEXT
         # Res should have alias1
         res = ann.label_mentions(
@@ -185,7 +187,10 @@ class TestEnd2End(unittest.TestCase):
             self.assertListEqual(gold_ans[k], res[k])
 
         ann = BootlegAnnotator(
-            config=self.args, verbose=True, entity_emb_file=out_emb_file, extract_method="ngram_spacy"
+            config=self.args,
+            verbose=True,
+            entity_emb_file=out_emb_file,
+            extract_method="ngram_spacy",
         )
         ann.return_embs = True
         # TEST SINGLE TEXT
