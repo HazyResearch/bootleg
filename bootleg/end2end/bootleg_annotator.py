@@ -153,7 +153,7 @@ class BootlegAnnotator(object):
         model_name: str = None,
         entity_emb_file: str = None,
         return_embs: bool = False,
-        extract_method: str = "ngram_spacy",
+        extract_method: str = "spacy",
         verbose: bool = False,
     ):
         """Bootleg annotator initializer."""
