@@ -536,7 +536,7 @@ def dump_model_outputs(
         mode="w+",
         shape=(1,),
     ).nbytes
-    total_expected_size = item_size * len(dataloader.dataset) / 1024 ** 3
+    total_expected_size = item_size * len(dataloader.dataset) / 1024**3
     log_rank_0_info(
         logger,
         f"Expected size is {total_expected_size}GB.",

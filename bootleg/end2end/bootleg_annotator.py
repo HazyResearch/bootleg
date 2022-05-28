@@ -137,7 +137,8 @@ class BootlegAnnotator(object):
         cache_dir: cache directory (default None)
         model_name: model name (default None)
         entity_emb_file: entity embedding file (default None)
-        return_embs: whether to return embeddings or not (default False)
+        return_embs: whether to return entity embeddings or not (default False)
+        return_ctx_embs: whether to return context embeddings or not (default False)
         extract_method: mention extraction method
         verbose: verbose boolean (default False)
     """
@@ -153,7 +154,8 @@ class BootlegAnnotator(object):
         model_name: str = None,
         entity_emb_file: str = None,
         return_embs: bool = False,
-        extract_method: str = "ngram_spacy",
+        return_ctx_embs: bool = False,
+        extract_method: str = "spacy",
         verbose: bool = False,
     ):
         """Bootleg annotator initializer."""
@@ -162,6 +164,7 @@ class BootlegAnnotator(object):
         self.verbose = verbose
         self.threshold = threshold
         self.return_embs = return_embs
+        self.return_ctx_embs = return_ctx_embs
         self.entity_emb_file = entity_emb_file
         self.extract_method = extract_method
 
@@ -289,9 +292,9 @@ class BootlegAnnotator(object):
         )
         # As we manually keep track of the aliases for scoring, we only need the embeddings as action outputs
         task_to_add.action_outputs = (
-            [("entity_encoder", 0)]
+            [("entity_encoder", 0), ("context_encoder", 0)]
             if self.entity_emb_file is None
-            else [("entity_encoder_static", 0)]
+            else [("entity_encoder_static", 0), ("context_encoder", 0)]
         )
         self.model.add_task(task_to_add)
 
@@ -527,6 +530,7 @@ class BootlegAnnotator(object):
         final_cand_probs = [[] for _ in range(num_exs)]
         final_pred_probs = [[] for _ in range(num_exs)]
         final_entity_embs = [[] for _ in range(num_exs)]
+        final_ctx_embs = [[] for _ in range(num_exs)]
         final_entity_cand_embs = [[] for _ in range(num_exs)]
         final_titles = [[] for _ in range(num_exs)]
         final_char_spans = [[] for _ in range(num_exs)]
@@ -557,19 +561,27 @@ class BootlegAnnotator(object):
                     task_to_label_dict=self.task_to_label_dict,
                     return_loss=False,
                     return_probs=True,
-                    return_action_outputs=self.return_embs,
+                    return_action_outputs=self.return_embs or self.return_ctx_embs,
                 )
             del x_dict
-            if self.return_embs:
-                (uid_bdict, _, prob_bdict, _, out_bdict) = res
-                output_embs = out_bdict[NED_TASK][
-                    "entity_encoder_0"
-                    if (self.entity_emb_file is None)
-                    else "entity_encoder_static_0"
-                ]
-            else:
-                output_embs = None
+            if not self.return_embs and not self.return_ctx_embs:
                 (uid_bdict, _, prob_bdict, _) = res
+                output_embs = None
+                output_ctx_embs = None
+            else:
+                (uid_bdict, _, prob_bdict, _, out_bdict) = res
+                if self.return_embs:
+                    output_embs = out_bdict[NED_TASK][
+                        "entity_encoder_0"
+                        if (self.entity_emb_file is None)
+                        else "entity_encoder_static_0"
+                    ]
+                else:
+                    output_embs = None
+                if self.return_ctx_embs:
+                    output_ctx_embs = out_bdict[NED_TASK]["context_encoder_0"]
+                else:
+                    output_ctx_embs = None
             # ====================================================
             # EVALUATE MODEL OUTPUTS
             # ====================================================
@@ -597,6 +609,8 @@ class BootlegAnnotator(object):
                                 output_embs[ex_i][pred_idx]
                             )
                             final_entity_cand_embs[idx_unq].append(output_embs[ex_i])
+                        if self.return_ctx_embs:
+                            final_ctx_embs[idx_unq].append(output_ctx_embs[ex_i])
                         final_aliases[idx_unq].append(batch_example_aliases[b_i + ex_i])
                         final_char_spans[idx_unq].append(
                             batch_char_spans_arr[b_i + ex_i]
@@ -625,6 +639,8 @@ class BootlegAnnotator(object):
         if self.return_embs:
             res_dict["embs"] = final_entity_embs
             res_dict["cand_embs"] = final_entity_cand_embs
+        if self.return_ctx_embs:
+            res_dict["ctx_embs"] = final_ctx_embs
         return res_dict
 
     def get_sentence_tokens(self, sample, men_idx):

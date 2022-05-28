@@ -16,7 +16,6 @@ VERSION = main_ns["__version__"]
 
 REQUIRED = [
     "argh>=0.26.2, <1.0.0",
-    "click>=7.1.2, <7.5.0",
     "emmental==0.1.0",
     "faiss-cpu>=1.6.8, <1.7.1",
     "jsonlines>=2.0.0, <2.4.0",
@@ -33,8 +32,7 @@ REQUIRED = [
     "rich>=10.0.0, <10.20.0",
     "scikit_learn>=0.24.0, <0.27.0",
     "scipy>=1.6.1, <1.9.0",
-    "sentencepiece==0.1.*",
-    "spacy==3.0.1",
+    "spacy>=3.2.0",
     "tagme>=0.1.3, <0.2.0",
     "torch>=1.7.0, <1.10.5",
     "tqdm>=4.27",
@@ -45,7 +43,7 @@ REQUIRED = [
 
 EXTRAS = {
     "dev": [
-        "black>=21.7b0",
+        "black>=22.3.0",
         "docformatter==1.4",
         "flake8>=3.9.2",
         "isort>=5.9.3",
