@@ -52,12 +52,15 @@ class DataEntityLoader(unittest.TestCase):
         dir = os.path.join(
             self.args.data_config.entity_dir, self.args.data_config.entity_prep_dir
         )
-        if utils.exists_dir(dir):
-            shutil.rmtree(dir)
-        if os.path.exists(self.temp_file_name):
-            os.remove(self.temp_file_name)
-        if os.path.exists(self.entity_temp_dir):
-            shutil.rmtree(self.entity_temp_dir)
+        try:
+            if utils.exists_dir(dir):
+                shutil.rmtree(dir)
+            if os.path.exists(self.temp_file_name):
+                os.remove(self.temp_file_name)
+            if os.path.exists(self.entity_temp_dir):
+                shutil.rmtree(self.entity_temp_dir)
+        except Exception:
+            pass
 
     def test_load_type_data(self):
         """
