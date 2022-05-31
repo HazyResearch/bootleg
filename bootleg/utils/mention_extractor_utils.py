@@ -310,13 +310,13 @@ def my_mention_extractor(
             start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
             end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
 
-        elif (
-            str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
-            in "GPE"
-        ):
-            str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
-            start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
-            end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+        # elif (
+        #     str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
+        #     in "GPE"
+        # ):
+        #     str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
+        #     start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
+        #     end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
         if str_main is not None and (start_pos != -1 and end_pos != -1):
             final_gram = None
             if str_main in all_aliases:
