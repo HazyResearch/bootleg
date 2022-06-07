@@ -49,7 +49,7 @@ NER_CLASSES = {
     #"NORP",
     "ORG",
     "GPE",
-    "LOC",
+    #"LOC",
     #"PRODUCT",
     #"EVENT",
     #"WORK_OF_ART",
