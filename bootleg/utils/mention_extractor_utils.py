@@ -288,8 +288,14 @@ def my_mention_extractor(
     """
 
     sentence = Sentence(text)
-    tagger_fast.predict(sentence, mini_batch_size=16)
+    tagger_fast.predict(sentence, mini_batch_size=32)
     entities = []
+    org_entities=[]
+    per_entities=[]
+    loc_entities=[]
+    type_entities=[]
+    is_org=False
+    is_per=False
     for i in range(len(sentence.to_dict(tag_type="ner")["entities"])):
         str_main = None
         start_pos = -1
@@ -301,6 +307,7 @@ def my_mention_extractor(
             str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
             start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
             end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+            is_org=True
 
         elif (
             str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
@@ -309,14 +316,21 @@ def my_mention_extractor(
             str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
             start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
             end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+            is_per=True
 
-        # elif (
-        #     str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
-        #     in "GPE"
-        # ):
-        #     str_main = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
-        #     start_pos = sentence.to_dict(tag_type="ner")["entities"][i]["start_pos"]
-        #     end_pos = sentence.to_dict(tag_type="ner")["entities"][i]["end_pos"]
+        elif (
+            str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
+            in "GPE"):
+            loc_value = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
+            loc_entities.append([loc_value])
+        if is_org:
+            org_text_entity = str_main
+            org_entities.append([org_text_entity,start_pos,end_pos])
+            type_entities.append(["ORG",start_pos,end_pos])
+        if is_per:
+            per_text_entity = str_main
+            per_entities.append([per_text_entity,start_pos,end_pos])
+            type_entities.append(["PER",start_pos,end_pos])
         if str_main is not None and (start_pos != -1 and end_pos != -1):
             final_gram = None
             if str_main in all_aliases:
@@ -331,8 +345,10 @@ def my_mention_extractor(
                         final_gram = joined_gram_merged_noplural
             if final_gram is not None:
                 entities.append([final_gram, start_pos, end_pos])
+        is_org=False
+        is_per=False
 
     used_aliases = [item[0] for item in entities]
     chars = [[item[1], item[2]] for item in entities]
     spans = [[len(text[: sp[0]].split()), len(text[: sp[1]].split())] for sp in chars]
-    return used_aliases, spans, chars
+    return used_aliases, spans, chars , org_entities, per_entities , loc_entities , type_entities
