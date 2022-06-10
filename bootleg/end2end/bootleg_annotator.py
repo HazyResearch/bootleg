@@ -144,7 +144,6 @@ class BootlegAnnotator(object):
         cache_dir: cache directory (default None)
         model_name: model name (default None)
         entity_emb_file: entity embedding file (default None)
-        entity_dir_loc: entity directory location (default None)
         return_embs: whether to return embeddings or not (default False)
         extract_method: mention extraction method
         verbose: verbose boolean (default False)
@@ -160,7 +159,6 @@ class BootlegAnnotator(object):
         cache_dir: str = None,
         model_name: str = None,
         entity_emb_file: str = None,
-        entity_dir_loc: str=None,
         return_embs: bool = False,
         extract_method: str = "ngram_spacy",
         verbose: bool = False,
@@ -173,7 +171,6 @@ class BootlegAnnotator(object):
         self.return_embs = return_embs
         self.entity_emb_file = entity_emb_file
         self.extract_method = extract_method
-        self.entity_dir_location = entity_dir_loc
 
         if self.entity_emb_file is not None:
             assert Path(
@@ -254,7 +251,7 @@ class BootlegAnnotator(object):
             edit_mode=False
         )
         self.entity_profile = EntityProfile.load_from_cache(\
-            load_dir=self.entity_dir_location,\
+            load_dir=self.config.data_config.entity_dir,\
             no_type=True,edit_mode=False,\
             verbose=True)
         self.all_aliases_trie = self.entity_db.get_all_alias_vocabtrie()
