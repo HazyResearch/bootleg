@@ -2,13 +2,14 @@ import logging
 import string
 from collections import namedtuple
 from typing import List, Tuple, Union
-
+import torch
 import nltk
 import spacy
 from spacy.cli.download import download as spacy_download
 
 from bootleg.symbols.constants import LANG_CODE
 from bootleg.utils.utils import get_lnrm
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,13 @@ except OSError:
     except OSError:
         nlp = None
 
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+
 try:
+    import flair
     from flair.data import Sentence
     from flair.models import SequenceTagger
-
+    flair.device = torch.device(DEVICE)
     tagger_fast = SequenceTagger.load("ner-ontonotes-fast")
 except ImportError:
     tagger_fast = None
@@ -288,7 +292,7 @@ def my_mention_extractor(
     """
 
     sentence = Sentence(text)
-    tagger_fast.predict(sentence, mini_batch_size=32)
+    tagger_fast.predict(sentence)
     entities = []
     org_entities=[]
     per_entities=[]
@@ -322,14 +326,14 @@ def my_mention_extractor(
             str(sentence.to_dict(tag_type="ner")["entities"][i]["labels"][0]).split()[0]
             in "GPE"):
             loc_value = str(sentence.to_dict(tag_type="ner")["entities"][i]["text"])
-            loc_entities.append([loc_value])
+            loc_entities.append(loc_value)
         if is_org:
             org_text_entity = str_main
-            org_entities.append([org_text_entity,start_pos,end_pos])
+            org_entities.append(org_text_entity)
             type_entities.append(["ORG",start_pos,end_pos])
         if is_per:
             per_text_entity = str_main
-            per_entities.append([per_text_entity,start_pos,end_pos])
+            per_entities.append(per_text_entity)
             type_entities.append(["PER",start_pos,end_pos])
         if str_main is not None and (start_pos != -1 and end_pos != -1):
             final_gram = None

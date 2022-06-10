@@ -1,4 +1,8 @@
-"""BootlegAnnotator."""
+"""BootlegAnnotator.
+
+author shounak.kundu
+"""
+
 import logging
 from operator import is_
 import os
@@ -247,6 +251,7 @@ class BootlegAnnotator(object):
             ),
             alias_cand_map_dir=self.config.data_config.alias_cand_map,
             alias_idx_dir=self.config.data_config.alias_idx_map,
+            edit_mode=False
         )
         self.entity_profile = EntityProfile.load_from_cache(\
             load_dir=self.entity_dir_location,\
@@ -627,6 +632,8 @@ class BootlegAnnotator(object):
                             instance_of_list = entity_relation_dict['instance of']
                             if 'Q5' not in instance_of_list: ## Q5 means human
                                 is_org=True
+                        elif 'place of birth' in entity_relation_dict:
+                            is_org=False
                         else:
                             is_org=True
                         if is_org:
