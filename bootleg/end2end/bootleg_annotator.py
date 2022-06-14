@@ -17,7 +17,6 @@ import torch
 from emmental.model import EmmentalModel
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
-
 from bootleg.dataset import extract_context, get_entity_string
 from bootleg.end2end.annotator_utils import DownloadProgressBar
 from bootleg.end2end.extract_mentions import MENTION_EXTRACTOR_OPTIONS
@@ -40,7 +39,6 @@ BOOTLEG_MODEL_PATHS = {
 }
 
 
-
 def get_default_cache():
     """Get default cache directory for saving Bootleg data."""
     try:
@@ -55,7 +53,6 @@ def get_default_cache():
             )
         )
     return Path(torch_cache_home) / "bootleg"
-
 
 def create_config(model_path, data_path, model_name):
     """Create Bootleg config.
@@ -89,7 +86,6 @@ def create_config(model_path, data_path, model_name):
 
     config_args = parse_boot_and_emm_args(config_args)
     return config_args
-
 
 def create_sources(model_path, data_path, model_name):
     """Download Bootleg data and saves in log dir.
@@ -250,10 +246,10 @@ class BootlegAnnotator(object):
             alias_idx_dir=self.config.data_config.alias_idx_map,
             edit_mode=False
         )
-        self.entity_profile = EntityProfile.load_from_cache(\
-            load_dir=self.config.data_config.entity_dir,\
-            no_type=True,edit_mode=False,\
-            verbose=True)
+        # self.entity_profile = EntityProfile.load_from_cache(\
+        #     load_dir=self.config.data_config.entity_dir,\
+        #     no_type=True,edit_mode=False,\
+        #     verbose=True)
         self.all_aliases_trie = self.entity_db.get_all_alias_vocabtrie()
 
         add_entity_type = self.config.data_config.entity_type_data.use_entity_types
@@ -270,14 +266,14 @@ class BootlegAnnotator(object):
         add_entity_kg = self.config.data_config.entity_kg_data.use_entity_kg
         self.kg_symbols = None
         # If we do not have self.entity_emb_file, then need to generate entity encoder input with metadata
-        if add_entity_kg and self.entity_emb_file is None:
-            logger.debug("Reading entity kg database")
-            self.kg_symbols = KGSymbols.load_from_cache(
-                os.path.join(
-                    self.config.data_config.entity_dir,
-                    self.config.data_config.entity_kg_data.kg_symbols_dir,
-                )
+        # if add_entity_kg and self.entity_emb_file is None:
+        logger.debug("Reading entity kg database")
+        self.kg_symbols = KGSymbols.load_from_cache(
+            os.path.join(
+                self.config.data_config.entity_dir,
+                self.config.data_config.entity_kg_data.kg_symbols_dir,
             )
+        )
         logger.debug("Reading word tokenizers")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.config.data_config.word_embedding.bert_model,
@@ -624,7 +620,7 @@ class BootlegAnnotator(object):
                         final_all_cands[idx_unq].append(entity_cands)
                         final_cand_probs[idx_unq].append(probs_ex)
                         final_pred_cands[idx_unq].append(pred_qid)
-                        entity_relation_dict=self.entity_profile.get_relations_tails_for_qid(pred_qid)
+                        entity_relation_dict=self.kg_symbols.get_relations_tails_for_qid(pred_qid)
                         if 'instance of' in entity_relation_dict:
                             instance_of_list = entity_relation_dict['instance of']
                             if 'Q5' not in instance_of_list: ## Q5 means human
